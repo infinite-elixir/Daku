@@ -264,13 +264,17 @@ payloads are served on upstream failure. Nyaa is never queried for movies or non
   `GET /api/v2/app/webapiVersion` once per process: `>= 2.11.0` uses
   `/torrents/stop|start`, older uses `/torrents/pause|resume`. If the probe fails, it tries
   start/stop first and falls back on `404`, caching the working pair.
-- File selection is enforced with the **stop → `filePrio` → verify → start** contract:
-  stop the torrent, wait for metadata, POST every file with selected `1` / others `0`,
-  read `/torrents/files` back until every priority matches, and only then start. Any
-  failure leaves the torrent stopped. Web API `>= 2.11.9` also receives add-time
-  `filePriorities` when the probe already knows the file list, but that never replaces the
-  stop/verify path. Live re-selection uses the same sequence and restores the previous
-  priorities (stopped) when the new selection is rejected.
+- File selection is enforced with the **stop → `filePrio` → verify → start** contract.
+  A stopped magnet has no metadata, so start it briefly, stop as soon as
+  `/torrents/files` returns the list, then POST one numeric `priority` per call with the
+  matching pipe-separated file `id` list (selected `1`, others `0`). Read
+  `/torrents/files` back until every priority matches, and only then start. A stop failure
+  is retried and surfaced as `QBT_FILE_SELECTION_PENDING`, so the worker backs off and
+  stops the torrent again. Add-time `filePriorities` are **not** used: Daku adds
+  magnets by URL, and qBittorrent rejects add-time priorities until it has fetched the
+  metadata itself. That never replaces the stop/verify path. Live re-selection uses the
+  same sequence and restores the previous priorities (stopped) when the new selection is
+  rejected.
 - Linux uses `qbittorrent-nox`; its Web API is identical to the GUI build.
 
 ### aria2 JSON-RPC

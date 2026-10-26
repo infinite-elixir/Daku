@@ -52,9 +52,6 @@ class AddRequest:
     tag: str | None = None
     #: Torrents are added paused when a file selection has to be applied first.
     paused: bool = False
-    #: Add-time file priorities when the metadata is already known from the probe.
-    file_indices: Sequence[int] | None = None
-    total_files: int | None = None
 
 
 @dataclass(slots=True)

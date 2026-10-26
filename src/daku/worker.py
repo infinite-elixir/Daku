@@ -55,7 +55,6 @@ class _Selection:
     indices: list[int] | None = None
     paths: list[str] | None = None
     pending: bool = False
-    total_files: int | None = None
 
 
 def _parse_json(raw: str | None) -> Any:
@@ -77,16 +76,12 @@ def _selection(download: Any) -> _Selection:
     match = _parse_json(download.file_match_json)
     paths: list[str] | None = None
     pending = False
-    total_files: int | None = None
     if isinstance(match, dict):
         raw_paths = match.get("file_paths")
         if isinstance(raw_paths, list):
             paths = [item for item in raw_paths if isinstance(item, str)] or None
         pending = bool(match.get("selection_pending"))
-        raw_total = match.get("total_files")
-        if isinstance(raw_total, int) and raw_total > 0:
-            total_files = raw_total
-    return _Selection(indices=indices, paths=paths, pending=pending, total_files=total_files)
+    return _Selection(indices=indices, paths=paths, pending=pending)
 
 
 def _row(download: Any) -> _Row:
@@ -206,8 +201,6 @@ class Worker:
                 filename=self._release_filename(row.release_id),
                 tag=self._release_title_id(row.release_id),
                 paused=has_selection,
-                file_indices=selection.indices,
-                total_files=selection.total_files,
             )
             try:
                 external_id = await engine.add(request)

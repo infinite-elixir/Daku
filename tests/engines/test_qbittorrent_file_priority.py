@@ -35,6 +35,8 @@ def engine(settings: Settings) -> QbittorrentEngine:
     instance = QbittorrentEngine(configured)
     instance.metadata_poll_interval = 0.0
     instance.metadata_timeout = 0.05
+    instance.file_selection_verify_attempts = 3
+    instance.file_selection_verify_delays = (0.0, 0.0)
     return instance
 
 
@@ -43,13 +45,20 @@ def _login(*, version: str = "2.11.0") -> None:
     respx.get(WEBAPI_VERSION).mock(return_value=httpx.Response(200, text=version))
 
 
-def _read_priority_body(body: str) -> tuple[list[int], list[int]]:
+def _read_priority_body(body: str) -> tuple[list[int], int]:
     from urllib.parse import parse_qs
 
     parsed = parse_qs(body)
     ids = [int(item) for item in parsed["id"][0].split("|")]
-    priorities = [int(item) for item in parsed["priority"][0].split("|")]
-    return ids, priorities
+    return ids, int(parsed["priority"][0])
+
+
+def _applied_priorities(route: respx.Route) -> dict[int, list[int]]:
+    applied: dict[int, list[int]] = {}
+    for call in route.calls:
+        ids, priority = _read_priority_body(call.request.content.decode("utf-8"))
+        applied[priority] = ids
+    return applied
 
 
 @respx.mock
@@ -74,10 +83,10 @@ async def test_add_uses_paused_true_when_a_selection_is_pending(
 
 
 @respx.mock
-async def test_add_time_file_priorities_are_sent_on_modern_webapi(
+async def test_magnet_adds_never_send_add_time_file_priorities(
     engine: QbittorrentEngine,
 ) -> None:
-    _login(version="2.11.9")
+    _login(version="2.16.2")
     add = respx.post(ADD).mock(return_value=httpx.Response(200, text="Ok."))
 
     await engine.add(
@@ -86,15 +95,12 @@ async def test_add_time_file_priorities_are_sent_on_modern_webapi(
             url=f"magnet:?xt=urn:btih:{HASH}",
             save_path="/downloads",
             paused=True,
-            file_indices=[1],
-            total_files=3,
         )
     )
     await engine.aclose()
 
     body = add.calls[0].request.content.decode("utf-8")
-    assert 'name="filePriorities"' in body
-    assert "0|1|0" in body
+    assert 'name="filePriorities"' not in body
     assert 'name="stopped"' in body and "true" in body
 
 
@@ -113,9 +119,10 @@ async def test_torrent_is_stopped_before_priorities_and_started_after_verificati
 
     def _priority(request: httpx.Request) -> httpx.Response:
         order.append("priority")
-        _ids, priorities = _read_priority_body(request.content.decode("utf-8"))
-        for row, priority in zip(state["files"], priorities, strict=True):
-            row["priority"] = priority
+        ids, priority = _read_priority_body(request.content.decode("utf-8"))
+        for row in state["files"]:
+            if row["index"] in ids:
+                row["priority"] = priority
         return httpx.Response(200)
 
     def _start(_request: httpx.Request) -> httpx.Response:
@@ -130,10 +137,45 @@ async def test_torrent_is_stopped_before_priorities_and_started_after_verificati
     await engine.aclose()
 
     assert selected == [1]
-    assert order == ["stop", "priority", "start"]
-    ids, priorities = _read_priority_body(priority.calls[0].request.content.decode("utf-8"))
-    assert ids == [0, 1, 2]
-    assert priorities == [0, 1, 0]
+    assert order == ["stop", "priority", "priority", "start"]
+    assert _applied_priorities(priority) == {0: [0, 2], 1: [1]}
+
+
+@respx.mock
+async def test_stopped_magnet_starts_for_metadata_then_stops_before_priorities(
+    engine: QbittorrentEngine,
+) -> None:
+    _login()
+    state = {"files": copy.deepcopy(FILES_PAYLOAD)}
+    reads = [httpx.Response(200, json=[]), httpx.Response(200, json=state["files"])]
+    respx.get(FILES).mock(
+        side_effect=lambda _request: (
+            reads.pop(0) if reads else httpx.Response(200, json=state["files"])
+        )
+    )
+    order: list[str] = []
+
+    def _stop(_request: httpx.Request) -> httpx.Response:
+        order.append("stop")
+        return httpx.Response(200)
+
+    def _start(_request: httpx.Request) -> httpx.Response:
+        order.append("start")
+        return httpx.Response(200)
+
+    def _priority(request: httpx.Request) -> httpx.Response:
+        order.append("priority")
+        return _apply_priorities(request, state["files"])
+
+    respx.post(STOP).mock(side_effect=_stop)
+    respx.post(START).mock(side_effect=_start)
+    respx.post(FILE_PRIORITY).mock(side_effect=_priority)
+
+    selected = await engine.set_file_selection(HASH, [1])
+    await engine.aclose()
+
+    assert selected == [1]
+    assert order == ["stop", "start", "stop", "priority", "priority", "start"]
 
 
 @respx.mock
@@ -213,9 +255,57 @@ async def test_metadata_timeout_leaves_the_torrent_stopped(
 
     assert caught.value.code == "QBT_FILE_SELECTION_PENDING"
     assert caught.value.transient
-    assert stop.called
+    assert stop.call_count == 2
+    assert start.call_count == 1
     assert not priority.called
-    assert not start.called
+
+
+@respx.mock
+async def test_cleanup_stop_failure_does_not_mask_the_metadata_timeout(
+    engine: QbittorrentEngine,
+) -> None:
+    _login()
+    respx.get(FILES).mock(return_value=httpx.Response(200, json=[]))
+    respx.post(STOP).mock(side_effect=[httpx.Response(200), httpx.Response(500)])
+    respx.post(START).mock(return_value=httpx.Response(200))
+
+    with pytest.raises(EngineError) as caught:
+        await engine.set_file_selection(HASH, [1])
+    await engine.aclose()
+
+    assert caught.value.code == "QBT_FILE_SELECTION_PENDING"
+    assert caught.value.transient
+
+
+@respx.mock
+async def test_stop_failure_after_metadata_keeps_selection_pending(
+    engine: QbittorrentEngine,
+) -> None:
+    _login()
+    reads = [httpx.Response(200, json=[]), httpx.Response(200, json=FILES_PAYLOAD)]
+    respx.get(FILES).mock(
+        side_effect=lambda _request: (
+            reads.pop(0) if reads else httpx.Response(200, json=FILES_PAYLOAD)
+        )
+    )
+    respx.post(STOP).mock(
+        side_effect=[
+            httpx.Response(200),
+            httpx.Response(500),
+            httpx.Response(500),
+        ]
+    )
+    priority = respx.post(FILE_PRIORITY).mock(return_value=httpx.Response(200))
+    start = respx.post(START).mock(return_value=httpx.Response(200))
+
+    with pytest.raises(EngineError) as caught:
+        await engine.set_file_selection(HASH, [1])
+    await engine.aclose()
+
+    assert caught.value.code == "QBT_FILE_SELECTION_PENDING"
+    assert caught.value.transient
+    assert start.call_count == 1
+    assert not priority.called
 
 
 @respx.mock
@@ -237,14 +327,14 @@ async def test_paths_are_mapped_to_engine_indices(engine: QbittorrentEngine) -> 
     await engine.aclose()
 
     assert selected == [2]
-    _ids, priorities = _read_priority_body(priority.calls[0].request.content.decode("utf-8"))
-    assert priorities == [0, 0, 1]
+    assert _applied_priorities(priority) == {0: [0, 1], 1: [2]}
 
 
 def _apply_priorities(request: httpx.Request, files: list[dict[str, object]]) -> httpx.Response:
-    _ids, priorities = _read_priority_body(request.content.decode("utf-8"))
-    for row, priority in zip(files, priorities, strict=True):
-        row["priority"] = priority
+    ids, priority = _read_priority_body(request.content.decode("utf-8"))
+    for row in files:
+        if row["index"] in ids:
+            row["priority"] = priority
     return httpx.Response(200)
 
 

@@ -145,8 +145,14 @@ multiple paths, but this ticket only guarantees one).
 
 ## Implementation notes
 
-- qBittorrent's `filePrio` is idempotent; sending the full id/priority list again is safe.
-- The read-back may briefly show the old priority; poll up to ~5 s, not once.
+- Add-time `filePriorities` cannot be used for the magnet URLs Daku adds: qBittorrent
+  returns `400 filePriorities may only be specified when metadata has already been
+  fetched`. Daku therefore never sends that field and always uses the stop/verify path.
+- qBittorrent's `filePrio` is idempotent. Web API 2.16 takes one numeric `priority` per
+  call and a pipe-separated `id` list, so group files by priority and send one call per
+  group. The read-back may briefly show the old priority; poll up to ~5 s, not once.
+- A stopped magnet has not fetched metadata. Start it briefly, then stop as soon as
+  `/torrents/files` returns the list, before applying priorities.
 - Do not use the torrent's overall `progress` to decide whether the selection worked; use
   the per-file `priority` and `progress` from `/torrents/files`.
 - The magnet necessarily adds the whole torrent; "download only one file" means file

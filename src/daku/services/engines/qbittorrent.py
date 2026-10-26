@@ -11,6 +11,7 @@ release id and the info-hash; the magnet itself stays on the release row.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import Sequence
 from pathlib import PurePosixPath
@@ -42,10 +43,9 @@ QBT_LOGIN_COOLDOWN_SECONDS = 30.0
 QBT_LOGIN_BAN_COOLDOWN_SECONDS = 120.0
 # qBittorrent 5.0 (Web API 2.11.0) renamed pause/resume to stop/start.
 QBT_START_STOP_WEBAPI_VERSION = (2, 11, 0)
-# Add-time file priorities exist from Web API 2.11.9 (qBittorrent 5.1).
-QBT_ADD_FILE_PRIORITY_WEBAPI_VERSION = (2, 11, 9)
-QBT_FILE_SELECTION_VERIFY_ATTEMPTS = 3
-QBT_FILE_SELECTION_VERIFY_DELAYS = (0.05, 0.1)
+# qBittorrent applies file priorities asynchronously; poll for about five seconds.
+QBT_FILE_SELECTION_VERIFY_ATTEMPTS = 11
+QBT_FILE_SELECTION_VERIFY_DELAYS = (0.1, 0.2, 0.4, 0.8, 1.0, 1.0, 0.5, 0.5, 0.25, 0.25)
 
 ACTIVE_STATES = frozenset(
     {
@@ -136,6 +136,8 @@ class QbittorrentEngine:
         self._modern_start_stop: bool | None = None
         self.metadata_timeout = QBT_METADATA_TIMEOUT_SECONDS
         self.metadata_poll_interval = QBT_METADATA_POLL_SECONDS
+        self.file_selection_verify_attempts = QBT_FILE_SELECTION_VERIFY_ATTEMPTS
+        self.file_selection_verify_delays = QBT_FILE_SELECTION_VERIFY_DELAYS
 
     async def aclose(self) -> None:
         if self._owns_client:
@@ -264,9 +266,6 @@ class QbittorrentEngine:
             "paused": (None, stopped),
             "stopped": (None, stopped),
         }
-        priorities = await self._add_time_priorities(request)
-        if priorities is not None:
-            files["filePriorities"] = (None, priorities)
         response = await self._request(
             "POST",
             "/api/v2/torrents/add",
@@ -274,21 +273,6 @@ class QbittorrentEngine:
         )
         self._check_add_response(response, request.external_id)
         return request.external_id.lower()
-
-    async def _add_time_priorities(self, request: AddRequest) -> str | None:
-        """Build ``filePriorities`` only when metadata and a modern API are known."""
-
-        if request.file_indices is None or not request.total_files:
-            return None
-        version = await self._probe_webapi_version()
-        if version is None or version < QBT_ADD_FILE_PRIORITY_WEBAPI_VERSION:
-            return None
-        total = request.total_files
-        chosen = set(request.file_indices)
-        return "|".join(
-            str(QBT_PRIORITY_NORMAL if index in chosen else QBT_PRIORITY_SKIP)
-            for index in range(total)
-        )
 
     def _check_add_response(self, response: httpx.Response, external_id: str) -> None:
         if not 200 <= response.status_code < 300:
@@ -531,6 +515,19 @@ class QbittorrentEngine:
         files.sort(key=lambda item: item.index)
         return files
 
+    async def _stop_for_selection(self, external_id: str) -> None:
+        """Stop before priorities; keep a stop failure retryable."""
+
+        try:
+            await self.stop(external_id)
+        except Exception as exc:
+            with contextlib.suppress(Exception):
+                await self.stop(external_id)
+            raise EngineError(
+                "QBT_FILE_SELECTION_PENDING",
+                "qBittorrent did not stop the torrent before applying the file selection",
+            ) from exc
+
     async def _wait_for_files(self, external_id: str) -> list[EngineFile]:
         """Wait until qBittorrent has parsed the torrent metadata."""
 
@@ -572,14 +569,29 @@ class QbittorrentEngine:
     ) -> list[int]:
         """Stop, set every file priority, verify them, then optionally start.
 
-        The magnet adds the whole torrent; only file priorities decide what is
-        fetched. If any step fails the torrent is left stopped so the pack never
-        starts downloading by accident.
+        A stopped magnet cannot fetch metadata, so it is started briefly and
+        stopped again before priorities change. The magnet adds the whole
+        torrent; only file priorities decide what is fetched. If any step fails
+        the torrent is left stopped where qBittorrent cooperates.
         """
 
-        await self.stop(external_id)
+        await self._stop_for_selection(external_id)
 
-        files = await self._wait_for_files(external_id)
+        files = await self.files(external_id)
+        if not files:
+            # qBittorrent does not fetch magnet metadata while stopped. Start it
+            # just long enough to obtain the file list, then stop before any
+            # priorities are changed.
+            await self.start(external_id)
+            try:
+                files = await self._wait_for_files(external_id)
+            except Exception:
+                # Preserve the metadata error the worker needs for its backoff;
+                # stopping is best effort here.
+                with contextlib.suppress(Exception):
+                    await self.stop(external_id)
+                raise
+            await self._stop_for_selection(external_id)
 
         if paths:
             selected: list[int] = []
@@ -610,22 +622,26 @@ class QbittorrentEngine:
             )
 
         chosen = set(selected)
-        ids = [str(item.index) for item in files]
         expected = {
             item.index: QBT_PRIORITY_NORMAL if item.index in chosen else QBT_PRIORITY_SKIP
             for item in files
         }
-        priorities = [str(expected[item.index]) for item in files]
+        by_priority: dict[int, list[str]] = {}
+        for item in files:
+            by_priority.setdefault(expected[item.index], []).append(str(item.index))
         try:
-            await self._request(
-                "POST",
-                "/api/v2/torrents/filePrio",
-                data={
-                    "hash": external_id.lower(),
-                    "id": "|".join(ids),
-                    "priority": "|".join(priorities),
-                },
-            )
+            # The Web API sets one numeric priority per call; ``id`` accepts a
+            # pipe-separated list. Group the files so every priority is applied.
+            for priority in sorted(by_priority):
+                await self._request(
+                    "POST",
+                    "/api/v2/torrents/filePrio",
+                    data={
+                        "hash": external_id.lower(),
+                        "id": "|".join(by_priority[priority]),
+                        "priority": str(priority),
+                    },
+                )
         except EngineError as exc:
             raise EngineError(
                 "QBT_FILE_SELECTION_FAILED",
@@ -640,13 +656,13 @@ class QbittorrentEngine:
     async def _verify_file_priorities(self, external_id: str, expected: dict[int, int]) -> None:
         """Read priorities back; qBittorrent applies filePrio asynchronously."""
 
-        for attempt in range(QBT_FILE_SELECTION_VERIFY_ATTEMPTS):
+        for attempt in range(self.file_selection_verify_attempts):
             files = await self.files(external_id)
             actual = {item.index: item.priority for item in files}
             if all(actual.get(index) == priority for index, priority in expected.items()):
                 return
-            if attempt < len(QBT_FILE_SELECTION_VERIFY_DELAYS):
-                await asyncio.sleep(QBT_FILE_SELECTION_VERIFY_DELAYS[attempt])
+            if attempt < len(self.file_selection_verify_delays):
+                await asyncio.sleep(self.file_selection_verify_delays[attempt])
         raise EngineError(
             "QBT_FILE_SELECTION_FAILED",
             "qBittorrent did not apply the file priorities",

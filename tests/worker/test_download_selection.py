@@ -111,8 +111,6 @@ async def test_a_queued_selection_is_stopped_prioritised_and_only_then_active(
     assert row.error is None
     assert row.selected_files_json == "[4]"
     assert engine.added[0].paused is True
-    assert engine.added[0].file_indices == [4]
-    assert engine.added[0].total_files == 12
     assert engine.stopped == [HASH]
     assert engine.selections == [(HASH, [4], ["Show.S02E05.1080p.mkv"])]
 
