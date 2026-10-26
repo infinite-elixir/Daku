@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "id": "tt0944947",
+    "type": "series",
+    "name": "Game of Thrones",
+    "releaseInfo": "2011–2019",
+    "poster": "https://images.example/got-cinemeta.jpg",
+    "description": "Noble families vie for control of Westeros.",
+    "videos": [
+      {
+        "id": "tt0944947:1:2",
+        "season": 1,
+        "episode": 2,
+        "name": "The Kingsroad",
+        "released": "2011-04-24"
+      },
+      {
+        "id": "tt0944947:1:1",
+        "season": 1,
+        "episode": 1,
+        "name": "Winter Is Coming",
+        "released": "2011-04-17"
+      },
+      {
+        "id": "tt0944947:2:1",
+        "name": "The North Remembers",
+        "released": "2012-04-01"
+      },
+      {
+        "id": "tt0944947:2:1",
+        "season": 2,
+        "episode": 1,
+        "name": "The North Remembers",
+        "released": "2012-04-01"
+      }
+    ]
+  }
+}

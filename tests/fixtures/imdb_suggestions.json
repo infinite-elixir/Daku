@@ -1,0 +1,45 @@
+{
+  "d": [
+    {
+      "id": "tt1234567",
+      "l": "Big Buck Bunny",
+      "y": 2008,
+      "qid": "movie",
+      "q": "feature",
+      "i": { "imageUrl": "https://images.example/bbb.jpg" }
+    },
+    {
+      "id": "tt0944947",
+      "l": "Game of Thrones",
+      "y": 2011,
+      "qid": "tvSeries",
+      "q": "TV series",
+      "i": { "imageUrl": "https://images.example/got.jpg" }
+    },
+    {
+      "id": "tt1111111",
+      "l": "Mini Series",
+      "y": "2019-2021",
+      "q": "TV mini-series"
+    },
+    {
+      "id": "tt2222222",
+      "l": "Odd Type",
+      "qid": "videoGame"
+    },
+    {
+      "id": "tt3333333",
+      "l": "   "
+    },
+    {
+      "id": "nm0000001",
+      "l": "Not A Title"
+    },
+    {
+      "id": "tt4444444",
+      "l": "Short Thing",
+      "y": "not-a-year",
+      "qid": "short"
+    }
+  ]
+}

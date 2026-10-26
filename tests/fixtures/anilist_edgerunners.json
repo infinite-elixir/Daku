@@ -1,0 +1,29 @@
+{
+  "data": {
+    "Media": {
+      "id": 120377,
+      "idMal": 42310,
+      "format": "ONA",
+      "episodes": 10,
+      "duration": 25,
+      "status": "FINISHED",
+      "season": "FALL",
+      "seasonYear": 2022,
+      "startDate": { "year": 2022, "month": 9, "day": 13 },
+      "title": {
+        "romaji": "Cyberpunk: Edgerunners",
+        "english": "Cyberpunk: Edgerunners",
+        "native": null
+      },
+      "coverImage": {
+        "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/edgerunners.jpg"
+      },
+      "bannerImage": null,
+      "description": "A street kid tries to survive in a city obsessed with technology.",
+      "genres": ["Action", "Sci-Fi"],
+      "studios": { "nodes": [{ "name": "Trigger" }] },
+      "streamingEpisodes": [],
+      "relations": { "edges": [] }
+    }
+  }
+}

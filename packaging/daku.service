@@ -1,0 +1,17 @@
+# Placeholder systemd user unit. T-019 replaces this with the real installer.
+[Unit]
+Description=Daku media librarian
+Documentation=https://github.com/example/daku
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# T-019 points this at the uv-managed virtualenv created by install.sh.
+ExecStart=%h/.local/bin/daku
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

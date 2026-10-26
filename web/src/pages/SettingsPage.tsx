@@ -1,0 +1,140 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+
+import { getSettings, patchSettings, type Kind, type ReleaseSettings } from "../lib/api";
+
+const KINDS: Array<{ key: Kind; label: string }> = [
+  { key: "movie", label: "Movies" },
+  { key: "series", label: "TV" },
+  { key: "anime", label: "Anime" },
+];
+const CATALOGUE = ["yts", "eztv", "1337x", "thepiratebay", "torrentgalaxy"];
+const QUALITIES = ["", "480p", "576p", "720p", "1080p", "1440p", "2160p"];
+const SORTS = ["seeders", "quality", "size"] as const;
+
+export function SettingsPage() {
+  const queryClient = useQueryClient();
+  const settings = useQuery({
+    queryKey: ["settings"],
+    queryFn: ({ signal }) => getSettings(signal),
+  });
+  const [providers, setProviders] = useState<Partial<Record<Kind, string[]>>>({});
+  const [minQuality, setMinQuality] = useState<string | null>(null);
+  const [sort, setSort] = useState<ReleaseSettings["release"]["sort"] | null>(null);
+  const [limit, setLimit] = useState<number | null>(null);
+  const [animeSources, setAnimeSources] = useState<string[] | null>(null);
+  const [custom, setCustom] = useState<Partial<Record<Kind, string>>>({});
+
+  const current = settings.data?.release;
+  const selected = (kind: Kind) => providers[kind] ?? current?.providers[kind] ?? [];
+  const changed = useMemo(
+    () => Object.keys(providers).length > 0 || minQuality !== null || sort !== null || limit !== null || animeSources !== null,
+    [providers, minQuality, sort, limit, animeSources],
+  );
+  const mutation = useMutation({
+    mutationFn: () =>
+      patchSettings({
+        ...(Object.keys(providers).length ? { providers } : {}),
+        ...(minQuality !== null ? { min_quality: minQuality || null } : {}),
+        ...(sort !== null ? { sort } : {}),
+        ...(limit !== null ? { limit } : {}),
+        ...(animeSources !== null ? { anime_sources: animeSources } : {}),
+      }),
+    onSuccess: (value) => {
+      queryClient.setQueryData(["settings"], value);
+      void queryClient.invalidateQueries({ queryKey: ["release-options"] });
+      setProviders({});
+      setMinQuality(null);
+      setSort(null);
+      setLimit(null);
+      setAnimeSources(null);
+    },
+  });
+
+  if (settings.isLoading) return <p className="text-[13px] text-fg-muted">Loading settings…</p>;
+  if (settings.error) return <p role="alert" className="text-[13px] text-danger">{settings.error.message}</p>;
+  if (!current) return null;
+
+  function toggle(kind: Kind, provider: string) {
+    const next = selected(kind).includes(provider)
+      ? selected(kind).filter((item) => item !== provider)
+      : [...selected(kind), provider];
+    setProviders((old) => ({ ...old, [kind]: next }));
+  }
+  const selectedSources = animeSources ?? settings.data?.sources.anime_sources ?? ["torrentio", "nyaa"];
+  function toggleSource(source: string) {
+    const next = selectedSources.includes(source)
+      ? selectedSources.filter((item) => item !== source)
+      : [...selectedSources, source];
+    if (next.length > 0) setAnimeSources(next);
+  }
+
+  return (
+    <section className="flex max-w-3xl flex-col gap-6">
+      <header>
+        <h1 className="text-[28px] font-bold tracking-tight text-fg">Settings</h1>
+        <p className="mt-1 text-[13px] text-fg-muted">Release search defaults are shared by every browser.</p>
+      </header>
+      <section className="rounded-panel border border-border-subtle bg-panel p-4">
+        <h2 className="text-[16px] font-semibold text-fg">Default providers</h2>
+        <div className="mt-4 flex flex-col gap-4">
+          {KINDS.map(({ key, label }) => (
+            <fieldset key={key}>
+              <legend className="text-[13px] font-semibold text-fg">{label}</legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {[...new Set([...CATALOGUE, ...selected(key)])].map((provider) => (
+                  <label key={provider} className="rounded-control border border-border-strong px-2 py-1 text-[12px] text-fg">
+                    <input type="checkbox" className="mr-1" checked={selected(key).includes(provider)} onChange={() => toggle(key, provider)} />
+                    {provider}
+                  </label>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <input
+                  aria-label={`${label} provider`}
+                  value={custom[key] ?? ""}
+                  onChange={(event) => setCustom((old) => ({ ...old, [key]: event.target.value }))}
+                  placeholder="Additional provider"
+                  className="min-h-8 flex-1 rounded-control border border-border-strong bg-canvas px-2 text-[12px] text-fg"
+                />
+                <button type="button" className="rounded-control border border-border-strong px-2 text-[12px]" onClick={() => {
+                  const value = (custom[key] ?? "").trim().toLowerCase();
+                  if (value && !selected(key).includes(value)) setProviders((old) => ({ ...old, [key]: [...selected(key), value] }));
+                  setCustom((old) => ({ ...old, [key]: "" }));
+                }}>Add</button>
+                <button type="button" className="rounded-control border border-border-strong px-2 text-[12px]" onClick={() => setProviders((old) => ({ ...old, [key]: current.config_providers[key] }))}>Reset to config</button>
+              </div>
+            </fieldset>
+          ))}
+        </div>
+      </section>
+      <section className="rounded-panel border border-border-subtle bg-panel p-4">
+        <h2 className="text-[16px] font-semibold text-fg">Anime sources</h2>
+        <p className="mt-1 text-[13px] text-fg-muted">Nyaa uses RSS and has stricter rate limits than Torrentio.</p>
+        <div className="mt-3 flex gap-2">
+          {["torrentio", "nyaa"].map((source) => (
+            <label key={source} className="rounded-control border border-border-strong px-2 py-1 text-[12px] text-fg">
+              <input type="checkbox" className="mr-1" checked={selectedSources.includes(source)} onChange={() => toggleSource(source)} />
+              {source === "nyaa" ? "Nyaa" : "Torrentio"}
+            </label>
+          ))}
+        </div>
+      </section>
+      <section className="rounded-panel border border-border-subtle bg-panel p-4">
+        <h2 className="text-[16px] font-semibold text-fg">Release search defaults</h2>
+        <div className="mt-3 flex flex-wrap gap-3 text-[12px] text-fg-muted">
+          <label>Minimum quality <select value={minQuality ?? current.min_quality ?? ""} onChange={(e) => setMinQuality(e.target.value)} className="ml-2 rounded-control border border-border-strong bg-canvas p-1 text-fg">{QUALITIES.map((value) => <option key={value} value={value}>{value || "Any"}</option>)}</select></label>
+          <label>Sort <select value={sort ?? current.sort} onChange={(e) => setSort(e.target.value as ReleaseSettings["release"]["sort"])} className="ml-2 rounded-control border border-border-strong bg-canvas p-1 text-fg">{SORTS.map((value) => <option key={value}>{value}</option>)}</select></label>
+          <label>Page size <select value={limit ?? current.limit} onChange={(e) => setLimit(Number(e.target.value))} className="ml-2 rounded-control border border-border-strong bg-canvas p-1 text-fg">{[20, 50, 100, 200].map((value) => <option key={value}>{value}</option>)}</select></label>
+        </div>
+      </section>
+      <section className="rounded-panel border border-border-subtle bg-panel p-4">
+        <h2 className="text-[16px] font-semibold text-fg">Integrations</h2>
+        <p className="mt-1 text-[13px] text-fg-muted">Check qBittorrent, Jellyfin and metadata integrations on the <Link className="text-accent underline" to="/">System</Link> page.</p>
+      </section>
+      {mutation.error ? <p role="alert" className="text-[13px] text-danger">{mutation.error.message}</p> : null}
+      <button type="button" disabled={!changed || mutation.isPending} onClick={() => mutation.mutate()} className="min-h-11 self-start rounded-control bg-accent px-5 text-[13px] font-semibold text-canvas disabled:opacity-40">{mutation.isPending ? "Saving…" : "Save settings"}</button>
+    </section>
+  );
+}

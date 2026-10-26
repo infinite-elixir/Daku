@@ -1,0 +1,77 @@
+{
+  "streams": [
+    {
+      "name": "Torrentio\n1080p",
+      "title": "Torrentio\n1080p\nBig Buck Bunny (2008) [BluRay] [1080p] [x264] [DDP 5.1]\n👤 43 💾 209.37 MB ⚙️ ThePirateBay",
+      "infoHash": "ABCDEF0123456789ABCDEF0123456789ABCDEF01",
+      "behaviorHints": {
+        "filename": "Big.Buck.Bunny.2008.1080p.BluRay.x264.DDP5.1-GROUP.mkv"
+      },
+      "sources": [
+        "tracker:udp://tracker.opentrackr.org:1337/announce",
+        "dht:abcdef",
+        "tracker:udp://tracker.opentrackr.org:1337/announce",
+        "tracker:https://tracker.example.org/announce?pass=abc"
+      ]
+    },
+    {
+      "name": "Torrentio\n2160p",
+      "title": "Torrentio\n2160p\nBig Buck Bunny (2008) 2160p WEB-DL DDP5.1 Atmos H.265 MULTI\n👤 120 💾 4.5 GB ⚙️ YTS",
+      "infoHash": "1111111111111111111111111111111111111111",
+      "behaviorHints": {
+        "filename": "Big.Buck.Bunny.2008.2160p.WEB-DL.DDP5.1.Atmos.H.265.MULTI-YIFY.mkv"
+      },
+      "sources": ["tracker:udp://tracker.example.net:80/announce"]
+    },
+    {
+      "name": "Torrentio\n720p",
+      "title": "Torrentio\n720p\nBig Buck Bunny (2008) 720p WEBRip AAC EN-FR\n👤 7 💾 700 MB ⚙️ EZTV",
+      "infoHash": "2222222222222222222222222222222222222222",
+      "behaviorHints": {
+        "filename": "Big.Buck.Bunny.2008.720p.WEBRip.AAC.EN-FR-RARBG.mkv"
+      },
+      "sources": []
+    },
+    {
+      "name": "Torrentio\nCAM",
+      "title": "Torrentio\nCAM\nBig Buck Bunny (2008) HDCAM\n👤 900 💾 1.2 GB ⚙️ 1337x",
+      "infoHash": "3333333333333333333333333333333333333333",
+      "behaviorHints": {
+        "filename": "Big.Buck.Bunny.2008.HDCAM-CAMRIP.mkv"
+      },
+      "sources": []
+    },
+    {
+      "name": "Torrentio\n1080p",
+      "title": "Torrentio\n1080p\nAmélie (2001) 1080p BluRay x265 TrueHD Director's Cut\n👤 12 💾 3.1GiB ⚙️ 1337x",
+      "infoHash": "4444444444444444444444444444444444444444",
+      "behaviorHints": {
+        "filename": "Amélie.2001.1080p.BluRay.x265.TrueHD.Directors.Cut.mkv"
+      },
+      "sources": ["tracker:udp://tracker.unicode.example:6969/announce"]
+    },
+    {
+      "name": "Torrentio\nUnknown",
+      "title": "Torrentio\nUnknown\nMystery release without hints",
+      "infoHash": "5555555555555555555555555555555555555555",
+      "behaviorHints": {
+        "filename": "Mystery.Release.mkv"
+      },
+      "sources": []
+    },
+    {
+      "name": "Torrentio\n1080p",
+      "title": "Torrentio\n1080p\nNo hash here\n👤 5 💾 100 MB ⚙️ EZTV",
+      "behaviorHints": {
+        "filename": "No.Hash.mkv"
+      }
+    },
+    {
+      "name": "Torrentio\n1080p",
+      "title": "Torrentio\n1080p\nNo filename here\n👤 5 💾 100 MB ⚙️ EZTV",
+      "infoHash": "6666666666666666666666666666666666666666"
+    },
+    "not-a-stream",
+    null
+  ]
+}

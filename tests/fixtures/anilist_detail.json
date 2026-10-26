@@ -1,0 +1,107 @@
+{
+  "data": {
+    "Media": {
+      "id": 154587,
+      "idMal": 52991,
+      "format": "TV",
+      "episodes": 28,
+      "duration": 24,
+      "status": "FINISHED",
+      "season": "FALL",
+      "seasonYear": 2023,
+      "startDate": { "year": 2023, "month": 9, "day": 29 },
+      "title": {
+        "romaji": "Sousou no Frieren",
+        "english": "Frieren: Beyond Journey's End",
+        "native": "葬送のフリーレン"
+      },
+      "synonyms": ["Frieren at the Funeral", " Funeral Frieren "],
+      "coverImage": {
+        "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/frieren.jpg",
+        "color": "#3a5f8f"
+      },
+      "bannerImage": "https://s4.anilist.co/file/anilistcdn/media/anime/banner/frieren.jpg",
+      "description": "<i>Frieren</i> is an elf mage.<br><br>She walks &amp; remembers.</br>",
+      "genres": ["Adventure", "Drama", "Fantasy"],
+      "studios": { "nodes": [{ "name": "Madhouse" }] },
+      "relations": {
+        "edges": [
+          {
+            "relationType": "SEQUEL",
+            "node": {
+              "id": 170068,
+              "idMal": 55555,
+              "format": "TV",
+              "episodes": 28,
+              "seasonYear": 2026,
+              "startDate": { "year": 2026 },
+              "title": {
+                "romaji": "Sousou no Frieren 2nd Season",
+                "english": "Frieren: Beyond Journey's End Season 2",
+                "native": null
+              },
+              "coverImage": {
+                "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/frieren2.jpg"
+              },
+              "relations": {
+                "edges": [
+                  {
+                    "relationType": "PREQUEL",
+                    "node": { "id": 1, "title": { "romaji": "Should not recurse" } }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "relationType": "SIDE_STORY",
+            "node": {
+              "id": 77777,
+              "idMal": 33000,
+              "format": "OVA",
+              "episodes": 3,
+              "seasonYear": null,
+              "startDate": { "year": null },
+              "title": { "romaji": "Frieren OVA", "english": null, "native": null },
+              "coverImage": null
+            }
+          },
+          {
+            "relationType": "ADAPTATION",
+            "node": {
+              "id": 88888,
+              "idMal": null,
+              "format": "MANGA",
+              "episodes": null,
+              "seasonYear": 2020,
+              "startDate": { "year": 2020 },
+              "title": {
+                "romaji": "Sousou no Frieren (Manga)",
+                "english": null,
+                "native": null
+              },
+              "coverImage": null
+            }
+          },
+          {
+            "relationType": "SEQUEL",
+            "node": {
+              "id": 170068,
+              "idMal": 55555,
+              "format": "TV",
+              "episodes": 28,
+              "seasonYear": 2026,
+              "startDate": { "year": 2026 },
+              "title": {
+                "romaji": "Sousou no Frieren 2nd Season",
+                "english": null,
+                "native": null
+              },
+              "coverImage": null
+            }
+          }
+        ]
+      }
+    }
+  }
+}

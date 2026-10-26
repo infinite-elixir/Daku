@@ -1,0 +1,22 @@
+{
+  "metas": [
+    {
+      "id": "tt1234567",
+      "type": "movie",
+      "name": "Big Buck Bunny",
+      "releaseInfo": "2008",
+      "poster": "https://images.example/bbb-cinemeta.jpg"
+    },
+    {
+      "id": "tt15239678",
+      "type": "movie",
+      "name": "Dune: Part Two",
+      "releaseInfo": "2024",
+      "poster": "https://images.example/dune2.jpg"
+    },
+    {
+      "id": "not-an-imdb-id",
+      "name": "Broken"
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "meta": {
+    "id": "tt12590266",
+    "type": "series",
+    "name": "Cyberpunk: Edgerunners",
+    "releaseInfo": "2022",
+    "poster": "https://images.example/edgerunners.jpg",
+    "description": "A street kid tries to survive in a city obsessed with technology.",
+    "videos": [
+      {
+        "id": "tt12590266:0:1",
+        "season": 0,
+        "episode": 1,
+        "name": "Let You Down",
+        "released": "2022-09-13"
+      },
+      {
+        "id": "tt12590266:1:1",
+        "season": 1,
+        "episode": 1,
+        "name": "Let You Down",
+        "released": "2022-09-13"
+      },
+      {
+        "id": "tt12590266:1:2",
+        "season": 1,
+        "episode": 2,
+        "name": "Like a Boy",
+        "released": "2022-09-13"
+      },
+      {
+        "id": "tt12590266:1:3",
+        "season": 1,
+        "episode": 3,
+        "name": "Smooth Criminal",
+        "released": "2022-09-13"
+      },
+      {
+        "id": "tt12590266:1:4",
+        "season": 1,
+        "episode": 4,
+        "name": "Girl on Fire",
+        "released": "2022-09-13"
+      },
+      {
+        "id": "tt12590266:1:5",
+        "season": 1,
+        "episode": 5,
+        "name": "All Eyez on Me",
+        "released": "2022-09-13"
+      },
+      {
+        "id": "tt12590266:1:6",
+        "season": 1,
+        "episode": 6,
+        "name": "Girl on Fire",
+        "released": "2022-09-13"
+      },
+      {
+        "id": "tt12590266:1:7",
+        "season": 1,
+        "episode": 7,
+        "name": "Stronger",
+        "released": "2022-09-13"
+      },
+      {
+        "id": "tt12590266:1:8",
+        "season": 1,
+        "episode": 8,
+        "name": "Stay",
+        "released": "2022-09-13"
+      },
+      {
+        "id": "tt12590266:1:9",
+        "season": 1,
+        "episode": 9,
+        "name": "My Moon My Man",
+        "released": "2022-09-13"
+      },
+      {
+        "id": "tt12590266:1:10",
+        "season": 1,
+        "episode": 10,
+        "name": "My Moon My Man",
+        "released": "2022-09-13"
+      }
+    ]
+  }
+}

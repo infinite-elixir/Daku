@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+web/node_modules/
+web/dist/
+src/daku/webdist/
+
+# Local runtime data
+daku.db
+daku.db-*
+*.log
+secrets.json
+config.json
+.coverage
+htmlcov/
+
+# Editors
+.idea/
+.vscode/
+*.swp
+.DS_Store

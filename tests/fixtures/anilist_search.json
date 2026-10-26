@@ -1,0 +1,59 @@
+{
+  "data": {
+    "Page": {
+      "media": [
+        {
+          "id": 154587,
+          "idMal": 52991,
+          "format": "TV",
+          "episodes": 28,
+          "seasonYear": 2023,
+          "startDate": { "year": 2023 },
+          "title": {
+            "romaji": "Sousou no Frieren",
+            "english": "Frieren: Beyond Journey's End",
+            "native": "葬送のフリーレン"
+          },
+          "coverImage": {
+            "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/frieren.jpg",
+            "color": "#3a5f8f"
+          },
+          "description": "<p>A <b>mage</b> outlives her party.</p><br>Second line."
+        },
+        {
+          "id": 20954,
+          "idMal": null,
+          "format": "MOVIE",
+          "episodes": 1,
+          "seasonYear": 2016,
+          "startDate": { "year": 2016 },
+          "title": {
+            "romaji": "Koe no Katachi",
+            "english": "A Silent Voice",
+            "native": null
+          },
+          "coverImage": {
+            "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/koe.jpg",
+            "color": null
+          },
+          "description": null
+        },
+        {
+          "id": 77777,
+          "idMal": 33000,
+          "format": "OVA",
+          "episodes": 3,
+          "seasonYear": null,
+          "startDate": { "year": null },
+          "title": {
+            "romaji": "Frieren OVA",
+            "english": null,
+            "native": null
+          },
+          "coverImage": null,
+          "description": "Short side stories."
+        }
+      ]
+    }
+  }
+}

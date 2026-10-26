@@ -1,0 +1,10 @@
+{
+  "data": null,
+  "errors": [
+    {
+      "message": "Too Many Requests.",
+      "status": 429,
+      "locations": [{ "line": 2, "column": 3 }]
+    }
+  ]
+}
