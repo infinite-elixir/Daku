@@ -782,3 +782,13 @@ export function downloadAction(id: string, action: DownloadAction): Promise<Down
     method: "POST",
   });
 }
+
+export function removeDownload(
+  id: string,
+  { deleteFiles = false }: { deleteFiles?: boolean } = {},
+): Promise<void> {
+  return request<void>(
+    withQuery(`/api/downloads/${encodeURIComponent(id)}`, { delete_files: deleteFiles }),
+    { method: "DELETE" },
+  );
+}

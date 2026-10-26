@@ -519,6 +519,41 @@ async def cancel_download(
     return payload
 
 
+@router.delete("/downloads/{download_id}", status_code=204)
+async def remove_download(
+    download_id: str,
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+    delete_files: Annotated[bool, Query()] = False,
+) -> Response:
+    """Remove a queue entry without touching library files.
+
+    ``delete_files`` only reaches the download engine's copy. Every
+    ``media_files.lib_path`` stays where it is, and the media rows are detached
+    (not deleted) so availability survives.
+    """
+
+    row = _get_or_404(session, download_id)
+    if row.status == "organizing":
+        raise AppError(
+            code="DOWNLOAD_BUSY",
+            message="The organiser is still working on this download",
+            status_code=409,
+        )
+    try:
+        await _engine(request, row.engine).remove(
+            row.external_id,
+            delete_files=delete_files,
+        )
+    except EngineError as exc:
+        raise AppError(code=exc.code, message=exc.message, status_code=502) from exc
+
+    downloads_repo.detach_media_files(session, row.id)
+    downloads_repo.delete_download(session, row.id)
+    _publish(request, "download.removed", {"id": download_id})
+    return Response(status_code=204)
+
+
 @router.post("/downloads/{download_id}/inspect")
 async def inspect_completed_download(
     download_id: str,

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from daku.models import Download
+from daku.models import Download, MediaFile
 from daku.utils import new_id, utc_now_iso
 
 DOWNLOAD_STATUSES = frozenset(
@@ -98,6 +98,15 @@ def update_download(session: Session, download_id: str, **fields: Any) -> Downlo
     session.commit()
     session.refresh(row)
     return row
+
+
+def detach_media_files(session: Session, download_id: str) -> None:
+    """Keep library rows alive when their download queue entry is removed."""
+
+    session.execute(
+        update(MediaFile).where(MediaFile.download_id == download_id).values(download_id=None)
+    )
+    session.commit()
 
 
 def delete_download(session: Session, download_id: str) -> bool:

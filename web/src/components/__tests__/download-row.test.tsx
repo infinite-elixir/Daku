@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { DownloadRecord } from "../../lib/api";
@@ -34,7 +34,7 @@ function record(overrides: Partial<DownloadRecord> = {}): DownloadRecord {
 
 describe("DownloadRow selective downloads", () => {
   it("shows the selected episode and its size", () => {
-    render(<DownloadRow download={record()} onAction={vi.fn()} />);
+    render(<DownloadRow download={record()} onAction={vi.fn()} onRemove={vi.fn()} />);
 
     const label = screen.getByText("S02E04 only · 1.40 GB");
     expect(label).toBeInTheDocument();
@@ -50,6 +50,7 @@ describe("DownloadRow selective downloads", () => {
           error: "QBT_FILE_SELECTION_FAILED: qBittorrent did not apply the file priorities",
         })}
         onAction={vi.fn()}
+        onRemove={vi.fn()}
       />,
     );
 
@@ -68,9 +69,78 @@ describe("DownloadRow selective downloads", () => {
           selection_size_bytes: null,
         })}
         onAction={vi.fn()}
+        onRemove={vi.fn()}
       />,
     );
 
     expect(screen.getByText("Whole pack")).toBeInTheDocument();
+  });
+
+  it("confirms before removing and defaults the file-delete checkbox off", () => {
+    const onRemove = vi.fn();
+    render(<DownloadRow download={record()} onAction={vi.fn()} onRemove={onRemove} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove download" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Remove download?" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(
+      screen.getByText(
+        "This removes the queue entry. Files already in your library stay where they are.",
+      ),
+    ).toBeInTheDocument();
+    const checkbox = screen.getByRole("checkbox", {
+      name: /Also delete the downloaded files/i,
+    });
+    expect(checkbox).not.toBeChecked();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect(onRemove).toHaveBeenCalledWith("d1", false);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("passes delete_files when the checkbox is selected", () => {
+    const onRemove = vi.fn();
+    render(<DownloadRow download={record()} onAction={vi.fn()} onRemove={onRemove} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove download" }));
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /Also delete the downloaded files/i }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect(onRemove).toHaveBeenCalledWith("d1", true);
+  });
+
+  it("closes the remove dialog with Escape or Cancel", () => {
+    const onRemove = vi.fn();
+    render(<DownloadRow download={record()} onAction={vi.fn()} onRemove={onRemove} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove download" }));
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove download" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(onRemove).not.toHaveBeenCalled();
+  });
+
+  it("hides the file-delete option for direct downloads", () => {
+    render(
+      <DownloadRow
+        download={record({ engine: "aria2", source: "direct" })}
+        onAction={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove download" }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 });

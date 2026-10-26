@@ -95,6 +95,39 @@ def test_download_again_after_cancel_requeues_the_same_row(settings: Settings) -
             assert rows[0].status == "queued"
 
 
+def test_delete_then_download_creates_a_new_row(settings: Settings) -> None:
+    with _client(settings) as client:
+        engine = _FakeEngine()
+        client.app.state.qbt_engine = engine  # type: ignore[attr-defined]
+        factory = client.app.state.session_factory  # type: ignore[attr-defined]
+        with factory() as session:
+            title = titles_repo.create_title(session, kind="movie", title="Perfect Blue")
+            title_id = title.id
+        created = client.post("/api/releases", json={"magnet": MAGNET, "title_id": title_id})
+        release_id = created.json()["id"]
+
+        started = client.post("/api/downloads", json={"release_id": release_id})
+        assert started.status_code == 201
+        download_id = started.json()["id"]
+        cancelled = client.post(f"/api/downloads/{download_id}/cancel")
+        assert cancelled.status_code == 200
+
+        removed = client.delete(f"/api/downloads/{download_id}")
+        assert removed.status_code == 204
+        with factory() as session:
+            assert downloads_repo.list_downloads(session) == []
+
+        again = client.post("/api/downloads", json={"release_id": release_id})
+        assert again.status_code == 201, again.text
+        body = again.json()
+        assert body["id"] != download_id
+        assert body["status"] == "queued"
+        with factory() as session:
+            rows = downloads_repo.list_downloads(session)
+            assert len(rows) == 1
+            assert rows[0].id == body["id"]
+
+
 def test_unsaving_does_not_touch_a_download(settings: Settings) -> None:
     with _client(settings) as client:
         factory = client.app.state.session_factory  # type: ignore[attr-defined]

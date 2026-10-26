@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 from daku.config import Settings
 from daku.repositories import downloads as downloads_repo
 from daku.repositories import episodes as episodes_repo
+from daku.repositories import media_files as media_repo
 from daku.repositories import releases as releases_repo
 from daku.repositories import titles as titles_repo
 from daku.services.engines.base import EngineError
@@ -327,3 +329,181 @@ def test_a_rejected_live_reselection_restores_priorities_and_returns_409(
         row = downloads_repo.get_download(session, download_id)
     assert row is not None
     assert row.selected_files_json == "[4]"
+
+
+class FakeRemoveEngine:
+    def __init__(self, error: Exception | None = None) -> None:
+        self.error = error
+        self.calls: list[tuple[str, bool]] = []
+
+    async def remove(self, external_id: str, *, delete_files: bool = False) -> None:
+        self.calls.append((external_id, delete_files))
+        if self.error is not None:
+            raise self.error
+
+
+@pytest.mark.parametrize(
+    "status", ["queued", "active", "paused", "complete", "failed", "cancelled", "available"]
+)
+def test_remove_download_deletes_any_non_organizing_row(
+    app_client: tuple[TestClient, Settings], status: str
+) -> None:
+    client, _settings = app_client
+    release_id, _episode_id = _seed(client)
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        row = downloads_repo.create_download(
+            session,
+            source="torrent",
+            engine="qbittorrent",
+            external_id=HASH,
+            release_id=release_id,
+            status=status,
+            save_path="/downloads",
+        )
+        download_id = row.id
+    engine = FakeRemoveEngine()
+    client.app.state.qbt_engine = engine  # type: ignore[attr-defined]
+
+    response = client.delete(f"/api/downloads/{download_id}")
+
+    assert response.status_code == 204, response.text
+    assert response.content == b""
+    assert engine.calls == [(HASH, False)]
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        assert downloads_repo.get_download(session, download_id) is None
+    events = client.app.state.event_bus._buffer  # type: ignore[attr-defined]
+    assert events[-1].type == "download.removed"
+    assert events[-1].data == {"id": download_id}
+
+
+def test_remove_download_forwards_delete_files(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, _settings = app_client
+    release_id, _episode_id = _seed(client)
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        row = downloads_repo.create_download(
+            session,
+            source="torrent",
+            engine="qbittorrent",
+            external_id=HASH,
+            release_id=release_id,
+            status="failed",
+            save_path="/downloads",
+        )
+        download_id = row.id
+    engine = FakeRemoveEngine()
+    client.app.state.qbt_engine = engine  # type: ignore[attr-defined]
+
+    response = client.delete(f"/api/downloads/{download_id}?delete_files=true")
+
+    assert response.status_code == 204, response.text
+    assert engine.calls == [(HASH, True)]
+
+
+def test_removing_an_available_download_keeps_the_library_file(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, settings = app_client
+    release_id, _episode_id = _seed(client)
+    lib_path = settings.movies_dir / "Show" / "Show.mkv"
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        release = releases_repo.get_release(session, release_id)
+        assert release is not None
+        row = downloads_repo.create_download(
+            session,
+            source="torrent",
+            engine="qbittorrent",
+            external_id=HASH,
+            release_id=release_id,
+            status="available",
+            save_path="/downloads",
+        )
+        media = media_repo.create_media_file(
+            session,
+            title_id=release.title_id,
+            download_id=row.id,
+            src_path=str(settings.downloads_dir / "Show.mkv"),
+            lib_path=str(lib_path),
+            is_primary=True,
+        )
+        download_id = row.id
+        media_id = media.id
+    client.app.state.qbt_engine = FakeRemoveEngine()  # type: ignore[attr-defined]
+
+    response = client.delete(f"/api/downloads/{download_id}?delete_files=true")
+
+    assert response.status_code == 204, response.text
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        assert downloads_repo.get_download(session, download_id) is None
+        kept = media_repo.get_media_file(session, media_id)
+    assert kept is not None
+    assert kept.download_id is None
+    assert kept.lib_path == str(lib_path)
+
+
+def test_remove_download_returns_404_for_a_missing_row(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, _settings = app_client
+
+    response = client.delete("/api/downloads/missing")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "DOWNLOAD_NOT_FOUND"
+
+
+def test_remove_download_refuses_an_organizing_row(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, _settings = app_client
+    release_id, _episode_id = _seed(client)
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        row = downloads_repo.create_download(
+            session,
+            source="torrent",
+            engine="qbittorrent",
+            external_id=HASH,
+            release_id=release_id,
+            status="organizing",
+            save_path="/downloads",
+        )
+        download_id = row.id
+    engine = FakeRemoveEngine()
+    client.app.state.qbt_engine = engine  # type: ignore[attr-defined]
+
+    response = client.delete(f"/api/downloads/{download_id}")
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "DOWNLOAD_BUSY"
+    assert engine.calls == []
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        assert downloads_repo.get_download(session, download_id) is not None
+
+
+def test_remove_download_keeps_the_row_when_the_engine_fails(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, _settings = app_client
+    release_id, _episode_id = _seed(client)
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        row = downloads_repo.create_download(
+            session,
+            source="torrent",
+            engine="qbittorrent",
+            external_id=HASH,
+            release_id=release_id,
+            status="failed",
+            save_path="/downloads",
+        )
+        download_id = row.id
+    client.app.state.qbt_engine = FakeRemoveEngine(  # type: ignore[attr-defined]
+        error=EngineError("QBT_UNREACHABLE", "qBittorrent is unreachable")
+    )
+
+    response = client.delete(f"/api/downloads/{download_id}")
+
+    assert response.status_code == 502
+    assert response.json()["code"] == "QBT_UNREACHABLE"
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        assert downloads_repo.get_download(session, download_id) is not None

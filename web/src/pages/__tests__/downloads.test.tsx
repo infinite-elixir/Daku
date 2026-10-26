@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DownloadRecord, DownloadsResponse } from "../../lib/api";
@@ -115,5 +115,56 @@ describe("DownloadsPage qBittorrent 5 progress", () => {
     expect(await screen.findByText("qBittorrent rejected the torrent")).toBeInTheDocument();
     expect(screen.queryByText(/success_count/)).not.toBeInTheDocument();
     expect(screen.queryByText(/added_torrent_ids/)).not.toBeInTheDocument();
+  });
+
+  it("removes a download optimistically", async () => {
+    const calls: Array<{ url: string; method: string }> = [];
+    const payload: DownloadsResponse = { items: [record()], total: 1 };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        calls.push({ url, method: init?.method ?? "GET" });
+        if (init?.method === "DELETE") {
+          return { ok: true, status: 204, json: async () => ({}) };
+        }
+        return { ok: true, status: 200, json: async () => payload };
+      }),
+    );
+    renderPage();
+
+    await screen.findByTestId("download-row-d1");
+    fireEvent.click(screen.getByRole("button", { name: "Remove download" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    await waitFor(() => expect(screen.queryByTestId("download-row-d1")).not.toBeInTheDocument());
+    expect(calls).toContainEqual({
+      url: "/api/downloads/d1?delete_files=false",
+      method: "DELETE",
+    });
+  });
+
+  it("restores the row and shows the API message when removal fails", async () => {
+    const payload: DownloadsResponse = { items: [record()], total: 1 };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        if (init?.method === "DELETE") {
+          return {
+            ok: false,
+            status: 502,
+            json: async () => ({ code: "QBT_UNREACHABLE", message: "qBittorrent is unreachable" }),
+          };
+        }
+        return { ok: true, status: 200, json: async () => payload };
+      }),
+    );
+    renderPage();
+
+    await screen.findByTestId("download-row-d1");
+    fireEvent.click(screen.getByRole("button", { name: "Remove download" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("qBittorrent is unreachable");
+    expect(screen.getByTestId("download-row-d1")).toBeInTheDocument();
   });
 });

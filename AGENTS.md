@@ -160,6 +160,10 @@ Resolution order: environment → `~/.config/daku/config.json` → defaults.
   Deleting a download never deletes the saved release.
 - One `media_files` row per physical file. A download may yield several (samples, extras);
   exactly one may have `is_primary = 1`.
+- Removing a download row never deletes a library file and never cascades `media_files`.
+  The API detaches media rows (`download_id = NULL`) before deleting the queue entry, so
+  `lib_path` and title/episode availability survive. `delete_files` only reaches the
+  engine's download directory.
 - `downloads.engine` is `qbittorrent`, `aria2`, or `local` (same-host Telegram file copy).
   `downloads.external_id` is the qBittorrent info-hash, the aria2 GID, or the Telegram
   `message_id` respectively. `UNIQUE(engine, external_id)` prevents double-tracking.

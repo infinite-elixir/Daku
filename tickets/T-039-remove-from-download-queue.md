@@ -84,20 +84,21 @@ the download state machine, a general-purpose confirm-dialog framework.
 
 ## Acceptance criteria
 
-- [ ] `DELETE /api/downloads/{id}` removes the row and returns 204 for every
+- [x] `DELETE /api/downloads/{id}` removes the row and returns 204 for every
       non-`organizing` state.
-- [ ] The engine `remove` is called with the row's external id and the requested
+- [x] The engine `remove` is called with the row's external id and the requested
       `delete_files` flag; an already-missing engine entry does not fail the delete.
-- [ ] Removing an `available` download leaves its `media_files` rows and the library
+- [x] Removing an `available` download leaves its `media_files` rows and the library
       availability intact (`download_id` is NULL, `lib_path` unchanged).
-- [ ] Removing an `active` torrent stops/removes it in qBittorrent; no further progress
+- [x] Removing an `active` torrent stops/removes it in qBittorrent; no further progress
       events are emitted for the deleted row.
-- [ ] `download.removed` is published with the id and the row disappears without a refetch.
-- [ ] `organizing` returns 409 `DOWNLOAD_BUSY` and the row stays.
-- [ ] The UI shows Remove on every row, confirms before deleting, defaults the file-delete
+- [x] `download.removed` is published with the id and the row disappears without a refetch.
+- [x] `organizing` returns 409 `DOWNLOAD_BUSY` and the row stays.
+- [x] The UI shows Remove on every row, confirms before deleting, defaults the file-delete
       checkbox off, and restores the row if the API fails.
 - [ ] At 390 px the dialog fits, the buttons are reachable, and long file names wrap.
-- [ ] `delete_files=true` never removes a `lib_path` or anything under a Jellyfin library
+      (responsive layout implemented; manual viewport pass still pending)
+- [x] `delete_files=true` never removes a `lib_path` or anything under a Jellyfin library
       root.
 
 ## Test plan

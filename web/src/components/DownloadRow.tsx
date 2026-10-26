@@ -1,7 +1,8 @@
-import { memo } from "react";
+import { memo, useCallback, useState } from "react";
 
 import type { DownloadAction, DownloadRecord } from "../lib/api";
 import { formatBytes, formatEta, formatSpeed, percent } from "../lib/format";
+import { RemoveDownloadDialog } from "./RemoveDownloadDialog";
 
 const STATUS_LABEL: Record<string, string> = {
   queued: "Queued",
@@ -71,10 +72,21 @@ function RowButton({
 export const DownloadRow = memo(function DownloadRow({
   download,
   onAction,
+  onRemove,
 }: {
   download: DownloadRecord;
   onAction: (id: string, action: DownloadAction) => void;
+  onRemove: (id: string, deleteFiles: boolean) => void;
 }) {
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const closeRemove = useCallback(() => setConfirmingRemove(false), []);
+  const confirmRemove = useCallback(
+    (deleteFiles: boolean) => {
+      setConfirmingRemove(false);
+      onRemove(download.id, deleteFiles);
+    },
+    [download.id, onRemove],
+  );
   const value = percent(download.progress);
   const label = STATUS_LABEL[download.status] ?? download.status;
   const name = download.title ?? download.filename ?? download.id;
@@ -147,6 +159,27 @@ export const DownloadRow = memo(function DownloadRow({
           {failed ? (
             <RowButton action="retry" onAction={onAction} id={download.id} primary />
           ) : null}
+          <button
+            type="button"
+            onClick={() => setConfirmingRemove(true)}
+            aria-label="Remove download"
+            title="Remove download"
+            className="inline-flex min-h-8 items-center gap-1.5 rounded-control border border-border-subtle px-2.5 text-[12px] font-semibold text-fg-muted hover:bg-hover hover:text-danger"
+          >
+            <svg
+              aria-hidden
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+            >
+              <path d="M3.5 5.5h13M8 3.5h4M5.5 5.5l.7 10a1.5 1.5 0 0 0 1.5 1.4h4.6a1.5 1.5 0 0 0 1.5-1.4l.7-10M8.3 8.5v5.4M11.7 8.5v5.4" />
+            </svg>
+            <span className="hidden sm:inline">Remove</span>
+          </button>
         </div>
       </div>
 
@@ -187,6 +220,15 @@ export const DownloadRow = memo(function DownloadRow({
         <p className="mt-2 rounded-control border-l-2 border-danger bg-canvas px-3 py-2 text-[12px] leading-5 text-danger">
           {errorText}
         </p>
+      ) : null}
+
+      {confirmingRemove ? (
+        <RemoveDownloadDialog
+          name={name}
+          showDeleteFiles={download.source === "torrent"}
+          onCancel={closeRemove}
+          onConfirm={confirmRemove}
+        />
       ) : null}
     </article>
   );

@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 import { DownloadRow, isActiveDownload, isCompletedDownload, isFailedDownload } from "../components/DownloadRow";
 import { DOWNLOADS_QUERY_KEY, useEventSource } from "../hooks/useEventSource";
 import {
   downloadAction,
   listDownloads,
+  removeDownload,
   type DownloadAction,
   type DownloadRecord,
   type DownloadsResponse,
@@ -37,9 +38,24 @@ function withStatus(
   return changed ? { ...current, items } : current;
 }
 
+function withoutDownload(
+  current: DownloadsResponse | undefined,
+  id: string,
+): DownloadsResponse | undefined {
+  if (!current) {
+    return current;
+  }
+  const items = current.items.filter((item) => item.id !== id);
+  if (items.length === current.items.length) {
+    return current;
+  }
+  return { items, total: items.length };
+}
+
 export function DownloadsPage() {
   const queryClient = useQueryClient();
   const stream = useEventSource();
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   const { data, error, isLoading, refetch } = useQuery<DownloadsResponse>({
     queryKey: DOWNLOADS_QUERY_KEY,
@@ -83,6 +99,34 @@ export function DownloadsPage() {
     [mutation],
   );
 
+  const removeMutation = useMutation({
+    mutationFn: ({ id, deleteFiles }: { id: string; deleteFiles: boolean }) =>
+      removeDownload(id, { deleteFiles }),
+    onMutate: async ({ id }) => {
+      setRemoveError(null);
+      await queryClient.cancelQueries({ queryKey: DOWNLOADS_QUERY_KEY });
+      const previous = queryClient.getQueryData<DownloadsResponse>(DOWNLOADS_QUERY_KEY);
+      queryClient.setQueryData<DownloadsResponse>(DOWNLOADS_QUERY_KEY, (current) =>
+        withoutDownload(current, id),
+      );
+      return { previous };
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(DOWNLOADS_QUERY_KEY, context.previous);
+      }
+      setRemoveError(error.message);
+    },
+    onSuccess: () => setRemoveError(null),
+  });
+
+  const onRemove = useCallback(
+    (id: string, deleteFiles: boolean) => {
+      removeMutation.mutate({ id, deleteFiles });
+    },
+    [removeMutation],
+  );
+
   const rows = data?.items ?? [];
   const active = rows.filter(isActiveDownload);
   const completed = rows.filter(isCompletedDownload);
@@ -118,6 +162,15 @@ export function DownloadsPage() {
         </span>
       </header>
 
+      {removeError ? (
+        <div
+          role="alert"
+          className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3 text-[13px] text-danger"
+        >
+          {removeError}
+        </div>
+      ) : null}
+
       {error ? (
         <div className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3">
           <p className="text-[13px] text-danger">{error.message}</p>
@@ -140,10 +193,28 @@ export function DownloadsPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-6">
-          <DownloadSection title="Active" rows={active} onAction={onAction} empty="No active downloads." />
-          <DownloadSection title="Completed" rows={completed} onAction={onAction} empty="Nothing completed yet." />
+          <DownloadSection
+            title="Active"
+            rows={active}
+            onAction={onAction}
+            onRemove={onRemove}
+            empty="No active downloads."
+          />
+          <DownloadSection
+            title="Completed"
+            rows={completed}
+            onAction={onAction}
+            onRemove={onRemove}
+            empty="Nothing completed yet."
+          />
           {failed.length > 0 ? (
-            <DownloadSection title="Needs attention" rows={failed} onAction={onAction} empty="" />
+            <DownloadSection
+              title="Needs attention"
+              rows={failed}
+              onAction={onAction}
+              onRemove={onRemove}
+              empty=""
+            />
           ) : null}
         </div>
       )}
@@ -155,11 +226,13 @@ function DownloadSection({
   title,
   rows,
   onAction,
+  onRemove,
   empty,
 }: {
   title: string;
   rows: DownloadRecord[];
   onAction: (id: string, action: DownloadAction) => void;
+  onRemove: (id: string, deleteFiles: boolean) => void;
   empty: string;
 }) {
   return (
@@ -174,7 +247,7 @@ function DownloadSection({
         <ul className="flex flex-col gap-3">
           {rows.map((row) => (
             <li key={row.id}>
-              <DownloadRow download={row} onAction={onAction} />
+              <DownloadRow download={row} onAction={onAction} onRemove={onRemove} />
             </li>
           ))}
         </ul>

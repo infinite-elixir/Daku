@@ -458,14 +458,23 @@ class QbittorrentEngine:
         await self.start(external_id)
 
     async def remove(self, external_id: str, *, delete_files: bool = False) -> None:
-        await self._request(
+        response = await self._request(
             "POST",
             "/api/v2/torrents/delete",
             data={
                 "hashes": external_id.lower(),
                 "deleteFiles": "true" if delete_files else "false",
             },
+            raise_for_status=False,
         )
+        # Deleting an entry qBittorrent no longer knows is already the desired end state.
+        if response.status_code == 404:
+            return
+        if not 200 <= response.status_code < 300:
+            raise EngineError(
+                "QBT_REJECTED",
+                f"qBittorrent rejected delete (HTTP {response.status_code})",
+            )
 
     async def files(self, external_id: str) -> list[EngineFile]:
         """Return the engine's current file list, or an empty list before metadata."""

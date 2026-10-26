@@ -433,10 +433,21 @@ async def test_unknown_version_falls_back_to_resume_and_caches_it(
 
 
 @respx.mock
-async def test_a_404_from_a_mutation_is_a_rejection(engine: QbittorrentEngine) -> None:
+async def test_removing_a_missing_torrent_is_success(engine: QbittorrentEngine) -> None:
     respx.post(LOGIN).mock(return_value=httpx.Response(200, text="Ok."))
     respx.post("http://127.0.0.1:8080/api/v2/torrents/delete").mock(
         return_value=httpx.Response(404)
+    )
+
+    await engine.remove(HASH)
+    await engine.aclose()
+
+
+@respx.mock
+async def test_a_rejected_delete_is_a_rejection(engine: QbittorrentEngine) -> None:
+    respx.post(LOGIN).mock(return_value=httpx.Response(200, text="Ok."))
+    respx.post("http://127.0.0.1:8080/api/v2/torrents/delete").mock(
+        return_value=httpx.Response(400)
     )
 
     with pytest.raises(EngineError) as caught:
