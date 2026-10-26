@@ -81,6 +81,19 @@ export const DownloadRow = memo(function DownloadRow({
   const active = isActiveDownload(download);
   const failed = isFailedDownload(download);
   const completed = isCompletedDownload(download);
+  const selectionText = download.selection_label
+    ? `${download.selection_label}${
+        download.selection_size_bytes
+          ? ` · ${formatBytes(download.selection_size_bytes)}`
+          : ""
+      }`
+    : null;
+  const errorText =
+    download.error && download.error.includes("FILE_SELECTION_FAILED")
+      ? `Could not restrict this torrent to ${
+          download.episode_label ?? "the selected files"
+        }. Nothing is downloading.`
+      : download.error;
 
   return (
     <article
@@ -100,15 +113,19 @@ export const DownloadRow = memo(function DownloadRow({
               {label}
             </span>
             {download.episode_label ? <span>{download.episode_label}</span> : null}
-            {download.selection_label ? (
-              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium leading-4 text-accent">
-                {download.selection_label}
+            {selectionText ? (
+              <span
+                className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium leading-4 text-accent"
+                title="The magnet adds the whole torrent; Daku only fetches the selected files."
+              >
+                {selectionText}
               </span>
             ) : null}
             {download.selection_label && download.release_id ? (
               <a
                 href={`#release-files-${download.release_id}`}
                 className="underline decoration-dotted hover:text-fg"
+                title="Open the torrent file list"
               >
                 Files
               </a>
@@ -166,9 +183,9 @@ export const DownloadRow = memo(function DownloadRow({
         </div>
       </div>
 
-      {download.error ? (
+      {errorText ? (
         <p className="mt-2 rounded-control border-l-2 border-danger bg-canvas px-3 py-2 text-[12px] leading-5 text-danger">
-          {download.error}
+          {errorText}
         </p>
       ) : null}
     </article>

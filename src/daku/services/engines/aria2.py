@@ -239,6 +239,12 @@ class Aria2Engine:
             raise transient
         return statuses
 
+    async def stop(self, external_id: str) -> None:
+        await self.pause(external_id)
+
+    async def start(self, external_id: str) -> None:
+        await self.resume(external_id)
+
     async def pause(self, external_id: str) -> None:
         await self.call("aria2.pause", [external_id])
 
@@ -251,6 +257,7 @@ class Aria2Engine:
         indices: Sequence[int],
         *,
         paths: Sequence[str] | None = None,
+        start: bool = True,
     ) -> list[int]:
         """aria2 direct downloads have no torrent file list to select from."""
 

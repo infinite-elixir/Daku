@@ -4,18 +4,32 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
+from daku.errors import AppError
 from daku.models import Download
 from daku.repositories import downloads as downloads_repo
 from daku.repositories import episodes as episodes_repo
 from daku.repositories import media_files as media_repo
 from daku.repositories import releases as releases_repo
 from daku.repositories import titles as titles_repo
+from daku.services.engines.base import EngineFile
 from daku.services.organize import select
 from daku.services.organize.ffprobe import MediaInfo
 
 MB = 1024 * 1024
+
+
+class FakeTorrentEngine:
+    def __init__(self, paths: list[str]) -> None:
+        self.paths = paths
+
+    async def files(self, _external_id: str) -> list[EngineFile]:
+        return [
+            EngineFile(index=index, path=path, size_bytes=0)
+            for index, path in enumerate(self.paths)
+        ]
 
 
 def make_file(path: Path, size: int = 100 * MB) -> Path:
@@ -137,11 +151,68 @@ async def test_engine_indices_are_used_when_paths_were_not_recorded(
         downloads_repo.update_download(session, download.id, selected_files_json="[1]")
         row = downloads_repo.get_download(session, download.id)
         assert row is not None
-        await select.inspect_download(session, row, probe_fn=_probe)
+        await select.inspect_download(
+            session,
+            row,
+            probe_fn=_probe,
+            engine=FakeTorrentEngine(["Show.S02E01.mkv", "Show.S02E02.mkv"]),
+        )
         files = media_repo.list_by_download(session, row.id)
 
     assert [Path(item.src_path).name for item in files] == ["Show.S02E02.mkv"]
     assert files[0].episode_id == episodes[2]
+
+
+async def test_indices_are_never_guessed_from_scan_order(
+    db: tuple[Any, sessionmaker[Session]], tmp_path: Path
+) -> None:
+    _engine, factory = db
+    root = tmp_path / "downloads"
+    make_file(root / "Show.S02E01.mkv")
+    make_file(root / "Show.S02E02.mkv")
+    _title_id, _episodes, download = _series(factory, root)
+
+    with factory() as session:
+        downloads_repo.update_download(session, download.id, selected_files_json="[1]")
+        row = downloads_repo.get_download(session, download.id)
+        assert row is not None
+        with pytest.raises(AppError) as caught:
+            await select.inspect_download(session, row, probe_fn=_probe)
+
+    assert caught.value.code == "MEDIA_SELECTION_UNRESOLVED"
+
+
+async def test_a_twelve_file_pack_files_only_the_selected_episode(
+    db: tuple[Any, sessionmaker[Session]], tmp_path: Path
+) -> None:
+    _engine, factory = db
+    root = tmp_path / "downloads"
+    names = [f"Show.S02E{number:02d}.mkv" for number in range(1, 13)]
+    for name in names:
+        make_file(root / "Show.S02" / name)
+    _title_id, episodes, download = _series(factory, root)
+
+    with factory() as session:
+        downloads_repo.update_download(
+            session,
+            download.id,
+            selected_files_json="[3]",
+            file_match_json=json.dumps({"episode_id": episodes[4], "total_files": 12}),
+        )
+        row = downloads_repo.get_download(session, download.id)
+        assert row is not None
+        await select.inspect_download(
+            session,
+            row,
+            probe_fn=_probe,
+            engine=FakeTorrentEngine([f"Show.S02/{name}" for name in names]),
+        )
+        files = media_repo.list_by_download(session, row.id)
+
+    assert len(files) == 1
+    assert Path(files[0].src_path).name == "Show.S02E04.mkv"
+    assert files[0].episode_id == episodes[4]
+    assert files[0].is_primary
 
 
 async def test_a_null_selection_keeps_every_file(

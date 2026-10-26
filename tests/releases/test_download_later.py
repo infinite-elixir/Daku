@@ -40,7 +40,10 @@ def test_save_then_restart_then_download_links_back(settings: Settings) -> None:
 
         again = second.post("/api/downloads", json={"release_id": release_id})
         assert again.status_code == 409
-        assert again.json()["id"] == body["id"]
+        duplicate = again.json()
+        assert duplicate["id"] == body["id"]
+        assert duplicate["code"] == "DOWNLOAD_ALREADY_TRACKED"
+        assert "already in your downloads" in duplicate["message"]
 
         factory = second.app.state.session_factory  # type: ignore[attr-defined]
         with factory() as session:
@@ -48,6 +51,48 @@ def test_save_then_restart_then_download_links_back(settings: Settings) -> None:
             assert len(rows) == 1
             assert rows[0].release_id == release_id
             assert releases_repo.get_release(session, release_id) is not None
+
+
+class _FakeEngine:
+    def __init__(self) -> None:
+        self.removed: list[str] = []
+
+    async def remove(self, external_id: str, delete_files: bool = False) -> None:
+        self.removed.append(external_id)
+
+
+def test_download_again_after_cancel_requeues_the_same_row(settings: Settings) -> None:
+    with _client(settings) as client:
+        engine = _FakeEngine()
+        client.app.state.qbt_engine = engine  # type: ignore[attr-defined]
+        factory = client.app.state.session_factory  # type: ignore[attr-defined]
+        with factory() as session:
+            title = titles_repo.create_title(session, kind="movie", title="Perfect Blue")
+            title_id = title.id
+        created = client.post("/api/releases", json={"magnet": MAGNET, "title_id": title_id})
+        release_id = created.json()["id"]
+
+        started = client.post("/api/downloads", json={"release_id": release_id})
+        assert started.status_code == 201
+        download_id = started.json()["id"]
+
+        cancelled = client.post(f"/api/downloads/{download_id}/cancel")
+        assert cancelled.status_code == 200
+        assert cancelled.json()["status"] == "cancelled"
+
+        again = client.post("/api/downloads", json={"release_id": release_id})
+        assert again.status_code == 202, again.text
+        body = again.json()
+        assert body["id"] == download_id
+        assert body["status"] == "queued"
+        assert body["progress"] == 0.0
+        assert body["error"] is None
+        assert engine.removed == [HASH, HASH]
+
+        with factory() as session:
+            rows = downloads_repo.list_downloads(session)
+            assert len(rows) == 1
+            assert rows[0].status == "queued"
 
 
 def test_unsaving_does_not_touch_a_download(settings: Settings) -> None:

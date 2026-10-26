@@ -568,6 +568,7 @@ export interface DownloadRecord {
   selected_files?: number[] | null;
   file_match?: Record<string, unknown> | null;
   selection_label?: string | null;
+  selection_size_bytes?: number | null;
 }
 
 export interface DownloadsResponse {

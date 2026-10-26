@@ -260,6 +260,13 @@ payloads are served on upstream failure. Nyaa is never queried for movies or non
   `GET /api/v2/app/webapiVersion` once per process: `>= 2.11.0` uses
   `/torrents/stop|start`, older uses `/torrents/pause|resume`. If the probe fails, it tries
   start/stop first and falls back on `404`, caching the working pair.
+- File selection is enforced with the **stop → `filePrio` → verify → start** contract:
+  stop the torrent, wait for metadata, POST every file with selected `1` / others `0`,
+  read `/torrents/files` back until every priority matches, and only then start. Any
+  failure leaves the torrent stopped. Web API `>= 2.11.9` also receives add-time
+  `filePriorities` when the probe already knows the file list, but that never replaces the
+  stop/verify path. Live re-selection uses the same sequence and restores the previous
+  priorities (stopped) when the new selection is rejected.
 - Linux uses `qbittorrent-nox`; its Web API is identical to the GUI build.
 
 ### aria2 JSON-RPC
@@ -314,7 +321,9 @@ File selection (T-031) is also not a new state. `downloads.selected_files_json` 
 `downloads.file_match_json` say which torrent files the existing `active` download may
 fetch. A metadata timeout is a transient engine error (`FILE_SELECTION_PENDING`) while the
 torrent stays `paused`; the worker retries the selection with backoff. Nothing resumes the
-whole pack and the organiser only sees the selected files.
+whole pack and the organiser only sees the selected files. The magnet necessarily adds the
+whole torrent: "download only one file" means file priorities, never a partial torrent.
+Selection is metadata, not a state; a failed selection is an ordinary `failed` row.
 
 ---
 

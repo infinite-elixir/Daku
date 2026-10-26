@@ -25,7 +25,8 @@ from daku.models import Download, MediaFile, Release, Title
 from daku.repositories import episodes as episodes_repo
 from daku.repositories import media_files as media_repo
 from daku.repositories import releases as releases_repo
-from daku.services.organize.ffprobe import MediaInfo, probe
+from daku.services.organize.ffprobe import MediaInfo
+from daku.services.organize.ffprobe import probe as _default_probe
 from daku.services.releases.episode_match import normalize_path, season_episode_from_path
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,9 @@ SAMPLE_DIRS: frozenset[str] = frozenset(
 SAMPLE_TOKENS: tuple[str, ...] = ("sample", "trailer", "featurette", "preview")
 
 ProbeFn = Callable[..., Awaitable[MediaInfo]]
+
+# Kept as a module attribute so tests and callers can monkeypatch the default probe.
+probe = _default_probe
 
 
 @dataclass(slots=True)
@@ -272,17 +276,55 @@ def _path_keys(path: Path, root: Path) -> set[str]:
     return {key for key in keys if key}
 
 
-def _filter_selected(paths: list[Path], root: Path, download: Download) -> list[Path]:
-    indices, selected_paths = _selection(download)
-    if selected_paths:
-        wanted = {normalize_path(item) for item in selected_paths if item}
-        return [path for path in paths if _path_keys(path, root) & wanted]
-    if indices is not None:
-        # Last resort when only engine indices were stored: the scan is sorted
-        # and qBittorrent indexes follow the torrent file order.
-        wanted_indices = set(indices)
-        return [path for index, path in enumerate(paths) if index in wanted_indices]
-    return paths
+def _filter_selected(paths: list[Path], root: Path, selected_paths: list[str]) -> list[Path]:
+    if not selected_paths:
+        return paths
+    wanted = {normalize_path(item) for item in selected_paths if item}
+    return [path for path in paths if _path_keys(path, root) & wanted]
+
+
+async def _resolved_selected_paths(
+    download: Download,
+    release: Release,
+    *,
+    engine: Any | None,
+    probe: Any | None,
+) -> list[str]:
+    """Resolve persisted indices to paths without ever trusting scan order."""
+
+    _indices, paths = _selection(download)
+    if paths:
+        return paths
+    indices = _indices
+    if indices is None:
+        return []
+
+    by_index: dict[int, str] = {}
+    if engine is not None:
+        try:
+            files = await engine.files(download.external_id)
+        except Exception:
+            files = []
+        by_index = {item.index: item.path for item in files if getattr(item, "path", None)}
+    if not by_index and probe is not None and release.magnet:
+        try:
+            metadata = await probe.probe(release.magnet)
+        except Exception:
+            metadata = None
+        if metadata is not None:
+            by_index = {item.index: item.path for item in metadata.files}
+
+    resolved = [by_index[index] for index in dict.fromkeys(indices) if index in by_index]
+    if len(resolved) != len(set(indices)):
+        raise AppError(
+            code="MEDIA_SELECTION_UNRESOLVED",
+            message=(
+                "The selected torrent file could not be resolved to a path; "
+                "refusing to guess from the scan order"
+            ),
+            status_code=422,
+        )
+    return resolved
 
 
 def _episode_id_for(
@@ -316,6 +358,8 @@ async def inspect_download(
     ffprobe_bin: str | None = None,
     probe_fn: ProbeFn | None = None,
     max_parallel: int = MAX_PARALLEL_PROBES,
+    engine: Any | None = None,
+    probe: Any | None = None,
 ) -> InspectionResult:
     """Scan, probe and persist the media files for a completed download."""
 
@@ -331,7 +375,13 @@ async def inspect_download(
 
     paths = scan_video_files(directory)
     scan_root = directory if directory.is_dir() else directory.parent
-    paths = _filter_selected(paths, scan_root, download)
+    selected_paths = await _resolved_selected_paths(
+        download,
+        release,
+        engine=engine,
+        probe=probe,
+    )
+    paths = _filter_selected(paths, scan_root, selected_paths)
     if not paths:
         raise AppError(
             code="MEDIA_NOT_FOUND",
@@ -340,10 +390,11 @@ async def inspect_download(
         )
 
     candidates = [build_candidate(path, scan_root) for path in paths]
+    default_probe = globals().get("probe", _default_probe)
     errors = await _probe_candidates(
         candidates,
         ffprobe_bin=ffprobe_bin,
-        probe_fn=probe_fn or probe,
+        probe_fn=probe_fn or default_probe,
         max_parallel=max_parallel,
     )
 

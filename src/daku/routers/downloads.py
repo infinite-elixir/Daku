@@ -34,6 +34,15 @@ router = APIRouter(prefix="/api", tags=["downloads"])
 
 SIZE_PROBE_TIMEOUT_SECONDS = 3.0
 TERMINAL_STATUSES = frozenset({"cancelled", "available", "organizing"})
+RETRYABLE_STATUSES = frozenset({"failed", "cancelled"})
+
+DUPLICATE_CODE = "DOWNLOAD_ALREADY_TRACKED"
+
+
+def _duplicate_message(status: str) -> str:
+    if status in {"complete", "available", "organizing"}:
+        return "This release is already in your library. Open Downloads to see it."
+    return "This release is already in your downloads. Open Downloads to track or cancel it."
 
 
 class StartDownloadRequest(BaseModel):
@@ -113,13 +122,43 @@ async def _resolve(
     )
 
 
+async def _requeue_existing(
+    request: Request,
+    session: Session,
+    row: Download,
+    selection: Selection,
+) -> dict[str, Any]:
+    """Restart a cancelled or failed download in place for a Download click."""
+
+    # Clear any engine-side entry left behind so the worker can add it cleanly again.
+    with contextlib.suppress(AppError, EngineError):
+        await _engine(request, row.engine).remove(row.external_id, delete_files=False)
+    updated = downloads_repo.update_download(
+        session,
+        row.id,
+        status="queued",
+        progress=0.0,
+        downloaded_bytes=0,
+        speed_bps=None,
+        eta_seconds=None,
+        error=None,
+    )
+    payload = _payload(session, updated or row)
+    payload.update(selection.to_dict())
+    _publish(request, "download.updated", payload)
+    return payload
+
+
 async def _apply_live_selection(
     request: Request,
     session: Session,
     row: Download,
     selection: Selection,
+    previous: list[int] | None = None,
+    previous_files_json: str | None = None,
+    previous_match_json: str | None = None,
 ) -> None:
-    """Push a new selection to an already-running torrent in place."""
+    """Stop, re-prioritise, verify and start an already-running torrent in place."""
 
     if row.status != "active" or selection.indices is None:
         return
@@ -127,6 +166,8 @@ async def _apply_live_selection(
     setter = getattr(engine, "set_file_selection", None)
     if setter is None:
         return
+    if previous is None:
+        previous = _json_indices(row.selected_files_json)
     try:
         effective = await setter(
             row.external_id,
@@ -134,20 +175,64 @@ async def _apply_live_selection(
             paths=selection.paths,
         )
     except EngineError as exc:
+        if previous:
+            # Best effort: put the old priorities back but leave the torrent stopped.
+            with contextlib.suppress(EngineError, Exception):
+                await setter(row.external_id, previous, start=False)
+            downloads_repo.update_download(
+                session,
+                row.id,
+                selected_files_json=previous_files_json,
+                file_match_json=previous_match_json,
+            )
+        code = exc.code if exc.transient else "FILE_SELECTION_FAILED"
         raise AppError(
-            code=exc.code,
+            code=code,
             message=exc.message,
             status_code=502 if exc.transient else 409,
         ) from exc
     if effective:
         match = dict(selection.match or {})
         match["file_paths"] = selection.paths or match.get("file_paths")
+        match["selected_size_bytes"] = _selection_size(match, selection)
         downloads_repo.update_download(
             session,
             row.id,
             selected_files_json=json.dumps(effective),
             file_match_json=(json.dumps(match, ensure_ascii=False) if match else None),
         )
+
+
+def _json_indices(raw: str | None) -> list[int] | None:
+    if not raw:
+        return None
+    try:
+        value = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    if isinstance(value, list) and all(isinstance(item, int) for item in value):
+        return value
+    return None
+
+
+def _current_selection(
+    session: Session, info_hash: str
+) -> tuple[list[int] | None, str | None, str | None]:
+    row = downloads_repo.find_by_external_id(
+        session, engine="qbittorrent", external_id=(info_hash or "").lower()
+    )
+    if row is None or row.status != "active":
+        return None, None, None
+    return _json_indices(row.selected_files_json), row.selected_files_json, row.file_match_json
+
+
+def _selection_size(match: dict[str, Any], selection: Selection) -> int | None:
+    if selection.metadata is None or selection.indices is None:
+        existing = match.get("selected_size_bytes")
+        return existing if isinstance(existing, int) and existing > 0 else None
+    chosen = set(selection.indices)
+    total = sum(item.size_bytes for item in selection.metadata.files if item.index in chosen)
+    return total or None
 
 
 @router.post("/downloads/preview")
@@ -283,6 +368,9 @@ async def start_download(
     selection = await _resolve(request, session, release, body)
 
     settings = request.app.state.settings
+    previous_selection, previous_files_json, previous_match_json = _current_selection(
+        session, release.info_hash
+    )
     result = queue_release(
         session,
         release,
@@ -297,13 +385,30 @@ async def start_download(
         response.status_code = 201
         return payload
 
-    await _apply_live_selection(request, session, result.download, selection)
+    if result.download.status in RETRYABLE_STATUSES:
+        # The release was downloaded before and either failed or was cancelled.
+        # Pressing Download again is a retry, not a duplicate.
+        payload = await _requeue_existing(request, session, result.download, selection)
+        response.status_code = 202
+        return payload
+
+    await _apply_live_selection(
+        request,
+        session,
+        result.download,
+        selection,
+        previous_selection,
+        previous_files_json,
+        previous_match_json,
+    )
 
     # The same info-hash is already tracked. Returning the existing row with 409
     # makes a double tap harmless and tells the UI to open the existing download.
     response.status_code = 409
     payload = _payload(session, result.download)
     payload.update(selection.to_dict())
+    payload["code"] = DUPLICATE_CODE
+    payload["message"] = _duplicate_message(result.download.status)
     return payload
 
 
@@ -426,7 +531,13 @@ async def inspect_completed_download(
 
     row = _get_or_404(session, download_id)
     settings = request.app.state.settings
-    result = await inspect_download(session, row, settings=settings)
+    result = await inspect_download(
+        session,
+        row,
+        settings=settings,
+        engine=getattr(request.app.state, "qbt_engine", None),
+        probe=getattr(request.app.state, "probe", None),
+    )
     _publish(request, "download.updated", _payload(session, row))
     return result.to_dict()
 

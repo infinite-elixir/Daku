@@ -78,6 +78,13 @@ def _metadata_files(metadata: TorrentMetadata) -> list[dict[str, Any]]:
     return [item.to_dict() for item in metadata.files]
 
 
+def _size_for_index(files: list[TorrentFile], index: int) -> int:
+    for item in files:
+        if item.index == index:
+            return item.size_bytes
+    return 0
+
+
 def _resolve_path(path: str, files: list[TorrentFile]) -> TorrentFile | None:
     wanted = normalize_path(path)
     if not wanted:
@@ -190,6 +197,7 @@ async def resolve_selection(
                 "confidence": 100,
                 "reason": "explicit selection",
                 "file_paths": paths,
+                "selected_size_bytes": sum(item.size_bytes for item in chosen),
                 "total_files": len(metadata.files),
             },
             metadata=metadata,
@@ -246,6 +254,7 @@ async def resolve_selection(
                     "confidence": matched.score,
                     "reason": matched.reason,
                     "file_paths": [matched.path],
+                    "selected_size_bytes": _size_for_index(files, matched.index),
                     "total_files": len(files),
                 },
                 metadata=probed,
@@ -265,6 +274,7 @@ async def resolve_selection(
                 match={
                     "pack": True,
                     "reason": "whole pack requested",
+                    "selected_size_bytes": sum(item.size_bytes for item in files),
                     "total_files": len(files),
                 },
                 metadata=probed,
@@ -299,6 +309,7 @@ async def resolve_selection(
                 "confidence": winner.score,
                 "reason": winner.reason,
                 "file_paths": paths,
+                "selected_size_bytes": _size_for_index(files, winner.index),
                 "total_files": len(files),
             },
             metadata=probed,

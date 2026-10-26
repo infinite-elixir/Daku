@@ -2,6 +2,11 @@
 
 **Phase:** 8 · **Depends on:** T-009, T-012, T-013, T-030 · **Estimate:** L
 
+> **Regression:** the matcher and the selection metadata are correct, but the engine-side
+> enforcement is broken against qBittorrent 5.x (add response parsing and the ignored
+> `paused` flag). See **T-040** and **T-041**; do not treat the boxes below as proof that a
+> pack is restricted on a live 5.x install.
+
 ## Goal
 
 Make season packs and multi-file torrents usable for one episode. When the user asks for

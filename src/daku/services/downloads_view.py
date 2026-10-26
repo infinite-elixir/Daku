@@ -68,6 +68,9 @@ def download_payload(session: Session, row: Download) -> dict[str, Any]:
         candidate = match.get("episode_id")
         episode_id = candidate if isinstance(candidate, str) else None
     episode = session.get(Episode, episode_id) if episode_id else None
+    selected_size = match.get("selected_size_bytes") if isinstance(match, dict) else None
+    if not isinstance(selected_size, int) or selected_size <= 0:
+        selected_size = None
     return {
         "id": row.id,
         "release_id": row.release_id,
@@ -93,4 +96,5 @@ def download_payload(session: Session, row: Download) -> dict[str, Any]:
         "selected_files": selected,
         "file_match": match,
         "selection_label": _selection_label(selected, match, episode),
+        "selection_size_bytes": selected_size,
     }

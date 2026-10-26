@@ -389,6 +389,18 @@ Tickets live in `tickets/`. Each is independently shippable and lists acceptance
 | T-037 | Aggregate season structure (specials, split cours) for anime |
 | T-038 | Providers popover that escapes episode/release clipping |
 
+### Phase 11 — Download engine correctness
+
+| Ticket | Deliverable |
+|---|---|
+| T-039 | Remove a download from the queue without touching the library |
+| T-040 | qBittorrent 5.x add response parsing and `start`/`stop` endpoints |
+| T-041 | Enforce the T-031 file selection so a pack never downloads every file |
+
+Phase 11 is a correctness pass over the download engine. T-040 is the blocker: until the
+qBittorrent 5.x add response is parsed, a successful add is recorded as a failure and T-041
+never gets the chance to apply file priorities.
+
 T-021 and T-023 are the two halves of "search → pick → watch"; T-022 is the repair path for
 entries added while metadata was offline. Phase 7 makes classification and provider selection
 honest; Phase 8 makes the acquisition side understand what a release actually contains; Phase 9
@@ -417,6 +429,8 @@ T-024 → T-033 → T-034, T-035
 T-021 → T-038 (also needs T-023)
 T-028, T-029 → T-036 → T-037 (T-036 also needs T-004, T-021)
 T-005, T-022, T-028, T-029 → T-037
+T-011, T-031 → T-039
+T-009 → T-040 → T-041 (T-041 also needs T-031)
 ```
 
 Note: T-008 depends on T-006 *and* T-007, and is usable before T-009. You can build a

@@ -74,8 +74,14 @@ Do not store the magnet in logs. The download row keeps only `release_id` and `e
   `routers/downloads.py` implement the ticket.
 - A duplicate `POST /api/downloads {release_id}` now returns **409** with the existing
   row; the T-008 test was updated to expect that.
+- Pressing Download again for a `failed` or `cancelled` row re-queues that same row
+  (`202`, status `queued`, progress reset) instead of returning a bare 409. Duplicate
+  `active`/`queued` rows still return 409 and now carry `code=DOWNLOAD_ALREADY_TRACKED`
+  plus a human-readable `message` for the UI.
 - The worker starts from the FastAPI lifespan unless `worker_enabled=false`
   (`DAKU_WORKER_ENABLED`). Tests disable it and drive `Worker.tick()` directly.
 - Unreachable qBittorrent writes the message to `downloads.error` and leaves the row
   `active`; the doctor reports `degraded` via a live version probe.
+- A failed login now starts a cooldown (30 s for bad credentials, 120 s for a banned IP)
+  instead of retrying on every worker tick, which previously kept the qBittorrent ban alive.
 - Status changes are also recorded as `download.status` events for T-011 to consume.

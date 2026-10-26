@@ -52,6 +52,9 @@ class AddRequest:
     tag: str | None = None
     #: Torrents are added paused when a file selection has to be applied first.
     paused: bool = False
+    #: Add-time file priorities when the metadata is already known from the probe.
+    file_indices: Sequence[int] | None = None
+    total_files: int | None = None
 
 
 @dataclass(slots=True)
@@ -102,6 +105,10 @@ class DownloadEngine(Protocol):
         """Return snapshots keyed by lowercased external id."""
         ...
 
+    async def stop(self, external_id: str) -> None: ...
+
+    async def start(self, external_id: str) -> None: ...
+
     async def pause(self, external_id: str) -> None: ...
 
     async def resume(self, external_id: str) -> None: ...
@@ -114,6 +121,7 @@ class DownloadEngine(Protocol):
         indices: Sequence[int],
         *,
         paths: Sequence[str] | None = None,
+        start: bool = True,
     ) -> list[int]:
         """Keep only ``indices`` (or ``paths``) and return the effective indices."""
         ...

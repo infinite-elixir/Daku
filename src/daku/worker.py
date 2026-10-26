@@ -55,6 +55,7 @@ class _Selection:
     indices: list[int] | None = None
     paths: list[str] | None = None
     pending: bool = False
+    total_files: int | None = None
 
 
 def _parse_json(raw: str | None) -> Any:
@@ -76,12 +77,16 @@ def _selection(download: Any) -> _Selection:
     match = _parse_json(download.file_match_json)
     paths: list[str] | None = None
     pending = False
+    total_files: int | None = None
     if isinstance(match, dict):
         raw_paths = match.get("file_paths")
         if isinstance(raw_paths, list):
             paths = [item for item in raw_paths if isinstance(item, str)] or None
         pending = bool(match.get("selection_pending"))
-    return _Selection(indices=indices, paths=paths, pending=pending)
+        raw_total = match.get("total_files")
+        if isinstance(raw_total, int) and raw_total > 0:
+            total_files = raw_total
+    return _Selection(indices=indices, paths=paths, pending=pending, total_files=total_files)
 
 
 def _row(download: Any) -> _Row:
@@ -192,13 +197,17 @@ class Worker:
                 if adopted:
                     continue
 
+            selection = _selection(row)
+            has_selection = selection.indices is not None
             request = AddRequest(
                 external_id=row.external_id,
                 url=url,
                 save_path=row.save_path or str(self._settings.downloads_dir),
                 filename=self._release_filename(row.release_id),
                 tag=self._release_title_id(row.release_id),
-                paused=bool(_selection(row).indices),
+                paused=has_selection,
+                file_indices=selection.indices,
+                total_files=selection.total_files,
             )
             try:
                 external_id = await engine.add(request)
@@ -214,13 +223,31 @@ class Worker:
 
             self._update(
                 row.id,
-                status="active",
                 external_id=external_id,
                 error=None,
                 progress=0.0,
             )
             self._touch_external_id(row, external_id)
-            self._event(row.id, "active", type="started")
+
+            if not has_selection:
+                self._update(row.id, status="active")
+                row.status = "active"
+                self._event(row.id, "active", type="started")
+                self._publish(row.id, force=True)
+                continue
+
+            # Close the race on versions that ignore the add-time pause flag. The
+            # selection setter stops again (idempotent) before setting priorities.
+            stop = getattr(engine, "stop", None)
+            if stop is not None:
+                try:
+                    await stop(external_id)
+                except EngineError as exc:
+                    if exc.transient:
+                        self._mark_selection_pending(row, exc.message)
+                    else:
+                        self._fail(row, f"{exc.code}: {exc.message}")
+                    continue
             if not await self._apply_selection(engine, row):
                 continue
             self._publish(row.id, force=True)
@@ -234,6 +261,7 @@ class Worker:
         setter = getattr(engine, "set_file_selection", None)
         if setter is None:
             return True
+        previous = row.status
         try:
             effective = await setter(
                 row.external_id,
@@ -244,7 +272,7 @@ class Worker:
             if exc.transient:
                 self._mark_selection_pending(row, exc.message)
                 return False
-            self._fail(row, exc.message)
+            self._fail(row, f"{exc.code}: {exc.message}")
             return False
         except Exception as exc:  # pragma: no cover - defensive
             self._mark_selection_pending(row, str(exc))
@@ -269,6 +297,8 @@ class Worker:
         row.error = None
         self._selection_attempts.pop(row.id, None)
         self._selection_not_before.pop(row.id, None)
+        if previous != "active":
+            self._event(row.id, "active", type="started")
         return True
 
     def _mark_selection_pending(self, row: _Row, message: str) -> None:
@@ -278,6 +308,15 @@ class Worker:
         match["selection_pending"] = True
         attempts = self._selection_attempts.get(row.id, 0) + 1
         self._selection_attempts[row.id] = attempts
+        if attempts >= 5:
+            self._selection_attempts.pop(row.id, None)
+            self._selection_not_before.pop(row.id, None)
+            self._fail(
+                row,
+                f"FILE_SELECTION_FAILED: could not restrict this torrent after "
+                f"5 attempts: {message}",
+            )
+            return
         delay = min(60.0, float(2 ** min(attempts - 1, 6)))
         self._selection_not_before[row.id] = time.monotonic() + delay
         error = f"FILE_SELECTION_PENDING: {message}"
@@ -300,8 +339,7 @@ class Worker:
             not_before = self._selection_not_before.get(row.id, 0.0)
             if not_before > now:
                 continue
-            self._update(row.id, status="active", error=None)
-            row.status = "active"
+            self._update(row.id, error=None)
             if await self._apply_selection(engine, row):
                 self._publish(row.id, force=True)
 
@@ -316,10 +354,13 @@ class Worker:
         status = self._status_for(statuses, row.external_id)
         if status is None:
             return False
+        selection = _selection(row)
+        if selection.pending or selection.indices is not None:
+            # Never adopt a partially tracked selection as an active whole pack.
+            await self._apply_selection(engine, row)
+            return True
         if self._apply(row, status):
             await self._auto_inspect(row)
-        elif _selection(row).indices is not None:
-            await self._apply_selection(engine, row)
         return True
 
     # -- polling -------------------------------------------------------------
@@ -457,7 +498,12 @@ class Worker:
                 download = downloads_repo.get_download(session, row.id)
                 if download is None:
                     return
-                await inspect_download(session, download, settings=self._settings)
+                await inspect_download(
+                    session,
+                    download,
+                    settings=self._settings,
+                    engine=self._engines.get(row.engine),
+                )
         except AppError as exc:
             self._update(row.id, error=f"{exc.code}: {exc.message}")
         except Exception:  # pragma: no cover - inspection must not kill the loop

@@ -9,6 +9,7 @@ from daku.repositories import downloads as downloads_repo
 from daku.repositories import episodes as episodes_repo
 from daku.repositories import releases as releases_repo
 from daku.repositories import titles as titles_repo
+from daku.services.engines.base import EngineError
 from daku.services.torrents.probe import TorrentFile, TorrentMetadata
 
 HASH = "a" * 40
@@ -39,6 +40,29 @@ class FakeProbe:
             files=files,
             fetched_at="2026-10-26T00:00:00Z",
         )
+
+
+class FakeLiveEngine:
+    def __init__(self, error: Exception | None = None) -> None:
+        self.error = error
+        self.calls: list[tuple[list[int], bool]] = []
+
+    async def set_file_selection(
+        self,
+        _external_id: str,
+        indices: list[int],
+        *,
+        paths: list[str] | None = None,
+        start: bool = True,
+    ) -> list[int]:
+        self.calls.append((list(indices), start))
+        if self.error is not None:
+            raise self.error
+        return list(indices)
+
+
+def _install_live(client: TestClient, engine: FakeLiveEngine) -> None:
+    client.app.state.qbt_engine = engine  # type: ignore[attr-defined]
 
 
 def _install(client: TestClient, probe: FakeProbe) -> None:
@@ -235,3 +259,71 @@ def test_anime_absolute_match_uses_the_absolute_number(
     assert response.status_code == 201, response.text
     assert response.json()["selected_files"] == [0]
     assert "absolute 17" in response.json()["match"]["reason"]
+
+
+def _active_row(client: TestClient, release_id: str) -> str:
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        row = downloads_repo.create_download(
+            session,
+            source="torrent",
+            engine="qbittorrent",
+            external_id=HASH,
+            release_id=release_id,
+            status="active",
+            save_path="/downloads",
+            selected_files_json="[4]",
+            file_match_json='{"file_paths": ["Show.S02E05.1080p.mkv"]}',
+        )
+        return row.id
+
+
+def test_live_reselection_updates_an_active_torrent(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, _settings = app_client
+    _install(client, FakeProbe())
+    release_id, _episode_id = _seed(client)
+    download_id = _active_row(client, release_id)
+    engine = FakeLiveEngine()
+    _install_live(client, engine)
+
+    response = client.post(
+        "/api/downloads",
+        json={"release_id": release_id, "file_indices": [5]},
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["code"] == "DOWNLOAD_ALREADY_TRACKED"
+    assert engine.calls == [([5], True)]
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        row = downloads_repo.get_download(session, download_id)
+    assert row is not None
+    assert row.selected_files_json == "[5]"
+
+
+def test_a_rejected_live_reselection_restores_priorities_and_returns_409(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, _settings = app_client
+    _install(client, FakeProbe())
+    release_id, _episode_id = _seed(client)
+    download_id = _active_row(client, release_id)
+    engine = FakeLiveEngine(
+        error=EngineError("QBT_FILE_SELECTION_FAILED", "priorities were not applied")
+    )
+    _install_live(client, engine)
+
+    response = client.post(
+        "/api/downloads",
+        json={"release_id": release_id, "file_indices": [5]},
+    )
+
+    assert response.status_code == 409, response.text
+    body = response.json()
+    assert body["code"] == "FILE_SELECTION_FAILED"
+    assert "priorities were not applied" in body["message"]
+    assert engine.calls == [([5], True), ([4], False)]
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        row = downloads_repo.get_download(session, download_id)
+    assert row is not None
+    assert row.selected_files_json == "[4]"

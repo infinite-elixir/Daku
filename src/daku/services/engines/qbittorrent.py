@@ -42,6 +42,10 @@ QBT_LOGIN_COOLDOWN_SECONDS = 30.0
 QBT_LOGIN_BAN_COOLDOWN_SECONDS = 120.0
 # qBittorrent 5.0 (Web API 2.11.0) renamed pause/resume to stop/start.
 QBT_START_STOP_WEBAPI_VERSION = (2, 11, 0)
+# Add-time file priorities exist from Web API 2.11.9 (qBittorrent 5.1).
+QBT_ADD_FILE_PRIORITY_WEBAPI_VERSION = (2, 11, 9)
+QBT_FILE_SELECTION_VERIFY_ATTEMPTS = 3
+QBT_FILE_SELECTION_VERIFY_DELAYS = (0.05, 0.1)
 
 ACTIVE_STATES = frozenset(
     {
@@ -249,23 +253,42 @@ class QbittorrentEngine:
 
     async def add(self, request: AddRequest) -> str:
         stopped = "true" if request.paused else "false"
+        files = {
+            "urls": (None, request.url),
+            "savepath": (None, request.save_path),
+            "category": (None, QBT_CATEGORY),
+            "tags": (None, request.tag or ""),
+            "sequentialDownload": (None, "false"),
+            "firstLastPiecePrio": (None, "true"),
+            # 4.x/5.0/5.1 read ``paused``; 5.2+ reads ``stopped``.
+            "paused": (None, stopped),
+            "stopped": (None, stopped),
+        }
+        priorities = await self._add_time_priorities(request)
+        if priorities is not None:
+            files["filePriorities"] = (None, priorities)
         response = await self._request(
             "POST",
             "/api/v2/torrents/add",
-            files={
-                "urls": (None, request.url),
-                "savepath": (None, request.save_path),
-                "category": (None, QBT_CATEGORY),
-                "tags": (None, request.tag or ""),
-                "sequentialDownload": (None, "false"),
-                "firstLastPiecePrio": (None, "true"),
-                # 4.x/5.0/5.1 read ``paused``; 5.2+ reads ``stopped``.
-                "paused": (None, stopped),
-                "stopped": (None, stopped),
-            },
+            files=files,
         )
         self._check_add_response(response, request.external_id)
         return request.external_id.lower()
+
+    async def _add_time_priorities(self, request: AddRequest) -> str | None:
+        """Build ``filePriorities`` only when metadata and a modern API are known."""
+
+        if request.file_indices is None or not request.total_files:
+            return None
+        version = await self._probe_webapi_version()
+        if version is None or version < QBT_ADD_FILE_PRIORITY_WEBAPI_VERSION:
+            return None
+        total = request.total_files
+        chosen = set(request.file_indices)
+        return "|".join(
+            str(QBT_PRIORITY_NORMAL if index in chosen else QBT_PRIORITY_SKIP)
+            for index in range(total)
+        )
 
     def _check_add_response(self, response: httpx.Response, external_id: str) -> None:
         if not 200 <= response.status_code < 300:
@@ -422,11 +445,17 @@ class QbittorrentEngine:
             f"qBittorrent rejected {primary} (HTTP 404)",
         )
 
-    async def pause(self, external_id: str) -> None:
+    async def stop(self, external_id: str) -> None:
         await self._set_running(external_id, running=False)
 
-    async def resume(self, external_id: str) -> None:
+    async def start(self, external_id: str) -> None:
         await self._set_running(external_id, running=True)
+
+    async def pause(self, external_id: str) -> None:
+        await self.stop(external_id)
+
+    async def resume(self, external_id: str) -> None:
+        await self.start(external_id)
 
     async def remove(self, external_id: str, *, delete_files: bool = False) -> None:
         await self._request(
@@ -530,8 +559,16 @@ class QbittorrentEngine:
         indices: Sequence[int],
         *,
         paths: Sequence[str] | None = None,
+        start: bool = True,
     ) -> list[int]:
-        """Set every unselected file to priority 0, selected files to normal, then resume."""
+        """Stop, set every file priority, verify them, then optionally start.
+
+        The magnet adds the whole torrent; only file priorities decide what is
+        fetched. If any step fails the torrent is left stopped so the pack never
+        starts downloading by accident.
+        """
+
+        await self.stop(external_id)
 
         files = await self._wait_for_files(external_id)
 
@@ -565,21 +602,46 @@ class QbittorrentEngine:
 
         chosen = set(selected)
         ids = [str(item.index) for item in files]
-        priorities = [
-            str(QBT_PRIORITY_NORMAL if item.index in chosen else QBT_PRIORITY_SKIP)
+        expected = {
+            item.index: QBT_PRIORITY_NORMAL if item.index in chosen else QBT_PRIORITY_SKIP
             for item in files
-        ]
-        await self._request(
-            "POST",
-            "/api/v2/torrents/filePrio",
-            data={
-                "hash": external_id.lower(),
-                "id": "|".join(ids),
-                "priority": "|".join(priorities),
-            },
+        }
+        priorities = [str(expected[item.index]) for item in files]
+        try:
+            await self._request(
+                "POST",
+                "/api/v2/torrents/filePrio",
+                data={
+                    "hash": external_id.lower(),
+                    "id": "|".join(ids),
+                    "priority": "|".join(priorities),
+                },
+            )
+        except EngineError as exc:
+            raise EngineError(
+                "QBT_FILE_SELECTION_FAILED",
+                f"qBittorrent rejected the file selection: {exc.message}",
+            ) from exc
+
+        await self._verify_file_priorities(external_id, expected)
+        if start:
+            await self.start(external_id)
+        return sorted(selected)
+
+    async def _verify_file_priorities(self, external_id: str, expected: dict[int, int]) -> None:
+        """Read priorities back; qBittorrent applies filePrio asynchronously."""
+
+        for attempt in range(QBT_FILE_SELECTION_VERIFY_ATTEMPTS):
+            files = await self.files(external_id)
+            actual = {item.index: item.priority for item in files}
+            if all(actual.get(index) == priority for index, priority in expected.items()):
+                return
+            if attempt < len(QBT_FILE_SELECTION_VERIFY_DELAYS):
+                await asyncio.sleep(QBT_FILE_SELECTION_VERIFY_DELAYS[attempt])
+        raise EngineError(
+            "QBT_FILE_SELECTION_FAILED",
+            "qBittorrent did not apply the file priorities",
         )
-        await self.resume(external_id)
-        return selected
 
     async def health(self) -> Health:
         try:

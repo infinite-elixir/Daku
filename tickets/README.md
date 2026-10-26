@@ -44,6 +44,9 @@ contracts. If a ticket contradicts `AGENTS.md`, `AGENTS.md` wins and the ticket 
 | [T-036](T-036-anime-episode-titles.md) | 10 | T-004, T-021, T-028, T-029 | Anime episode titles + air dates |
 | [T-037](T-037-anime-season-structure.md) | 10 | T-005, T-022, T-028, T-029, T-036 | Aggregate anime season structure |
 | [T-038](T-038-providers-popover-clipping.md) | 10 | T-021, T-023 | Unclipped providers popover |
+| [T-039](T-039-remove-from-download-queue.md) | 11 | T-011, T-031 | Remove a download from the queue |
+| [T-040](T-040-qbittorrent-5x-compatibility.md) | 11 | T-009 | qBittorrent 5.x add response and start/stop |
+| [T-041](T-041-enforce-selective-downloads.md) | 11 | T-031, T-040 | Enforce selective downloads (T-031 regression) |
 
 ## Rules
 
