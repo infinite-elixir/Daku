@@ -5,6 +5,9 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+import httpx
+import respx
+
 from daku.config import Settings
 from daku.events import EventBus
 from daku.models import Download
@@ -13,6 +16,7 @@ from daku.repositories import media_files as media_repo
 from daku.repositories import releases as releases_repo
 from daku.repositories import titles as titles_repo
 from daku.services.engines.base import AddRequest, EngineStatus, Health
+from daku.services.engines.qbittorrent import QbittorrentEngine
 from daku.services.organize.ffprobe import MediaInfo
 from daku.services.queue import queue_release
 from daku.worker import Worker
@@ -113,6 +117,72 @@ async def test_progress_events_are_throttled_to_one_per_second(
         events.append(queue.get_nowait())
     assert len(events) == 1
     assert events[0].data["progress"] == 0.4
+
+
+@respx.mock
+async def test_qbittorrent_json_add_becomes_active_with_live_progress(
+    db: tuple[Any, Any], settings: Settings
+) -> None:
+    """The 5.2 add response must not strand a queued row in ``failed``."""
+
+    _engine, factory = db
+    bus = EventBus()
+    queue = bus.subscribe()
+    configured = settings.model_copy(
+        update={"qbt_url": "http://127.0.0.1:8080", "qbt_user": "admin", "qbt_pass": "secret"}
+    )
+    respx.post("http://127.0.0.1:8080/api/v2/auth/login").mock(return_value=httpx.Response(204))
+    respx.post("http://127.0.0.1:8080/api/v2/torrents/add").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "success_count": 1,
+                "failure_count": 0,
+                "pending_count": 0,
+                "added_torrent_ids": [HASH],
+            },
+        )
+    )
+    respx.get("http://127.0.0.1:8080/api/v2/torrents/info").mock(
+        side_effect=[
+            httpx.Response(200, json=[]),
+            httpx.Response(
+                200,
+                json=[
+                    {
+                        "hash": HASH,
+                        "state": "downloading",
+                        "progress": 0.4,
+                        "size": 100,
+                        "completed": 40,
+                        "dlspeed": 10,
+                        "eta": 6,
+                    }
+                ],
+            ),
+        ]
+    )
+    engine = QbittorrentEngine(configured)
+    worker = Worker(factory, settings, {"qbittorrent": engine}, bus=bus, auto_inspect=False)
+    download_id = _queued(factory, settings.downloads_dir)
+
+    await worker.tick()
+
+    row = _row(factory, download_id)
+    assert row.status == "active"
+    assert row.error is None
+
+    worker._last_publish.clear()  # type: ignore[attr-defined]
+    await worker.tick()
+    await engine.aclose()
+
+    row = _row(factory, download_id)
+    assert row.status == "active"
+    assert row.progress == 0.4
+    events = []
+    while not queue.empty():
+        events.append(queue.get_nowait())
+    assert events[-1].data["progress"] == 0.4
 
 
 async def test_completion_inspects_the_download(

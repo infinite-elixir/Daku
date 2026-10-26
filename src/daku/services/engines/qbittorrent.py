@@ -11,6 +11,7 @@ release id and the info-hash; the magnet itself stays on the release row.
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Sequence
 from pathlib import PurePosixPath
 
@@ -26,6 +27,8 @@ from daku.services.engines.base import (
 )
 from daku.services.releases.episode_match import normalize_path
 
+logger = logging.getLogger(__name__)
+
 QBT_TIMEOUT_SECONDS = 10.0
 QBT_INFINITE_ETA = 8_640_000
 QBT_CATEGORY = "daku"
@@ -33,6 +36,12 @@ QBT_METADATA_TIMEOUT_SECONDS = 30.0
 QBT_METADATA_POLL_SECONDS = 0.5
 QBT_PRIORITY_SKIP = 0
 QBT_PRIORITY_NORMAL = 1
+# qBittorrent bans an IP after five failed logins. Never turn one bad password into
+# a login loop: back off after a failure and back off longer when already banned.
+QBT_LOGIN_COOLDOWN_SECONDS = 30.0
+QBT_LOGIN_BAN_COOLDOWN_SECONDS = 120.0
+# qBittorrent 5.0 (Web API 2.11.0) renamed pause/resume to stop/start.
+QBT_START_STOP_WEBAPI_VERSION = (2, 11, 0)
 
 ACTIVE_STATES = frozenset(
     {
@@ -58,12 +67,13 @@ def map_state(state: str, progress: float) -> str:
 
     if state in FAILED_STATES:
         return "failed"
+    # qBittorrent 5.x uses stoppedDL/stoppedUP for a user-paused torrent.
+    if state in PAUSED_STATES:
+        return "paused"
     # A seeding torrent is finished. qBittorrent keeps reporting it as "uploading",
     # which must never look like a download in progress.
     if progress >= 1.0:
         return "complete"
-    if state in PAUSED_STATES:
-        return "paused"
     if state in QUEUED_STATES:
         return "queued"
     if state in ACTIVE_STATES:
@@ -90,6 +100,15 @@ def _as_int(value: object) -> int | None:
         return None
 
 
+def _parse_version(text: str) -> tuple[int, ...] | None:
+    """Turn ``2.11.0`` into ``(2, 11, 0)`` without adding a dependency."""
+
+    parts = text.strip().split(".")
+    if not parts or not all(part.isdigit() for part in parts):
+        return None
+    return tuple(int(part) for part in parts)
+
+
 class QbittorrentEngine:
     """Drive one qBittorrent instance over its Web API."""
 
@@ -105,6 +124,12 @@ class QbittorrentEngine:
         self._owns_client = client is None
         self._authenticated = False
         self._auth_lock = asyncio.Lock()
+        self._login_blocked_until = 0.0
+        self._login_error_code = "QBT_LOGIN_FAILED"
+        self._login_error_message = "qBittorrent login failed"
+        self._webapi_version: tuple[int, ...] | None = None
+        self._webapi_version_checked = False
+        self._modern_start_stop: bool | None = None
         self.metadata_timeout = QBT_METADATA_TIMEOUT_SECONDS
         self.metadata_poll_interval = QBT_METADATA_POLL_SECONDS
 
@@ -114,45 +139,68 @@ class QbittorrentEngine:
 
     # -- auth -----------------------------------------------------------------
 
+    def _login_failure(self, exc: EngineError) -> EngineError:
+        """Remember a failed login so the next call does not hammer qBittorrent."""
+
+        cooldown = (
+            QBT_LOGIN_BAN_COOLDOWN_SECONDS
+            if "banned" in exc.message.lower()
+            else QBT_LOGIN_COOLDOWN_SECONDS
+        )
+        self._login_blocked_until = asyncio.get_running_loop().time() + cooldown
+        self._login_error_code = exc.code
+        self._login_error_message = exc.message
+        return exc
+
     async def login(self) -> None:
         async with self._auth_lock:
+            now = asyncio.get_running_loop().time()
+            if now < self._login_blocked_until:
+                raise EngineError(self._login_error_code, self._login_error_message)
             try:
-                response = await self._client.post(
-                    f"{self._base}/api/v2/auth/login",
-                    data={"username": self._username, "password": self._password},
-                    headers={"Referer": self._base},
-                )
-            except httpx.HTTPError as exc:
-                self._authenticated = False
-                raise EngineError("QBT_UNREACHABLE", f"qBittorrent is unreachable: {exc}") from exc
-            if _login_accepted(response):
-                self._authenticated = True
-                return
+                await self._login_once()
+            except EngineError as exc:
+                raise self._login_failure(exc) from exc
+            self._login_blocked_until = 0.0
+
+    async def _login_once(self) -> None:
+        try:
+            response = await self._client.post(
+                f"{self._base}/api/v2/auth/login",
+                data={"username": self._username, "password": self._password},
+                headers={"Referer": self._base},
+            )
+        except httpx.HTTPError as exc:
             self._authenticated = False
-            body = response.text.strip()
-            if response.status_code == 401:
+            raise EngineError("QBT_UNREACHABLE", f"qBittorrent is unreachable: {exc}") from exc
+        if _login_accepted(response):
+            self._authenticated = True
+            return
+        self._authenticated = False
+        body = response.text.strip()
+        if response.status_code == 401:
+            raise EngineError(
+                "QBT_LOGIN_FAILED",
+                "qBittorrent rejected the username or password",
+            )
+        if response.status_code == 403:
+            if "ban" in body.lower():
                 raise EngineError(
                     "QBT_LOGIN_FAILED",
-                    "qBittorrent rejected the username or password",
+                    "qBittorrent banned this IP after failed logins; wait a few minutes",
                 )
-            if response.status_code == 403:
-                if "ban" in body.lower():
-                    raise EngineError(
-                        "QBT_LOGIN_FAILED",
-                        "qBittorrent banned this IP after failed logins; wait a few minutes",
-                    )
-                raise EngineError(
-                    "QBT_LOGIN_FAILED",
-                    f"qBittorrent refused the login: {body[:200]}"
-                    if body
-                    else "qBittorrent refused the login",
-                )
-            if response.status_code != 200:
-                raise EngineError(
-                    "QBT_LOGIN_FAILED",
-                    f"qBittorrent login returned HTTP {response.status_code}",
-                )
-            raise EngineError("QBT_LOGIN_FAILED", "qBittorrent rejected the login")
+            raise EngineError(
+                "QBT_LOGIN_FAILED",
+                f"qBittorrent refused the login: {body[:200]}"
+                if body
+                else "qBittorrent refused the login",
+            )
+        if response.status_code != 200:
+            raise EngineError(
+                "QBT_LOGIN_FAILED",
+                f"qBittorrent login returned HTTP {response.status_code}",
+            )
+        raise EngineError("QBT_LOGIN_FAILED", "qBittorrent rejected the login")
 
     async def _request(
         self,
@@ -160,6 +208,7 @@ class QbittorrentEngine:
         path: str,
         *,
         authenticate: bool = True,
+        raise_for_status: bool = True,
         **kwargs: object,
     ) -> httpx.Response:
         if authenticate and not self._authenticated:
@@ -188,11 +237,18 @@ class QbittorrentEngine:
         if response.status_code == 403:
             self._authenticated = False
             raise EngineError("QBT_LOGIN_FAILED", "qBittorrent denied the request")
+        if raise_for_status and 400 <= response.status_code < 500:
+            endpoint = path.rstrip("/").rsplit("/", 1)[-1]
+            raise EngineError(
+                "QBT_REJECTED",
+                f"qBittorrent rejected {endpoint} (HTTP {response.status_code})",
+            )
         return response
 
     # -- engine protocol ------------------------------------------------------
 
     async def add(self, request: AddRequest) -> str:
+        stopped = "true" if request.paused else "false"
         response = await self._request(
             "POST",
             "/api/v2/torrents/add",
@@ -203,16 +259,47 @@ class QbittorrentEngine:
                 "tags": (None, request.tag or ""),
                 "sequentialDownload": (None, "false"),
                 "firstLastPiecePrio": (None, "true"),
-                "paused": (None, "true" if request.paused else "false"),
+                # 4.x/5.0/5.1 read ``paused``; 5.2+ reads ``stopped``.
+                "paused": (None, stopped),
+                "stopped": (None, stopped),
             },
         )
-        body = response.text.strip()
-        if body != "Ok.":
-            raise EngineError(
-                "QBT_REJECTED",
-                "qBittorrent rejected the torrent" if body == "Fails." else body[:200],
-            )
+        self._check_add_response(response, request.external_id)
         return request.external_id.lower()
+
+    def _check_add_response(self, response: httpx.Response, external_id: str) -> None:
+        if not 200 <= response.status_code < 300:
+            raise EngineError("QBT_REJECTED", "qBittorrent rejected the torrent")
+
+        body = response.text.strip()
+        if body == "Ok." or not body:
+            return
+
+        if body == "Fails.":
+            raise EngineError("QBT_REJECTED", "qBittorrent rejected the torrent")
+
+        try:
+            payload = response.json()
+        except ValueError:
+            raise EngineError("QBT_REJECTED", "qBittorrent rejected the torrent") from None
+        if not isinstance(payload, dict):
+            raise EngineError("QBT_REJECTED", "qBittorrent rejected the torrent")
+
+        success_count = _as_int(payload.get("success_count")) or 0
+        failure_count = _as_int(payload.get("failure_count")) or 0
+        pending_count = _as_int(payload.get("pending_count")) or 0
+        accepted = failure_count == 0 and (success_count >= 1 or pending_count >= 1)
+        if not accepted:
+            raise EngineError("QBT_REJECTED", "qBittorrent rejected the torrent")
+
+        added = payload.get("added_torrent_ids")
+        if isinstance(added, list):
+            normalised = {str(item).lower() for item in added}
+            if external_id.lower() not in normalised:
+                logger.warning(
+                    "qBittorrent add returned different info-hash ids for %s",
+                    external_id[:12],
+                )
 
     async def poll(self, external_ids: Sequence[str]) -> dict[str, EngineStatus]:
         wanted = [item.lower() for item in external_ids if item]
@@ -272,19 +359,74 @@ class QbittorrentEngine:
             )
         return statuses
 
-    async def pause(self, external_id: str) -> None:
-        await self._request(
+    async def _probe_webapi_version(self) -> tuple[int, ...] | None:
+        """Read the Web API version once; a qBittorrent restart does not change it."""
+
+        if self._webapi_version_checked:
+            return self._webapi_version
+        self._webapi_version_checked = True
+        try:
+            response = await self._request(
+                "GET", "/api/v2/app/webapiVersion", raise_for_status=False
+            )
+        except EngineError:
+            return None
+        if response.status_code != 200:
+            return None
+        self._webapi_version = _parse_version(response.text)
+        return self._webapi_version
+
+    async def _use_modern_start_stop(self) -> bool:
+        if self._modern_start_stop is not None:
+            return self._modern_start_stop
+        version = await self._probe_webapi_version()
+        if version is None:
+            # Unknown version: try the new names first and fall back on 404.
+            return True
+        return version >= QBT_START_STOP_WEBAPI_VERSION
+
+    async def _post_action(self, path: str, external_id: str) -> bool:
+        """POST one torrent action. Return False only when the endpoint is missing."""
+
+        response = await self._request(
             "POST",
-            "/api/v2/torrents/pause",
+            path,
             data={"hashes": external_id.lower()},
+            raise_for_status=False,
+        )
+        if 200 <= response.status_code < 300:
+            return True
+        if response.status_code == 404:
+            return False
+        endpoint = path.rsplit("/", 1)[-1]
+        raise EngineError(
+            "QBT_REJECTED",
+            f"qBittorrent rejected {endpoint} (HTTP {response.status_code})",
         )
 
-    async def resume(self, external_id: str) -> None:
-        await self._request(
-            "POST",
-            "/api/v2/torrents/resume",
-            data={"hashes": external_id.lower()},
+    async def _set_running(self, external_id: str, *, running: bool) -> None:
+        modern = await self._use_modern_start_stop()
+        if modern:
+            primary, fallback = ("start", "resume") if running else ("stop", "pause")
+        else:
+            primary, fallback = ("resume", "start") if running else ("pause", "stop")
+
+        if await self._post_action(f"/api/v2/torrents/{primary}", external_id):
+            self._modern_start_stop = modern
+            return
+        if await self._post_action(f"/api/v2/torrents/{fallback}", external_id):
+            self._modern_start_stop = not modern
+            return
+        raise EngineError(
+            "QBT_REJECTED",
+            f"qBittorrent rejected {primary} (HTTP 404)",
         )
+
+    async def pause(self, external_id: str) -> None:
+        await self._set_running(external_id, running=False)
+
+    async def resume(self, external_id: str) -> None:
+        await self._set_running(external_id, running=True)
 
     async def remove(self, external_id: str, *, delete_files: bool = False) -> None:
         await self._request(
@@ -303,9 +445,15 @@ class QbittorrentEngine:
             "GET",
             "/api/v2/torrents/files",
             params={"hash": external_id.lower()},
+            raise_for_status=False,
         )
         if response.status_code == 404:
             return []
+        if not 200 <= response.status_code < 300:
+            raise EngineError(
+                "QBT_REJECTED",
+                f"qBittorrent rejected files (HTTP {response.status_code})",
+            )
         try:
             rows = response.json()
         except ValueError as exc:

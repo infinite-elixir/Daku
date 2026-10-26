@@ -247,10 +247,19 @@ payloads are served on upstream failure. Nyaa is never queried for movies or non
   password is `401` and a rate-limit ban is `403` with a "banned" body. Accept both
   success shapes — never require `200 Ok.` alone.
 - `POST /api/v2/torrents/add` (multipart): `urls`, `savepath`, `category=daku`,
-  `tags=<title_id>`, `sequentialDownload=false`, `firstLastPiecePrio=true`, `paused=false`.
+  `tags=<title_id>`, `sequentialDownload=false`, `firstLastPiecePrio=true`, and both
+  `paused=<bool>` (4.x/5.0/5.1) and `stopped=<bool>` (5.2+) with the same value.
+  A successful add may answer `200 Ok.`, an empty `2xx`, or (5.2+) JSON
+  `{success_count, failure_count, pending_count, added_torrent_ids}`. Accept the JSON as
+  success when `failure_count == 0` and `success_count >= 1` or `pending_count >= 1`
+  (a `202` with pending metadata is success). Never put the raw body in `download.error`.
 - `GET /api/v2/torrents/info?hashes=<hash>` → `progress`, `dlspeed`, `eta`, `state`, `size`.
 - `GET /api/v2/torrents/files?hash=<hash>` → file list with `progress` and `priority`.
 - Removing and deleting data are separate calls (`deleteFiles=true`).
+- Web API `2.11.0` (qBittorrent 5.0) renamed pause/resume to stop/start. Daku probes
+  `GET /api/v2/app/webapiVersion` once per process: `>= 2.11.0` uses
+  `/torrents/stop|start`, older uses `/torrents/pause|resume`. If the probe fails, it tries
+  start/stop first and falls back on `404`, caching the working pair.
 - Linux uses `qbittorrent-nox`; its Web API is identical to the GUI build.
 
 ### aria2 JSON-RPC

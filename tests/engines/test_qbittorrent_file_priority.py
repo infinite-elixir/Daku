@@ -14,6 +14,7 @@ ADD = f"{BASE}/torrents/add"
 FILES = f"{BASE}/torrents/files"
 FILE_PRIORITY = f"{BASE}/torrents/filePrio"
 RESUME = f"{BASE}/torrents/resume"
+WEBAPI_VERSION = f"{BASE}/app/webapiVersion"
 HASH = "a" * 40
 
 FILES_PAYLOAD = [
@@ -36,6 +37,7 @@ def engine(settings: Settings) -> QbittorrentEngine:
 
 def _login() -> None:
     respx.post(LOGIN).mock(return_value=httpx.Response(200, text="Ok."))
+    respx.get(WEBAPI_VERSION).mock(return_value=httpx.Response(200, text="2.10.0"))
 
 
 @respx.mock
