@@ -9,7 +9,13 @@ import pytest
 
 from daku.__main__ import main
 from daku.config import Settings
-from daku.services.doctor import STATUS_DEGRADED, STATUS_NOT_CONFIGURED, STATUS_OK, probe_engines
+from daku.services.doctor import (
+    STATUS_DEGRADED,
+    STATUS_NOT_CONFIGURED,
+    STATUS_OK,
+    probe_engines,
+    run_doctor,
+)
 from daku.services.engines.base import AddRequest, EngineStatus, Health
 
 
@@ -78,6 +84,32 @@ async def test_qbittorrent_ok_without_a_stored_password_is_ok(settings: Settings
     )
 
     assert checks["qbittorrent"].status == STATUS_OK
+
+
+def test_doctor_reports_the_magnet_probe_without_starting_one(settings: Settings) -> None:
+    checks = run_doctor(
+        settings,
+        probe_status={
+            "status": "unavailable",
+            "queue_depth": 3,
+            "last_failure_age_seconds": 12.0,
+        },
+    )
+
+    probe = next(check for check in checks if check.name == "magnet_probe")
+    assert probe.status == "unavailable"
+    assert "queue depth 3" in probe.detail
+    assert "12s ago" in probe.detail
+    assert "daku[probe]" in probe.detail
+
+
+def test_doctor_reports_a_disabled_probe(settings: Settings) -> None:
+    disabled = settings.model_copy(update={"magnet_probe": False})
+
+    checks = run_doctor(disabled, probe_status={"status": "ok", "queue_depth": 0})
+
+    probe = next(check for check in checks if check.name == "magnet_probe")
+    assert probe.status == "disabled"
 
 
 def test_doctor_cli_prints_checks_without_serving(

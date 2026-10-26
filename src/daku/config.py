@@ -104,6 +104,9 @@ class Settings(BaseModel):
     worker_enabled: bool = True
     worker_poll_seconds: float = Field(default=2.0, gt=0)
 
+    # Optional libtorrent metadata probe. Disabled means the Files view reports 503.
+    magnet_probe: bool = True
+
     telegram_api_base: str = "https://api.telegram.org"
     telegram_archive_channel: str = ""
     telegram_allowlist: list[int] = Field(default_factory=list)

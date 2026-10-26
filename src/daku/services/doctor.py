@@ -110,6 +110,7 @@ def run_doctor(
     session: Session | None = None,
     omdb: OmdbEnricher | None = None,
     engine_checks: Mapping[str, Check] | None = None,
+    probe_status: Mapping[str, object] | None = None,
 ) -> list[Check]:
     """Return one check per integration."""
 
@@ -205,7 +206,35 @@ def run_doctor(
     )
     checks.append(_omdb_check(settings, omdb))
     checks.append(_mapping_check(session))
+    checks.append(_magnet_probe_check(settings, probe_status))
     return checks
+
+
+def _magnet_probe_check(settings: Settings, probe_status: Mapping[str, object] | None) -> Check:
+    """Report the probe dependency and queue without starting a probe."""
+
+    if not settings.magnet_probe:
+        return Check(
+            name="magnet_probe",
+            status="disabled",
+            detail="disabled in settings; release lists and downloads are unaffected",
+        )
+    data = probe_status or {}
+    status = str(data.get("status") or "unavailable")
+    queue_depth = data.get("queue_depth")
+    last_failure = data.get("last_failure_age_seconds")
+    parts = [f"queue depth {queue_depth if queue_depth is not None else 0}"]
+    if last_failure is not None:
+        parts.append(f"last failure {float(str(last_failure)):.0f}s ago")
+    else:
+        parts.append("no recent failure")
+    if status == "ok":
+        detail = "libtorrent available for metadata-only probes; " + ", ".join(parts)
+    else:
+        detail = "libtorrent extra not installed; install daku[probe] for file lists; " + ", ".join(
+            parts
+        )
+    return Check(name="magnet_probe", status=status, detail=detail)
 
 
 def _omdb_check(settings: Settings, omdb: OmdbEnricher | None) -> Check:
@@ -262,8 +291,12 @@ def doctor_payload(
     session: Session | None = None,
     omdb: OmdbEnricher | None = None,
     engine_checks: Mapping[str, Check] | None = None,
+    probe_status: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     return {
         "checked_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-        "checks": [check.to_dict() for check in run_doctor(settings, session, omdb, engine_checks)],
+        "checks": [
+            check.to_dict()
+            for check in run_doctor(settings, session, omdb, engine_checks, probe_status)
+        ],
     }

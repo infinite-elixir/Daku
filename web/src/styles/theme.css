@@ -29,6 +29,9 @@
 
   --radius-control: 6px;
   --radius-panel: 8px;
+
+  --text-micro: 11px;
+  --text-micro--line-height: 16px;
 }
 
 :root {

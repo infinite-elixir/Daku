@@ -14,6 +14,8 @@ import {
   type ReleaseItem,
   type TitleDetail,
 } from "../lib/api";
+import { CopyMagnet } from "./CopyMagnet";
+import { MagnetFiles, looksLikeMagnet } from "./MagnetFiles";
 
 type Tab = "find" | "saved";
 export type ReleasesMode = "all" | "find" | "saved";
@@ -601,50 +603,57 @@ export function ReleasesSection({
                   {findQuery.data.releases.map((release) => (
                     <li
                       key={release.info_hash}
-                      className="flex flex-wrap items-center gap-3 px-4 py-3"
+                      className="flex flex-col gap-3 px-4 py-3"
                     >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[14px] font-semibold text-fg">
-                          {release.filename ?? release.info_hash}
-                        </p>
-                        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-muted">
-                          <span>{release.quality ?? "unknown"}</span>
-                          <span>· {formatSize(release.size_bytes)}</span>
-                          <span>· {release.seeders ?? 0} seeders</span>
-                          <span aria-label={`Source ${release.provider === "nyaa" ? "Nyaa" : "Torrentio"}`} className="rounded-full bg-fg-muted/10 px-1.5 py-0.5 text-[11px]">{release.provider === "nyaa" ? "NYAA" : "TORRENTIO"}</span>
-                        </p>
-                        {hintsLine(release) ? (
-                          <p className="mt-0.5 text-[11px] text-fg-comment">{hintsLine(release)}</p>
-                        ) : null}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[14px] font-semibold text-fg">
+                            {release.filename ?? release.info_hash}
+                          </p>
+                          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-muted">
+                            <span>{release.quality ?? "unknown"}</span>
+                            <span>· {formatSize(release.size_bytes)}</span>
+                            <span>· {release.seeders ?? 0} seeders</span>
+                            <span aria-label={`Source ${release.provider === "nyaa" ? "Nyaa" : "Torrentio"}`} className="rounded-full bg-fg-muted/10 px-1.5 py-0.5 text-[11px]">{release.provider === "nyaa" ? "NYAA" : "TORRENTIO"}</span>
+                          </p>
+                          {hintsLine(release) ? (
+                            <p className="mt-0.5 text-[11px] text-fg-comment">{hintsLine(release)}</p>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <CopyMagnet magnet={release.magnet} compact />
+                          <button
+                            type="button"
+                            aria-pressed={release.is_saved}
+                            aria-label={`${release.is_saved ? "Unsave" : "Save"} ${
+                              release.filename ?? release.info_hash
+                            }`}
+                            disabled={saveMutation.isPending}
+                            onClick={() => saveMutation.mutate(release)}
+                            className={[
+                              "flex h-9 w-9 items-center justify-center rounded-control border text-[16px] disabled:opacity-40",
+                              release.is_saved
+                                ? "border-accent/50 bg-accent/15 text-accent"
+                                : "border-border-strong text-fg-muted hover:bg-hover",
+                            ].join(" ")}
+                          >
+                            {release.is_saved ? "★" : "☆"}
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Download ${release.filename ?? release.info_hash}`}
+                            disabled={downloadMutation.isPending}
+                            onClick={() => downloadMutation.mutate(release)}
+                            className="min-h-9 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover disabled:opacity-40"
+                          >
+                            Download
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          aria-pressed={release.is_saved}
-                          aria-label={`${release.is_saved ? "Unsave" : "Save"} ${
-                            release.filename ?? release.info_hash
-                          }`}
-                          disabled={saveMutation.isPending}
-                          onClick={() => saveMutation.mutate(release)}
-                          className={[
-                            "flex h-9 w-9 items-center justify-center rounded-control border text-[16px] disabled:opacity-40",
-                            release.is_saved
-                              ? "border-accent/50 bg-accent/15 text-accent"
-                              : "border-border-strong text-fg-muted hover:bg-hover",
-                          ].join(" ")}
-                        >
-                          {release.is_saved ? "★" : "☆"}
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={`Download ${release.filename ?? release.info_hash}`}
-                          disabled={downloadMutation.isPending}
-                          onClick={() => downloadMutation.mutate(release)}
-                          className="min-h-9 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover disabled:opacity-40"
-                        >
-                          Download
-                        </button>
-                      </div>
+                      <MagnetFiles
+                        magnet={release.magnet}
+                        releaseId={release.release_id}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -722,66 +731,70 @@ export function ReleasesSection({
           {savedQuery.data && savedQuery.data.releases.length > 0 ? (
             <ul className="divide-y divide-border-subtle rounded-panel border border-border-subtle bg-panel">
               {savedQuery.data.releases.map((release) => (
-                <li key={release.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14px] font-semibold text-fg">
-                      {release.filename ?? release.info_hash}
-                    </p>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-muted">
-                      <span>{release.quality ?? "unknown"}</span>
-                      <span>· {formatSize(release.size_bytes)}</span>
-                      <span>· {release.seeders ?? 0} seeders</span>
-                      <span aria-label={`Source ${release.provider === "nyaa" ? "Nyaa" : "Torrentio"}`} className="rounded-full bg-fg-muted/10 px-1.5 py-0.5 text-[11px]">{release.provider === "nyaa" ? "NYAA" : "TORRENTIO"}</span>
-                    </p>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-fg-comment">
-                      <span>Checked {formatChecked(release.last_checked_at)}</span>
-                      {release.dead ? <span className={DEAD_PILL}>Dead</span> : null}
-                      {release.resolved_from === "manual" ? (
-                        <span className={SAVED_PILL}>Manual</span>
+                <li key={release.id} className="flex flex-col gap-3 px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-semibold text-fg">
+                        {release.filename ?? release.info_hash}
+                      </p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-muted">
+                        <span>{release.quality ?? "unknown"}</span>
+                        <span>· {formatSize(release.size_bytes)}</span>
+                        <span>· {release.seeders ?? 0} seeders</span>
+                        <span aria-label={`Source ${release.provider === "nyaa" ? "Nyaa" : "Torrentio"}`} className="rounded-full bg-fg-muted/10 px-1.5 py-0.5 text-[11px]">{release.provider === "nyaa" ? "NYAA" : "TORRENTIO"}</span>
+                      </p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-fg-comment">
+                        <span>Checked {formatChecked(release.last_checked_at)}</span>
+                        {release.dead ? <span className={DEAD_PILL}>Dead</span> : null}
+                        {release.resolved_from === "manual" ? (
+                          <span className={SAVED_PILL}>Manual</span>
+                        ) : null}
+                        {release.episode_id ? (
+                          <span>{episodeLabels.get(release.episode_id) ?? "episode"}</span>
+                        ) : null}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <CopyMagnet magnet={release.magnet} compact />
+                      {release.dead ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (showTabs) {
+                              setTab("find");
+                            } else {
+                              document
+                                .getElementById("episodes-heading")
+                                ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+                            }
+                          }}
+                          className="min-h-9 rounded-control border border-warning/50 px-3 text-[12px] font-semibold text-warning hover:bg-warning/10"
+                        >
+                          Find another
+                        </button>
                       ) : null}
-                      {release.episode_id ? (
-                        <span>{episodeLabels.get(release.episode_id) ?? "episode"}</span>
-                      ) : null}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {release.dead ? (
                       <button
                         type="button"
-                        onClick={() => {
-                          if (showTabs) {
-                            setTab("find");
-                          } else {
-                            document
-                              .getElementById("episodes-heading")
-                              ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-                          }
-                        }}
-                        className="min-h-9 rounded-control border border-warning/50 px-3 text-[12px] font-semibold text-warning hover:bg-warning/10"
+                        aria-pressed={release.is_saved}
+                        aria-label={`Unsave ${release.filename ?? release.info_hash}`}
+                        disabled={saveMutation.isPending}
+                        onClick={() => saveMutation.mutate(release)}
+                        className="flex h-9 w-9 items-center justify-center rounded-control border border-accent/50 bg-accent/15 text-[16px] text-accent disabled:opacity-40"
                       >
-                        Find another
+                        ★
                       </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      aria-pressed={release.is_saved}
-                      aria-label={`Unsave ${release.filename ?? release.info_hash}`}
-                      disabled={saveMutation.isPending}
-                      onClick={() => saveMutation.mutate(release)}
-                      className="flex h-9 w-9 items-center justify-center rounded-control border border-accent/50 bg-accent/15 text-[16px] text-accent disabled:opacity-40"
-                    >
-                      ★
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Download ${release.filename ?? release.info_hash}`}
-                      disabled={downloadMutation.isPending}
-                      onClick={() => downloadMutation.mutate(release)}
-                      className="min-h-9 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover disabled:opacity-40"
-                    >
-                      Download
-                    </button>
+                      <button
+                        type="button"
+                        aria-label={`Download ${release.filename ?? release.info_hash}`}
+                        disabled={downloadMutation.isPending}
+                        onClick={() => downloadMutation.mutate(release)}
+                        className="min-h-9 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover disabled:opacity-40"
+                      >
+                        Download
+                      </button>
+                    </div>
                   </div>
+                  <MagnetFiles magnet={release.magnet} releaseId={release.id} />
                 </li>
               ))}
             </ul>
@@ -826,6 +839,13 @@ export function ReleasesSection({
               {manualMutation.isPending ? "Saving…" : "Save magnet"}
             </button>
           </div>
+          {looksLikeMagnet(magnet) ? (
+            <MagnetFiles magnet={magnet.trim()} buttonLabel="Inspect" />
+          ) : magnet.trim() && ready ? (
+            <p className="text-micro text-fg-comment">
+              Add exactly one btih info hash to inspect this magnet.
+            </p>
+          ) : null}
         </form>
       ) : null}
     </section>

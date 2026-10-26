@@ -673,8 +673,44 @@ export function refreshRelease(
   );
 }
 
-export function startDownload(releaseId: string): Promise<DownloadRecord> {
-  return request<DownloadRecord>("/api/downloads", {
+export interface TorrentFile {
+  index: number;
+  path: string;
+  size_bytes: number;
+}
+
+export interface MagnetMetadata {
+  info_hash: string;
+  name: string;
+  total_size_bytes: number;
+  piece_length: number;
+  private: boolean;
+  files: TorrentFile[];
+  fetched_at: string;
+  cached: boolean;
+  source: "probe";
+  release_id?: string;
+}
+
+export function inspectMagnet(magnet: string, signal?: AbortSignal): Promise<MagnetMetadata> {
+  return request<MagnetMetadata>("/api/magnets/inspect", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ magnet }),
+    signal,
+  });
+}
+
+export function getReleaseFiles(
+  releaseId: string,
+  signal?: AbortSignal,
+): Promise<MagnetMetadata> {
+  return request<MagnetMetadata>(`/api/releases/${encodeURIComponent(releaseId)}/files`, {
+    signal,
+  });
+}
+
+export function startDownload(releaseId: string): Promise<DownloadRecord> {  return request<DownloadRecord>("/api/downloads", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ release_id: releaseId }),

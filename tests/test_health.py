@@ -35,6 +35,7 @@ def test_doctor_lists_every_integration(client: TestClient) -> None:
         "ffprobe",
         "disk",
         "mapping",
+        "magnet_probe",
     }
     for check in payload["checks"]:
         assert check["status"]

@@ -21,6 +21,7 @@ These are decisions, not preferences. Do not re-litigate them in a ticket.
 | Playback | Deep-link to Jellyfin. No in-app transcode, no HLS packaging, no `<video>` for non-MP4 |
 | Torrent engine | qBittorrent via Web API v2. **Never** use aria2c as the torrent client |
 | Torrent metadata | libtorrent may inspect a magnet read-only (metadata only, no payload, no download row) to list files. qBittorrent remains the only download engine |
+| Magnet probe | Optional `daku[probe]` extra. One lazy, serialised session; no listener; DHT only; probe dirs under `data_dir/probes` are always deleted. Never a download engine |
 | Direct downloads | aria2c via JSON-RPC (Telegram fallback, HTTP/DDL) |
 | Download model | Download fully, then organise. No sequential/stream-while-downloading in v1 |
 | Library source | Only artefacts Daku created. No scanning of pre-existing folders |
@@ -88,6 +89,7 @@ tickets/               # implementation tickets (read the assigned one first)
 
 ```bash
 uv sync                                  # backend deps
+uv sync --extra probe                    # optional libtorrent magnet inspection
 uv run daku                              # serve on 0.0.0.0:8420
 uv run daku doctor                       # probe every integration without serving (--json, --strict)
 scripts/check.sh                         # ruff + format + mypy + pytest: the one check to run
@@ -121,6 +123,7 @@ Resolution order: environment → `~/.config/daku/config.json` → defaults.
 | `tv_dir` | `~/Media/TV` | must be a Jellyfin library |
 | `anime_dir` | `~/Media/Anime` | must be a Jellyfin library |
 | `organize_mode` | `hardlink` | `hardlink` → `copy` fallback → `move` |
+| `magnet_probe` | `true` | optional libtorrent metadata probe; `false` reports `disabled` |
 | `qbt_url` / `qbt_user` / `qbt_pass` | `http://127.0.0.1:8080` | password in secrets |
 | `aria2_rpc` / `aria2_secret` | `http://127.0.0.1:6800/jsonrpc` | |
 | `jellyfin_url` / `jellyfin_api_key` | `http://127.0.0.1:8096` | key in secrets |
@@ -214,6 +217,21 @@ only RSS items, and builds magnets locally from a verified 40-hex or 32-base32 i
 The torrent link is never downloaded. Default category `1_2` is Anime — English-translated;
 `1_1` and `1_3` are also supported. Raw RSS is cached for one hour by full URL, and stale
 payloads are served on upstream failure. Nyaa is never queried for movies or non-anime TV.
+
+### Magnet probe (optional libtorrent)
+- `POST /api/magnets/inspect` `{magnet}` and `GET /api/releases/{id}/files` return torrent
+  metadata only: name, total size, piece length, private flag, file list. Both are read-only.
+- One lazy libtorrent session per process, in a worker thread, `listen_interfaces=127.0.0.1:0`,
+  DHT on, LSD/UPnP/NAT-PMP off. Add the magnet in `upload_mode` under
+  `data_dir/probes/<info_hash>` and remove it after success, timeout or error.
+- One active probe, at most 10 outstanding, 30 s deadline. Reject the 11th with
+  `429 PROBE_BUSY`. Success cache 24 h / LRU 200; failure cache 5 min. A per-hash lock
+  deduplicates clicks.
+- Errors: `400 INVALID_MAGNET`, `503 PROBE_UNAVAILABLE` (extra not installed),
+  `504 PROBE_TIMEOUT`, `429 PROBE_BUSY`, `502 PROBE_FAILED` (payload guard or adapter error).
+- Log `info_hash[:12]` only. Never log a magnet, tracker or probe path. No probe creates a
+  download row or touches qBittorrent. The doctor reports `ok|unavailable|disabled` without
+  starting a probe.
 
 ### qBittorrent Web API v2
 - `POST /api/v2/auth/login` (form: `username`, `password`) → `SID` cookie.

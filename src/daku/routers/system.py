@@ -32,7 +32,11 @@ async def doctor(
         },
         aria2_binary_available=supervisor.available if supervisor is not None else None,
     )
-    return doctor_payload(settings, session, request.app.state.omdb, checks)
+    probe = getattr(request.app.state, "probe", None)
+    probe_status = probe.status().to_dict() if probe is not None else None
+    return doctor_payload(
+        settings, session, request.app.state.omdb, checks, probe_status=probe_status
+    )
 
 
 @router.get("/mappings")

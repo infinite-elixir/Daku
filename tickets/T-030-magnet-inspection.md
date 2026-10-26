@@ -115,23 +115,23 @@ replacing qBittorrent as the torrent engine. Private-tracker credentials.
 
 ## Acceptance criteria
 
-- [ ] Clicking **Files** on a public magnet shows the real file list and total size without
+- [x] Clicking **Files** on a public magnet shows the real file list and total size without
       creating a download or adding a qBittorrent torrent.
-- [ ] A season pack lists every episode file with its size; a single-file torrent shows one row.
-- [ ] Probing writes no payload bytes; the probe directory is empty and removed afterwards.
-- [ ] A second click within 24 h returns the cached result instantly and makes no network
+- [x] A season pack lists every episode file with its size; a single-file torrent shows one row.
+- [x] Probing writes no payload bytes; the probe directory is empty and removed afterwards.
+- [x] A second click within 24 h returns the cached result instantly and makes no network
       request.
-- [ ] A dead magnet times out with `504 PROBE_TIMEOUT`, leaves no torrent in the session, and
+- [x] A dead magnet times out with `504 PROBE_TIMEOUT`, leaves no torrent in the session, and
       the UI offers Retry.
-- [ ] A malformed magnet returns `400 INVALID_MAGNET` before any libtorrent call.
-- [ ] When libtorrent is not installed, the release list still works and Files explains the
+- [x] A malformed magnet returns `400 INVALID_MAGNET` before any libtorrent call.
+- [x] When libtorrent is not installed, the release list still works and Files explains the
       missing optional dependency; the doctor reports `unavailable`.
-- [ ] The queue rejects the 11th concurrent request with `429 PROBE_BUSY` rather than blocking
+- [x] The queue rejects the 11th concurrent request with `429 PROBE_BUSY` rather than blocking
       the event loop.
-- [ ] **Copy magnet** works in Chromium and Firefox, falls back when Clipboard API is denied,
+- [x] **Copy magnet** works in Chromium and Firefox, falls back when Clipboard API is denied,
       and announces success.
-- [ ] No magnet or tracker string appears in logs, and no full magnet is used as a DOM label.
-- [ ] `AGENTS.md` records libtorrent as metadata-only, not a torrent engine.
+- [x] No magnet or tracker string appears in logs, and no full magnet is used as a DOM label.
+- [x] `AGENTS.md` records libtorrent as metadata-only, not a torrent engine.
 
 ## Test plan
 
@@ -157,3 +157,17 @@ replacing qBittorrent as the torrent engine. Private-tracker credentials.
 - The inline expansion state belongs to the release row and must not close when a sibling row
   is opened; only one panel per row.
 - Update `AGENTS.md` §1, §4 (optional dependency) and §6 (probe contract) when this lands.
+
+## Implementation notes (2026-10-26)
+
+- Implemented `services/torrents/probe.py` with a lazy `LibtorrentBackend` (optional
+  `daku[probe]` extra), `ProbeService` queue/cache and read-only API routes.
+- The 11th concurrent request is rejected counting the active probe plus the queue, matching
+  the acceptance criterion.
+- Automated coverage lives in `tests/torrents/test_probe.py`,
+  `tests/routers/test_magnet_inspect.py`, `tests/test_doctor.py`,
+  `web/src/components/__tests__/magnet-files.test.tsx` and
+  `web/src/components/__tests__/copy-magnet.test.tsx`.
+- Manual checks against one live public magnet and one dead magnet on a host with the
+  libtorrent extra installed were **not** run in this environment; the adapter is covered by a
+  mocked libtorrent session.

@@ -19,7 +19,7 @@ from daku.db import init_db
 from daku.errors import AppError
 from daku.events import EventBus
 from daku.logging_setup import configure_logging
-from daku.routers import downloads, events, health, releases, search, system, titles
+from daku.routers import downloads, events, health, magnets, releases, search, system, titles
 from daku.routers import settings as settings_router
 from daku.services.engines.aria2 import Aria2Engine
 from daku.services.engines.qbittorrent import QbittorrentEngine
@@ -30,6 +30,7 @@ from daku.services.metadata.mapping import ensure_mapping_settings
 from daku.services.metadata.ratings import OmdbEnricher
 from daku.services.releases.refresh import RefreshThrottle
 from daku.services.torrents.cache import PayloadCache
+from daku.services.torrents.probe import ProbeService
 from daku.worker import Worker
 
 logger = logging.getLogger(__name__)
@@ -82,6 +83,7 @@ def create_app(settings: Settings | None = None, *, configure_logs: bool = True)
         app.state.omdb = OmdbEnricher()
         app.state.releases_cache = PayloadCache(ttl_seconds=3600)
         app.state.release_refresh = RefreshThrottle()
+        app.state.probe = ProbeService(resolved)
         app.state.http_client = make_client()
         app.state.event_bus = EventBus()
 
@@ -120,6 +122,9 @@ def create_app(settings: Settings | None = None, *, configure_logs: bool = True)
                 with suppress(asyncio.CancelledError):
                     await worker_task
             await supervisor.stop()
+            probe = getattr(app.state, "probe", None)
+            if probe is not None:
+                await probe.aclose()
             await qbt_engine.aclose()
             await aria2_engine.aclose()
             await app.state.http_client.aclose()
@@ -141,6 +146,7 @@ def create_app(settings: Settings | None = None, *, configure_logs: bool = True)
     app.include_router(search.router)
     app.include_router(titles.router)
     app.include_router(releases.router)
+    app.include_router(magnets.router)
     app.include_router(settings_router.router)
     app.include_router(downloads.router)
 
