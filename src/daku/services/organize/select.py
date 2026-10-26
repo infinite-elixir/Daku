@@ -9,6 +9,7 @@ sidecars. This module scans the download directory, probes every video with
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 from collections.abc import Awaitable, Callable
@@ -20,10 +21,12 @@ from sqlalchemy.orm import Session
 
 from daku.config import Settings
 from daku.errors import AppError
-from daku.models import Download, MediaFile, Release
+from daku.models import Download, MediaFile, Release, Title
+from daku.repositories import episodes as episodes_repo
 from daku.repositories import media_files as media_repo
 from daku.repositories import releases as releases_repo
 from daku.services.organize.ffprobe import MediaInfo, probe
+from daku.services.releases.episode_match import normalize_path, season_episode_from_path
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +235,78 @@ def _linked_release(session: Session, download: Download) -> Release:
     return release
 
 
+def _selection(download: Download) -> tuple[list[int] | None, list[str]]:
+    """Return the persisted selection as ``(indices, paths)``.
+
+    Paths are authoritative for filtering because they were recorded from the
+    engine or the probe. Indices remain a fallback for older/advanced rows.
+    """
+
+    indices: list[int] | None = None
+    paths: list[str] = []
+    if download.selected_files_json:
+        try:
+            raw = json.loads(download.selected_files_json)
+        except (TypeError, ValueError):
+            raw = None
+        if isinstance(raw, list) and all(isinstance(item, int) for item in raw):
+            indices = raw
+    if download.file_match_json:
+        try:
+            match = json.loads(download.file_match_json)
+        except (TypeError, ValueError):
+            match = None
+        if isinstance(match, dict):
+            raw_paths = match.get("file_paths")
+            if isinstance(raw_paths, list):
+                paths = [item for item in raw_paths if isinstance(item, str)]
+            if not paths and isinstance(match.get("path"), str):
+                paths = [match["path"]]
+    return indices, paths
+
+
+def _path_keys(path: Path, root: Path) -> set[str]:
+    keys = {normalize_path(str(path)), normalize_path(path.name)}
+    with contextlib.suppress(ValueError):
+        keys.add(normalize_path(str(path.relative_to(root))))
+    return {key for key in keys if key}
+
+
+def _filter_selected(paths: list[Path], root: Path, download: Download) -> list[Path]:
+    indices, selected_paths = _selection(download)
+    if selected_paths:
+        wanted = {normalize_path(item) for item in selected_paths if item}
+        return [path for path in paths if _path_keys(path, root) & wanted]
+    if indices is not None:
+        # Last resort when only engine indices were stored: the scan is sorted
+        # and qBittorrent indexes follow the torrent file order.
+        wanted_indices = set(indices)
+        return [path for index, path in enumerate(paths) if index in wanted_indices]
+    return paths
+
+
+def _episode_id_for(
+    session: Session,
+    release: Release,
+    title: Title | None,
+    path: Path,
+    *,
+    single: bool,
+) -> str | None:
+    if title is None or title.kind == "movie":
+        return None
+    pair = season_episode_from_path(str(path))
+    if pair is not None:
+        episode = episodes_repo.find_episode(
+            session, title_id=title.id, season=pair[0], episode=pair[1]
+        )
+        if episode is not None:
+            return episode.id
+    if single and release.episode_id:
+        return release.episode_id
+    return None
+
+
 async def inspect_download(
     session: Session,
     download: Download,
@@ -245,6 +320,7 @@ async def inspect_download(
     """Scan, probe and persist the media files for a completed download."""
 
     release = _linked_release(session, download)
+    title = session.get(Title, release.title_id)
     directory = _download_root(download, settings, root)
     if not directory.exists():
         raise AppError(
@@ -254,17 +330,16 @@ async def inspect_download(
         )
 
     paths = scan_video_files(directory)
+    scan_root = directory if directory.is_dir() else directory.parent
+    paths = _filter_selected(paths, scan_root, download)
     if not paths:
         raise AppError(
             code="MEDIA_NOT_FOUND",
-            message="No video files were found in this download",
+            message="No selected video files were found in this download",
             status_code=422,
         )
 
-    candidates = [
-        build_candidate(path, directory if directory.is_dir() else directory.parent)
-        for path in paths
-    ]
+    candidates = [build_candidate(path, scan_root) for path in paths]
     errors = await _probe_candidates(
         candidates,
         ffprobe_bin=ffprobe_bin,
@@ -292,6 +367,13 @@ async def inspect_download(
             media_repo.create_media_file(
                 session,
                 title_id=release.title_id,
+                episode_id=_episode_id_for(
+                    session,
+                    release,
+                    title,
+                    candidate.path,
+                    single=len(valid) == 1,
+                ),
                 download_id=download.id,
                 src_path=str(candidate.path),
                 size_bytes=candidate.size_bytes,

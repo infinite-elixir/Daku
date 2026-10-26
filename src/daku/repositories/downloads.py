@@ -26,6 +26,8 @@ def create_download(
     save_path: str | None = None,
     url: str | None = None,
     total_bytes: int | None = None,
+    selected_files_json: str | None = None,
+    file_match_json: str | None = None,
 ) -> Download:
     now = utc_now_iso()
     row = Download(
@@ -38,6 +40,8 @@ def create_download(
         save_path=save_path,
         url=url,
         total_bytes=total_bytes,
+        selected_files_json=selected_files_json,
+        file_match_json=file_match_json,
         created_at=now,
         updated_at=now,
     )
@@ -79,6 +83,8 @@ def update_download(session: Session, download_id: str, **fields: Any) -> Downlo
         "save_path",
         "url",
         "error",
+        "selected_files_json",
+        "file_match_json",
     }
     row = session.get(Download, download_id)
     if row is None:

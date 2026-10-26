@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -14,6 +15,37 @@ def _label(row: Episode) -> str:
     return f"S{row.season:02d}E{row.episode:02d}"
 
 
+def _json_value(raw: str | None, fallback: Any) -> Any:
+    if not raw:
+        return fallback
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _selection_label(
+    selected: list[int] | None,
+    match: dict[str, Any] | None,
+    episode: Episode | None,
+) -> str | None:
+    if selected is None:
+        if match and match.get("pack"):
+            return "Whole pack"
+        return None
+    if not selected:
+        return None
+    if len(selected) == 1 and episode is not None:
+        return f"{_label(episode)} only"
+    if len(selected) == 1:
+        return "1 file only"
+    total = match.get("total_files") if isinstance(match, dict) else None
+    first = selected[0] + 1
+    if isinstance(total, int) and total > 0:
+        return f"File {first} of {total}"
+    return f"{len(selected)} files"
+
+
 def download_payload(session: Session, row: Download) -> dict[str, Any]:
     """Return the public shape of a download row.
 
@@ -23,11 +55,19 @@ def download_payload(session: Session, row: Download) -> dict[str, Any]:
 
     release = releases_repo.get_release(session, row.release_id) if row.release_id else None
     title = session.get(Title, release.title_id) if release is not None else None
-    episode = (
-        session.get(Episode, release.episode_id)
-        if release is not None and release.episode_id
-        else None
-    )
+    selected = _json_value(row.selected_files_json, None)
+    if not isinstance(selected, list) or not all(isinstance(item, int) for item in selected):
+        selected = None
+    match = _json_value(row.file_match_json, None)
+    if not isinstance(match, dict):
+        match = None
+    episode_id = release.episode_id if release is not None else None
+    if not episode_id and match is not None:
+        # The user may have supplied the episode on the download request rather
+        # than the release row; the matcher stores it in file_match_json.
+        candidate = match.get("episode_id")
+        episode_id = candidate if isinstance(candidate, str) else None
+    episode = session.get(Episode, episode_id) if episode_id else None
     return {
         "id": row.id,
         "release_id": row.release_id,
@@ -50,4 +90,7 @@ def download_payload(session: Session, row: Download) -> dict[str, Any]:
         "episode_label": _label(episode) if episode is not None else None,
         "quality": release.quality if release is not None else None,
         "filename": release.filename if release is not None else None,
+        "selected_files": selected,
+        "file_match": match,
+        "selection_label": _selection_label(selected, match, episode),
     }

@@ -100,6 +100,19 @@ export const DownloadRow = memo(function DownloadRow({
               {label}
             </span>
             {download.episode_label ? <span>{download.episode_label}</span> : null}
+            {download.selection_label ? (
+              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium leading-4 text-accent">
+                {download.selection_label}
+              </span>
+            ) : null}
+            {download.selection_label && download.release_id ? (
+              <a
+                href={`#release-files-${download.release_id}`}
+                className="underline decoration-dotted hover:text-fg"
+              >
+                Files
+              </a>
+            ) : null}
             {download.quality ? <span>{download.quality}</span> : null}
             <span>{download.engine === "aria2" ? "Direct" : "Torrent"}</span>
           </p>

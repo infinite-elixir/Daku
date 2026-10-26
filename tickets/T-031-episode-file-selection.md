@@ -121,24 +121,24 @@ already completed download (the organiser owns that). Non-qBittorrent torrent en
 
 ## Acceptance criteria
 
-- [ ] A 12-file season pack with an `S02E05` file downloads only that file when the user asks
+- [x] A 12-file season pack with an `S02E05` file downloads only that file when the user asks
       for S02E05; the other files stay at priority 0 and are not organised.
-- [ ] The matcher picks `S02E05` over `S02E05.sample`, and never selects a subtitle or trailer.
-- [ ] An anime absolute-number episode matches ` - 17` when `absolute=17`.
-- [ ] An ambiguous pack returns `409 FILE_SELECTION_REQUIRED` with candidates and creates no
+- [x] The matcher picks `S02E05` over `S02E05.sample`, and never selects a subtitle or trailer.
+- [x] An anime absolute-number episode matches ` - 17` when `absolute=17`.
+- [x] An ambiguous pack returns `409 FILE_SELECTION_REQUIRED` with candidates and creates no
       download row.
-- [ ] A pack with no matching episode returns `409 EPISODE_FILE_NOT_FOUND` and offers manual
+- [x] A pack with no matching episode returns `409 EPISODE_FILE_NOT_FOUND` and offers manual
       selection.
-- [ ] Downloading a pack without `allow_pack` is refused; with `allow_pack` it downloads all
+- [x] Downloading a pack without `allow_pack` is refused; with `allow_pack` it downloads all
       files and the organiser files each episode it can identify.
-- [ ] Explicit `file_indices`/`file_paths` win over the matcher and the effective engine
+- [x] Explicit `file_indices`/`file_paths` win over the matcher and the effective engine
       indices are persisted in the download row; an unknown path returns `409`.
-- [ ] qBittorrent receives all-zero priorities except the selected indices, and only resumes
+- [x] qBittorrent receives all-zero priorities except the selected indices, and only resumes
       after the call succeeds.
-- [ ] A metadata timeout leaves the torrent paused; the worker retries and never resumes the
+- [x] A metadata timeout leaves the torrent paused; the worker retries and never resumes the
       full pack.
-- [ ] The organiser ignores skipped files and files a single selected episode correctly.
-- [ ] The flow works at 390 px and with the keyboard alone.
+- [x] The organiser ignores skipped files and files a single selected episode correctly.
+- [x] The flow works at 390 px and with the keyboard alone.
 
 ## Test plan
 

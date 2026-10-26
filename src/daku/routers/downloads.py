@@ -10,11 +10,12 @@ row to the matching state; the worker owns polling and transitions afterwards.
 from __future__ import annotations
 
 import contextlib
+import json
 from typing import Annotated, Any
 
 import httpx
 from fastapi import APIRouter, Depends, Query, Request, Response
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 from daku.db import get_session
@@ -26,6 +27,8 @@ from daku.services.downloads_view import download_payload
 from daku.services.engines.aria2 import is_torrent_url
 from daku.services.engines.base import AddRequest, DownloadEngine, EngineError
 from daku.services.queue import check_disk_space, queue_direct, queue_release
+from daku.services.releases.selection import ResolveRequest, Selection, resolve_selection
+from daku.services.torrents.probe import ProbeService
 
 router = APIRouter(prefix="/api", tags=["downloads"])
 
@@ -37,12 +40,24 @@ class StartDownloadRequest(BaseModel):
     release_id: str | None = None
     url: str | None = None
     filename: str | None = None
+    episode_id: str | None = None
+    file_indices: list[int] | None = None
+    file_paths: list[str] | None = None
+    allow_pack: bool = False
 
     @model_validator(mode="after")
     def _one_source(self) -> StartDownloadRequest:
         if bool(self.release_id) == bool(self.url):
             raise ValueError("provide exactly one of release_id or url")
         return self
+
+
+class PreviewSelectionRequest(BaseModel):
+    release_id: str = Field(min_length=1)
+    episode_id: str | None = None
+    file_indices: list[int] | None = None
+    file_paths: list[str] | None = None
+    allow_pack: bool = False
 
 
 def _payload(session: Session, row: Download) -> dict[str, Any]:
@@ -68,6 +83,90 @@ def _engine(request: Request, name: str) -> DownloadEngine:
             status_code=503,
         )
     return engine
+
+
+def _selection_request(body: StartDownloadRequest | PreviewSelectionRequest) -> ResolveRequest:
+    return ResolveRequest(
+        episode_id=body.episode_id,
+        file_indices=body.file_indices,
+        file_paths=body.file_paths,
+        allow_pack=body.allow_pack,
+    )
+
+
+def _probe(request: Request) -> ProbeService | None:
+    service: ProbeService | None = getattr(request.app.state, "probe", None)
+    return service
+
+
+async def _resolve(
+    request: Request,
+    session: Session,
+    release: Any,
+    body: StartDownloadRequest | PreviewSelectionRequest,
+) -> Selection:
+    return await resolve_selection(
+        session,
+        release,
+        probe=_probe(request),
+        request=_selection_request(body),
+    )
+
+
+async def _apply_live_selection(
+    request: Request,
+    session: Session,
+    row: Download,
+    selection: Selection,
+) -> None:
+    """Push a new selection to an already-running torrent in place."""
+
+    if row.status != "active" or selection.indices is None:
+        return
+    engine = getattr(request.app.state, "qbt_engine", None)
+    setter = getattr(engine, "set_file_selection", None)
+    if setter is None:
+        return
+    try:
+        effective = await setter(
+            row.external_id,
+            selection.indices,
+            paths=selection.paths,
+        )
+    except EngineError as exc:
+        raise AppError(
+            code=exc.code,
+            message=exc.message,
+            status_code=502 if exc.transient else 409,
+        ) from exc
+    if effective:
+        match = dict(selection.match or {})
+        match["file_paths"] = selection.paths or match.get("file_paths")
+        downloads_repo.update_download(
+            session,
+            row.id,
+            selected_files_json=json.dumps(effective),
+            file_match_json=(json.dumps(match, ensure_ascii=False) if match else None),
+        )
+
+
+@router.post("/downloads/preview")
+async def preview_selection(
+    body: PreviewSelectionRequest,
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+) -> dict[str, Any]:
+    """Resolve what a download would fetch without creating a row."""
+
+    release = releases_repo.get_release(session, body.release_id)
+    if release is None:
+        raise AppError(
+            code="RELEASE_NOT_FOUND",
+            message=f"Release {body.release_id} does not exist",
+            status_code=404,
+        )
+    selection = await _resolve(request, session, release, body)
+    return selection.to_dict()
 
 
 async def _probe_content_length(client: httpx.AsyncClient, url: str) -> int | None:
@@ -181,18 +280,31 @@ async def start_download(
             status_code=422,
         )
 
+    selection = await _resolve(request, session, release, body)
+
     settings = request.app.state.settings
-    result = queue_release(session, release, save_path=settings.downloads_dir)
+    result = queue_release(
+        session,
+        release,
+        save_path=settings.downloads_dir,
+        selected_files_json=selection.selected_files_json,
+        file_match_json=selection.file_match_json,
+    )
     if result.created:
         payload = _payload(session, result.download)
+        payload.update(selection.to_dict())
         _publish(request, "download.created", payload)
         response.status_code = 201
         return payload
 
+    await _apply_live_selection(request, session, result.download, selection)
+
     # The same info-hash is already tracked. Returning the existing row with 409
     # makes a double tap harmless and tells the UI to open the existing download.
     response.status_code = 409
-    return _payload(session, result.download)
+    payload = _payload(session, result.download)
+    payload.update(selection.to_dict())
+    return payload
 
 
 @router.get("/downloads")

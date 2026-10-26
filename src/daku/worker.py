@@ -13,6 +13,7 @@ expects.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from collections import defaultdict
@@ -45,6 +46,42 @@ class _Row:
     release_id: str | None
     url: str | None
     error: str | None
+    selected_files_json: str | None = None
+    file_match_json: str | None = None
+
+
+@dataclass(slots=True)
+class _Selection:
+    indices: list[int] | None = None
+    paths: list[str] | None = None
+    pending: bool = False
+
+
+def _parse_json(raw: str | None) -> Any:
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _selection(download: Any) -> _Selection:
+    raw = _parse_json(download.selected_files_json)
+    indices = (
+        [item for item in raw if isinstance(item, int)]
+        if isinstance(raw, list) and all(isinstance(item, int) for item in raw)
+        else None
+    )
+    match = _parse_json(download.file_match_json)
+    paths: list[str] | None = None
+    pending = False
+    if isinstance(match, dict):
+        raw_paths = match.get("file_paths")
+        if isinstance(raw_paths, list):
+            paths = [item for item in raw_paths if isinstance(item, str)] or None
+        pending = bool(match.get("selection_pending"))
+    return _Selection(indices=indices, paths=paths, pending=pending)
 
 
 def _row(download: Any) -> _Row:
@@ -57,6 +94,8 @@ def _row(download: Any) -> _Row:
         release_id=download.release_id,
         url=download.url,
         error=download.error,
+        selected_files_json=download.selected_files_json,
+        file_match_json=download.file_match_json,
     )
 
 
@@ -82,6 +121,8 @@ class Worker:
         self.auto_inspect = auto_inspect
         self.interval = interval if interval is not None else settings.worker_poll_seconds
         self._last_publish: dict[str, float] = {}
+        self._selection_attempts: dict[str, int] = {}
+        self._selection_not_before: dict[str, float] = {}
 
     async def run(self, stop: asyncio.Event) -> None:
         logger.info("worker started", extra={"interval_s": self.interval})
@@ -100,11 +141,11 @@ class Worker:
 
     async def tick(self) -> None:
         with self._session_factory() as session:
-            rows = [
-                _row(row)
-                for row in downloads_repo.list_downloads(session)
-                if row.status in POLLED_STATUSES
-            ]
+            rows: list[_Row] = []
+            for download in downloads_repo.list_downloads(session):
+                pending_selection = download.status == "paused" and _selection(download).pending
+                if download.status in POLLED_STATUSES or pending_selection:
+                    rows.append(_row(download))
         if not rows:
             return
 
@@ -118,6 +159,7 @@ class Worker:
                 continue
             queued = [row for row in group if row.status == "queued"]
             active = [row for row in group if row.status == "active"]
+            pending = [row for row in group if row.status == "paused"]
 
             if engine_name == "aria2" and (queued or active) and self._supervisor is not None:
                 if not self._supervisor.available:
@@ -125,6 +167,8 @@ class Worker:
                     continue
                 await self._supervisor.ensure_started()
 
+            if pending:
+                await self._retry_selection(engine, pending)
             if queued:
                 await self._start(engine, queued)
             if active:
@@ -154,6 +198,7 @@ class Worker:
                 save_path=row.save_path or str(self._settings.downloads_dir),
                 filename=self._release_filename(row.release_id),
                 tag=self._release_title_id(row.release_id),
+                paused=bool(_selection(row).indices),
             )
             try:
                 external_id = await engine.add(request)
@@ -176,7 +221,89 @@ class Worker:
             )
             self._touch_external_id(row, external_id)
             self._event(row.id, "active", type="started")
+            if not await self._apply_selection(engine, row):
+                continue
             self._publish(row.id, force=True)
+
+    async def _apply_selection(self, engine: DownloadEngine, row: _Row) -> bool:
+        """Apply a known file selection; leave the torrent paused if it is not ready."""
+
+        selection = _selection(row)
+        if selection.indices is None:
+            return True
+        setter = getattr(engine, "set_file_selection", None)
+        if setter is None:
+            return True
+        try:
+            effective = await setter(
+                row.external_id,
+                selection.indices,
+                paths=selection.paths,
+            )
+        except EngineError as exc:
+            if exc.transient:
+                self._mark_selection_pending(row, exc.message)
+                return False
+            self._fail(row, exc.message)
+            return False
+        except Exception as exc:  # pragma: no cover - defensive
+            self._mark_selection_pending(row, str(exc))
+            return False
+
+        match = _parse_json(row.file_match_json)
+        if not isinstance(match, dict):
+            match = {}
+        match.pop("selection_pending", None)
+        if selection.paths:
+            match["file_paths"] = selection.paths
+        self._update(
+            row.id,
+            status="active",
+            error=None,
+            selected_files_json=json.dumps(effective),
+            file_match_json=json.dumps(match, ensure_ascii=False) if match else None,
+        )
+        row.selected_files_json = json.dumps(effective)
+        row.file_match_json = json.dumps(match, ensure_ascii=False) if match else None
+        row.status = "active"
+        row.error = None
+        self._selection_attempts.pop(row.id, None)
+        self._selection_not_before.pop(row.id, None)
+        return True
+
+    def _mark_selection_pending(self, row: _Row, message: str) -> None:
+        match = _parse_json(row.file_match_json)
+        if not isinstance(match, dict):
+            match = {}
+        match["selection_pending"] = True
+        attempts = self._selection_attempts.get(row.id, 0) + 1
+        self._selection_attempts[row.id] = attempts
+        delay = min(60.0, float(2 ** min(attempts - 1, 6)))
+        self._selection_not_before[row.id] = time.monotonic() + delay
+        error = f"FILE_SELECTION_PENDING: {message}"
+        self._update(
+            row.id,
+            status="paused",
+            error=error,
+            file_match_json=json.dumps(match, ensure_ascii=False),
+            speed_bps=None,
+            eta_seconds=None,
+        )
+        row.status = "paused"
+        row.error = error
+        row.file_match_json = json.dumps(match, ensure_ascii=False)
+        self._publish(row.id, force=True)
+
+    async def _retry_selection(self, engine: DownloadEngine, rows: list[_Row]) -> None:
+        now = time.monotonic()
+        for row in rows:
+            not_before = self._selection_not_before.get(row.id, 0.0)
+            if not_before > now:
+                continue
+            self._update(row.id, status="active", error=None)
+            row.status = "active"
+            if await self._apply_selection(engine, row):
+                self._publish(row.id, force=True)
 
     async def _adopt(self, engine: DownloadEngine, row: _Row) -> bool:
         try:
@@ -191,6 +318,8 @@ class Worker:
             return False
         if self._apply(row, status):
             await self._auto_inspect(row)
+        elif _selection(row).indices is not None:
+            await self._apply_selection(engine, row)
         return True
 
     # -- polling -------------------------------------------------------------

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Sequence
+from pathlib import PurePosixPath
 
 import httpx
 
@@ -19,13 +20,19 @@ from daku.config import Settings
 from daku.services.engines.base import (
     AddRequest,
     EngineError,
+    EngineFile,
     EngineStatus,
     Health,
 )
+from daku.services.releases.episode_match import normalize_path
 
 QBT_TIMEOUT_SECONDS = 10.0
 QBT_INFINITE_ETA = 8_640_000
 QBT_CATEGORY = "daku"
+QBT_METADATA_TIMEOUT_SECONDS = 30.0
+QBT_METADATA_POLL_SECONDS = 0.5
+QBT_PRIORITY_SKIP = 0
+QBT_PRIORITY_NORMAL = 1
 
 ACTIVE_STATES = frozenset(
     {
@@ -98,6 +105,8 @@ class QbittorrentEngine:
         self._owns_client = client is None
         self._authenticated = False
         self._auth_lock = asyncio.Lock()
+        self.metadata_timeout = QBT_METADATA_TIMEOUT_SECONDS
+        self.metadata_poll_interval = QBT_METADATA_POLL_SECONDS
 
     async def aclose(self) -> None:
         if self._owns_client:
@@ -194,7 +203,7 @@ class QbittorrentEngine:
                 "tags": (None, request.tag or ""),
                 "sequentialDownload": (None, "false"),
                 "firstLastPiecePrio": (None, "true"),
-                "paused": (None, "false"),
+                "paused": (None, "true" if request.paused else "false"),
             },
         )
         body = response.text.strip()
@@ -286,6 +295,143 @@ class QbittorrentEngine:
                 "deleteFiles": "true" if delete_files else "false",
             },
         )
+
+    async def files(self, external_id: str) -> list[EngineFile]:
+        """Return the engine's current file list, or an empty list before metadata."""
+
+        response = await self._request(
+            "GET",
+            "/api/v2/torrents/files",
+            params={"hash": external_id.lower()},
+        )
+        if response.status_code == 404:
+            return []
+        try:
+            rows = response.json()
+        except ValueError as exc:
+            raise EngineError("QBT_UNREACHABLE", "qBittorrent returned invalid JSON") from exc
+        if not isinstance(rows, list):
+            raise EngineError("QBT_UNREACHABLE", "qBittorrent returned an unexpected payload")
+
+        files: list[EngineFile] = []
+        for position, row in enumerate(rows):
+            if not isinstance(row, dict):
+                continue
+            try:
+                index = int(row.get("index", position))
+            except (TypeError, ValueError):
+                index = position
+            try:
+                size = int(row.get("size") or 0)
+            except (TypeError, ValueError):
+                size = 0
+            try:
+                progress = float(row.get("progress") or 0.0)
+            except (TypeError, ValueError):
+                progress = 0.0
+            try:
+                priority = int(row.get("priority", QBT_PRIORITY_NORMAL))
+            except (TypeError, ValueError):
+                priority = QBT_PRIORITY_NORMAL
+            files.append(
+                EngineFile(
+                    index=index,
+                    path=str(row.get("name") or ""),
+                    size_bytes=size,
+                    progress=min(max(progress, 0.0), 1.0),
+                    priority=priority,
+                )
+            )
+        files.sort(key=lambda item: item.index)
+        return files
+
+    async def _wait_for_files(self, external_id: str) -> list[EngineFile]:
+        """Wait until qBittorrent has parsed the torrent metadata."""
+
+        deadline = asyncio.get_running_loop().time() + self.metadata_timeout
+        while True:
+            files = await self.files(external_id)
+            if files:
+                return files
+            if asyncio.get_running_loop().time() >= deadline:
+                raise EngineError(
+                    "QBT_FILE_SELECTION_PENDING",
+                    "qBittorrent did not return the torrent file list in time",
+                )
+            await asyncio.sleep(self.metadata_poll_interval)
+
+    @staticmethod
+    def _find_path(target: str, files: Sequence[EngineFile]) -> EngineFile | None:
+        wanted = normalize_path(target)
+        if not wanted:
+            return None
+        exact = [item for item in files if normalize_path(item.path) == wanted]
+        if len(exact) == 1:
+            return exact[0]
+        wanted_name = normalize_path(PurePosixPath(target).name or target)
+        named = [
+            item
+            for item in files
+            if normalize_path(PurePosixPath(item.path).name or item.path) == wanted_name
+        ]
+        return named[0] if len(named) == 1 else None
+
+    async def set_file_selection(
+        self,
+        external_id: str,
+        indices: Sequence[int],
+        *,
+        paths: Sequence[str] | None = None,
+    ) -> list[int]:
+        """Set every unselected file to priority 0, selected files to normal, then resume."""
+
+        files = await self._wait_for_files(external_id)
+
+        if paths:
+            selected: list[int] = []
+            missing: list[str] = []
+            for path in paths:
+                found = self._find_path(path, files)
+                if found is None:
+                    missing.append(path)
+                elif found.index not in selected:
+                    selected.append(found.index)
+            if missing:
+                raise EngineError(
+                    "QBT_FILE_NOT_IN_TORRENT",
+                    f"The torrent does not contain {missing[0]}",
+                )
+        else:
+            available = {item.index for item in files}
+            selected = [index for index in dict.fromkeys(indices) if index in available]
+            if len(selected) != len(set(indices)):
+                raise EngineError(
+                    "QBT_FILE_NOT_IN_TORRENT",
+                    "A selected file index is not present in the torrent",
+                )
+        if not selected:
+            raise EngineError(
+                "QBT_FILE_NOT_IN_TORRENT",
+                "No selected files are present in the torrent",
+            )
+
+        chosen = set(selected)
+        ids = [str(item.index) for item in files]
+        priorities = [
+            str(QBT_PRIORITY_NORMAL if item.index in chosen else QBT_PRIORITY_SKIP)
+            for item in files
+        ]
+        await self._request(
+            "POST",
+            "/api/v2/torrents/filePrio",
+            data={
+                "hash": external_id.lower(),
+                "id": "|".join(ids),
+                "priority": "|".join(priorities),
+            },
+        )
+        await self.resume(external_id)
+        return selected
 
     async def health(self) -> Health:
         try:

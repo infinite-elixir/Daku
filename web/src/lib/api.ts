@@ -243,12 +243,14 @@ export interface EpisodeMapBody {
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string | null;
+  readonly detail: unknown;
 
-  constructor(message: string, status: number, code: string | null = null) {
+  constructor(message: string, status: number, code: string | null = null, detail: unknown = null) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.detail = detail;
   }
 }
 
@@ -257,18 +259,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     let message = `request failed: ${response.status}`;
     let code: string | null = null;
+    let detail: unknown = null;
     try {
-      const payload = (await response.json()) as { message?: string; code?: string };
+      const payload = (await response.json()) as {
+        message?: string;
+        code?: string;
+        detail?: unknown;
+      };
       if (typeof payload.message === "string") {
         message = payload.message;
       }
       if (typeof payload.code === "string") {
         code = payload.code;
       }
+      detail = payload.detail ?? null;
     } catch {
       // Keep the status-based message when the body is not JSON.
     }
-    throw new ApiError(message, response.status, code);
+    throw new ApiError(message, response.status, code, detail);
   }
   if (response.status === 204) {
     return undefined as T;
@@ -557,6 +565,9 @@ export interface DownloadRecord {
   episode_label: string | null;
   quality: string | null;
   filename: string | null;
+  selected_files?: number[] | null;
+  file_match?: Record<string, unknown> | null;
+  selection_label?: string | null;
 }
 
 export interface DownloadsResponse {
@@ -710,10 +721,54 @@ export function getReleaseFiles(
   });
 }
 
-export function startDownload(releaseId: string): Promise<DownloadRecord> {  return request<DownloadRecord>("/api/downloads", {
+export interface StartDownloadOptions {
+  episode_id?: string | null;
+  file_indices?: number[];
+  file_paths?: string[];
+  allow_pack?: boolean;
+}
+
+export interface DownloadMatchFile {
+  index: number;
+  path: string;
+  size_bytes: number;
+  score?: number;
+  reason?: string;
+}
+
+export interface DownloadSelection {
+  selected_files: number[] | null;
+  match: Record<string, unknown> | null;
+  selected_paths?: string[];
+  files?: DownloadMatchFile[];
+  total_files?: number;
+}
+
+export function startDownload(
+  releaseId: string,
+  options: StartDownloadOptions = {},
+): Promise<DownloadRecord> {
+  return request<DownloadRecord>("/api/downloads", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ release_id: releaseId }),
+    body: JSON.stringify({
+      release_id: releaseId,
+      ...options,
+    }),
+  });
+}
+
+export function previewSelection(
+  releaseId: string,
+  options: StartDownloadOptions = {},
+): Promise<DownloadSelection> {
+  return request<DownloadSelection>("/api/downloads/preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      release_id: releaseId,
+      ...options,
+    }),
   });
 }
 

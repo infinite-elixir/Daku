@@ -34,6 +34,7 @@ TRANSIENT_CODES: frozenset[str] = frozenset(
     {
         "QBT_UNREACHABLE",
         "QBT_LOGIN_FAILED",
+        "QBT_FILE_SELECTION_PENDING",
         "ARIA2_UNREACHABLE",
         "ARIA2_UNAVAILABLE",
     }
@@ -49,6 +50,19 @@ class AddRequest:
     save_path: str
     filename: str | None = None
     tag: str | None = None
+    #: Torrents are added paused when a file selection has to be applied first.
+    paused: bool = False
+
+
+@dataclass(slots=True)
+class EngineFile:
+    """One file inside a multi-file torrent, as the engine sees it."""
+
+    index: int
+    path: str
+    size_bytes: int = 0
+    progress: float = 0.0
+    priority: int = 1
 
 
 @dataclass(slots=True)
@@ -93,5 +107,15 @@ class DownloadEngine(Protocol):
     async def resume(self, external_id: str) -> None: ...
 
     async def remove(self, external_id: str, *, delete_files: bool = False) -> None: ...
+
+    async def set_file_selection(
+        self,
+        external_id: str,
+        indices: Sequence[int],
+        *,
+        paths: Sequence[str] | None = None,
+    ) -> list[int]:
+        """Keep only ``indices`` (or ``paths``) and return the effective indices."""
+        ...
 
     async def health(self) -> Health: ...

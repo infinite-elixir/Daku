@@ -173,6 +173,10 @@ Resolution order: environment → `~/.config/daku/config.json` → defaults.
   (provider season → library season), migration v7. `titles.*` is still updated so readers
   keep working; the override rows stop a metadata refresh from overwriting the decision.
   Deleting a title cascades all three. No file on disk is deleted by any fixer operation.
+- T-031 adds `downloads.selected_files_json` (JSON array of engine file indices; `null`
+  means the engine default/all) and `downloads.file_match_json` (matcher result plus the
+  selected paths and, when a selection is still pending, `selection_pending`), migration v9.
+  These are metadata only: they never introduce a download state.
 - Deleting a title cascades to episodes/releases/files but **never** deletes files on disk
   unless the caller passes `keep_files=false` explicitly.
 
@@ -296,6 +300,12 @@ progress. Every transition emits an event to SSE.
 Manual metadata changes (T-029) are not a state-machine state: identity and episode
 overrides are user decisions persisted in the `title_*_override(s)` tables and applied by
 the refresh path. They never add a new download or episode status.
+
+File selection (T-031) is also not a new state. `downloads.selected_files_json` and
+`downloads.file_match_json` say which torrent files the existing `active` download may
+fetch. A metadata timeout is a transient engine error (`FILE_SELECTION_PENDING`) while the
+torrent stays `paused`; the worker retries the selection with backoff. Nothing resumes the
+whole pack and the organiser only sees the selected files.
 
 ---
 

@@ -15,6 +15,7 @@ import {
   type TitleDetail,
 } from "../lib/api";
 import { CopyMagnet } from "./CopyMagnet";
+import { EpisodeDownload } from "./EpisodeDownload";
 import { MagnetFiles, looksLikeMagnet } from "./MagnetFiles";
 
 type Tab = "find" | "saved";
@@ -366,6 +367,26 @@ export function ReleasesSection({
     }
   }
 
+  async function ensureReleaseId(release: ReleaseItem): Promise<string> {
+    if (release.release_id) {
+      return release.release_id;
+    }
+    const stored = await createRelease({
+      magnet: release.magnet,
+      title_id: title.id,
+      episode_id: isMovie ? null : (selectedEpisode?.id ?? null),
+      filename: release.filename,
+      provider: release.provider,
+      quality: release.quality,
+      size_bytes: release.size_bytes,
+      seeders: release.seeders,
+      metadata_json: release.metadata_json,
+      resolved_from: release.resolved_from,
+      save: false,
+    });
+    return stored.id;
+  }
+
   return (
     <section className="flex flex-col gap-4">
       {mode === "find" ? null : (
@@ -650,9 +671,26 @@ export function ReleasesSection({
                           </button>
                         </div>
                       </div>
+                      {!isMovie && selectedEpisode ? (
+                        <EpisodeDownload
+                          release={release}
+                          episodeId={selectedEpisode.id}
+                          episodeLabel={selectedEpisode.label}
+                          ensureRelease={() => ensureReleaseId(release)}
+                          onQueued={(message) => {
+                            setNotice(message);
+                            invalidate();
+                          }}
+                        />
+                      ) : null}
                       <MagnetFiles
                         magnet={release.magnet}
                         releaseId={release.release_id}
+                        episodeId={isMovie ? null : (selectedEpisode?.id ?? null)}
+                        onQueued={(message) => {
+                          setNotice(message);
+                          invalidate();
+                        }}
                       />
                     </li>
                   ))}
@@ -794,7 +832,27 @@ export function ReleasesSection({
                       </button>
                     </div>
                   </div>
-                  <MagnetFiles magnet={release.magnet} releaseId={release.id} />
+                  {!isMovie && selectedEpisode ? (
+                    <EpisodeDownload
+                      release={release}
+                      episodeId={selectedEpisode.id}
+                      episodeLabel={selectedEpisode.label}
+                      ensureRelease={() => ensureReleaseId(release)}
+                      onQueued={(message) => {
+                        setNotice(message);
+                        invalidate();
+                      }}
+                    />
+                  ) : null}
+                  <MagnetFiles
+                    magnet={release.magnet}
+                    releaseId={release.id}
+                    episodeId={isMovie ? null : (selectedEpisode?.id ?? null)}
+                    onQueued={(message) => {
+                      setNotice(message);
+                      invalidate();
+                    }}
+                  />
                 </li>
               ))}
             </ul>

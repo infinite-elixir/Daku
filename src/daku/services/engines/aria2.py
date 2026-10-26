@@ -245,6 +245,20 @@ class Aria2Engine:
     async def resume(self, external_id: str) -> None:
         await self.call("aria2.unpause", [external_id])
 
+    async def set_file_selection(
+        self,
+        external_id: str,
+        indices: Sequence[int],
+        *,
+        paths: Sequence[str] | None = None,
+    ) -> list[int]:
+        """aria2 direct downloads have no torrent file list to select from."""
+
+        raise EngineError(
+            "ARIA2_FILE_SELECTION_UNSUPPORTED",
+            "File selection is only available for torrent downloads",
+        )
+
     async def remove(self, external_id: str, *, delete_files: bool = False) -> None:
         try:
             await self.call("aria2.remove", [external_id])

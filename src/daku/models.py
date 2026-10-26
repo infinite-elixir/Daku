@@ -178,6 +178,8 @@ class Download(Base):
     save_path: Mapped[str | None] = mapped_column(Text)
     url: Mapped[str | None] = mapped_column(Text)
     error: Mapped[str | None] = mapped_column(Text)
+    selected_files_json: Mapped[str | None] = mapped_column(Text)
+    file_match_json: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[str] = mapped_column(String(40), nullable=False, default=utc_now_iso)
     updated_at: Mapped[str] = mapped_column(String(40), nullable=False, default=utc_now_iso)
 

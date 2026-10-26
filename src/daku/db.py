@@ -321,6 +321,18 @@ def _migration_008(engine: Engine) -> None:
         )
 
 
+def _migration_009(engine: Engine) -> None:
+    """T-031: persist the chosen engine file indices and the matcher result."""
+
+    statements = [
+        "ALTER TABLE downloads ADD COLUMN selected_files_json TEXT",
+        "ALTER TABLE downloads ADD COLUMN file_match_json TEXT",
+    ]
+    with engine.begin() as conn:
+        for statement in statements:
+            conn.exec_driver_sql(statement)
+
+
 class Migration:
     __slots__ = ("name", "upgrade", "version")
 
@@ -339,6 +351,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(6, "media file subtitle sidecars", _migration_006),
     Migration(7, "manual metadata overrides", _migration_007),
     Migration(8, "per-season provider structure", _migration_008),
+    Migration(9, "selective torrent file downloads", _migration_009),
 )
 SCHEMA_VERSION = MIGRATIONS[-1].version
 

@@ -38,14 +38,25 @@ def queue_release(
     *,
     save_path: Path | str,
     engine: str = TORRENT_ENGINE,
+    selected_files_json: str | None = None,
+    file_match_json: str | None = None,
 ) -> QueueResult:
     """Create the download row for a release, deduplicating by info-hash."""
 
     info_hash = (release.info_hash or "").lower()
     existing = downloads_repo.find_by_external_id(session, engine=engine, external_id=info_hash)
     if existing is not None:
+        fields: dict[str, object] = {}
         if existing.release_id != release.id:
-            updated = downloads_repo.update_download(session, existing.id, release_id=release.id)
+            fields["release_id"] = release.id
+        # A fresh selection request must reach an already tracked torrent. The
+        # worker (or the router for an active row) applies the priorities.
+        if selected_files_json is not None:
+            fields["selected_files_json"] = selected_files_json
+        if file_match_json is not None:
+            fields["file_match_json"] = file_match_json
+        if fields:
+            updated = downloads_repo.update_download(session, existing.id, **fields)
             if updated is not None:
                 existing = updated
         return QueueResult(download=existing, created=False)
@@ -59,6 +70,8 @@ def queue_release(
         status="queued",
         save_path=str(Path(save_path).expanduser()),
         total_bytes=release.size_bytes,
+        selected_files_json=selected_files_json,
+        file_match_json=file_match_json,
     )
     return QueueResult(download=row, created=True)
 
