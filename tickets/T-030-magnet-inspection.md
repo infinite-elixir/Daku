@@ -26,8 +26,9 @@ a second download engine.
 - The probe session:
 
   - is created once per process, lazily, in a worker thread;
-  - has no incoming listener (`listen_interfaces` on `127.0.0.1:0` or empty), DHT enabled,
-    LSD/UPnP/NAT-PMP disabled;
+  - binds `listen_interfaces=0.0.0.0:0` with `enable_incoming_tcp=False` and
+    `enable_incoming_utp=False` (DHT needs a non-loopback UDP socket; loopback or an empty
+    value leaves `dht_nodes=0`), DHT enabled, LSD/UPnP/NAT-PMP disabled;
   - adds the magnet with `upload_mode` (metadata only, no payload) and a temporary
     `save_path` under `data_dir/probes/<hash>`;
   - never sets a media save path, never creates a download row, never touches qBittorrent;
@@ -171,3 +172,9 @@ replacing qBittorrent as the torrent engine. Private-tracker credentials.
 - Manual checks against one live public magnet and one dead magnet on a host with the
   libtorrent extra installed were **not** run in this environment; the adapter is covered by a
   mocked libtorrent session.
+- 2026-10-26 fix: the original `listen_interfaces=127.0.0.1:0` prevented libtorrent DHT from
+  bootstrapping (`dht_nodes=0`, every live probe timed out). The session now binds
+  `0.0.0.0:0` and disables incoming TCP/uTP. Verified manually with a live Cyberpunk:
+  Edgerunners magnet: full season-pack metadata returned via DHT. Payload safety is unchanged;
+  the payload guard and `upload_mode` still apply. Probe failures (including timeouts) are now
+  logged with the info hash and error code.

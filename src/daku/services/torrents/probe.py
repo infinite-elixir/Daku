@@ -180,7 +180,12 @@ class LibtorrentBackend:
             lt = self._libtorrent()
             self._session = lt.session(
                 {
-                    "listen_interfaces": "127.0.0.1:0",
+                    # DHT needs a non-loopback UDP socket to reach the swarm. Binding
+                    # 127.0.0.1:0 (or "") leaves dht_nodes at 0 and every probe times out.
+                    # Incoming peer connections stay disabled, so no payload can be served.
+                    "listen_interfaces": "0.0.0.0:0",
+                    "enable_incoming_tcp": False,
+                    "enable_incoming_utp": False,
                     "enable_dht": True,
                     "enable_lsd": False,
                     "enable_upnp": False,
@@ -376,6 +381,10 @@ class ProbeService:
                 raise
         except ProbeError as exc:
             self._record_failure(key, exc)
+            logger.warning(
+                "magnet probe failed",
+                extra={"info_hash": key[:12], "code": exc.code},
+            )
             raise
         except Exception as exc:  # pragma: no cover - unexpected adapter failure
             logger.warning("magnet probe failed", extra={"info_hash": key[:12]}, exc_info=True)

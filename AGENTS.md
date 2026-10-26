@@ -221,8 +221,12 @@ payloads are served on upstream failure. Nyaa is never queried for movies or non
 ### Magnet probe (optional libtorrent)
 - `POST /api/magnets/inspect` `{magnet}` and `GET /api/releases/{id}/files` return torrent
   metadata only: name, total size, piece length, private flag, file list. Both are read-only.
-- One lazy libtorrent session per process, in a worker thread, `listen_interfaces=127.0.0.1:0`,
-  DHT on, LSD/UPnP/NAT-PMP off. Add the magnet in `upload_mode` under
+- One lazy libtorrent session per process, in a worker thread,
+  `listen_interfaces=0.0.0.0:0` with `enable_incoming_tcp=False` and
+  `enable_incoming_utp=False`; DHT on, LSD/UPnP/NAT-PMP off. DHT needs a non-loopback UDP
+  socket: binding `127.0.0.1:0` or `""` leaves `dht_nodes=0` and every probe times out.
+  Incoming peer connections stay disabled, so the probe only fetches metadata and never
+  serves or receives payload. Add the magnet in `upload_mode` under
   `data_dir/probes/<info_hash>` and remove it after success, timeout or error.
 - One active probe, at most 10 outstanding, 30 s deadline. Reject the 11th with
   `429 PROBE_BUSY`. Success cache 24 h / LRU 200; failure cache 5 min. A per-hash lock

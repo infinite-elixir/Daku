@@ -189,8 +189,11 @@ async def test_probe_returns_the_file_list_and_cleans_up(settings: Settings) -> 
     assert len(session.added) == 1
     assert len(session.removed) == 1
     assert not (settings.data_dir / "probes" / ("a" * 40)).exists()
-    # The session is configured with no reachable listener and no discovery extras.
-    assert lt.settings[0]["listen_interfaces"] == "127.0.0.1:0"
+    # DHT must bind a non-loopback socket; incoming peer connections stay disabled so a
+    # probe can only fetch metadata, never serve or receive payload bytes.
+    assert lt.settings[0]["listen_interfaces"] == "0.0.0.0:0"
+    assert lt.settings[0]["enable_incoming_tcp"] is False
+    assert lt.settings[0]["enable_incoming_utp"] is False
     assert lt.settings[0]["enable_dht"] is True
     assert lt.settings[0]["enable_lsd"] is False
     assert lt.settings[0]["enable_upnp"] is False
