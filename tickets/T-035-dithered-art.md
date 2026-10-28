@@ -90,23 +90,23 @@ artwork.
 
 ## Acceptance criteria
 
-- [ ] The title page shows a dithered banner derived from its poster at ≥ 720 px, with legible
+- [x] The title page shows a dithered banner derived from its poster at ≥ 720 px, with legible
       text over it.
-- [ ] The library shows at most one quiet dithered backdrop, stable across a reload within the
+- [x] The library shows at most one quiet dithered backdrop, stable across a reload within the
       same day/session.
-- [ ] No new network request is made for the library backdrop beyond posters already in the
+- [x] No new network request is made for the library backdrop beyond posters already in the
       grid.
-- [ ] A CORS-blocked poster is retried through the same-origin proxy and produces a banner; if
+- [x] A CORS-blocked poster is retried through the same-origin proxy and produces a banner; if
       the proxy is unavailable, it falls back to procedural ASCII with no console error shown to
       the user and no broken image.
-- [ ] The proxy rejects non-allowlisted hosts and private/link-local addresses with a stable
+- [x] The proxy rejects non-allowlisted hosts and private/link-local addresses with a stable
       `400`, and never writes the image to disk.
-- [ ] A title with no poster renders the fallback, not an empty box.
-- [ ] The art is deterministic for the same inputs and does not flicker on re-render.
-- [ ] Decorative canvases are `aria-hidden`; no information exists only in the art.
-- [ ] At 390 px the banner does not push the title below the fold or cause horizontal scroll.
-- [ ] Reduced-motion users see the same static result with no added animation.
-- [ ] Rendering a grid of 100 posters does not block typing or scrolling for more than a frame.
+- [x] A title with no poster renders the fallback, not an empty box.
+- [x] The art is deterministic for the same inputs and does not flicker on re-render.
+- [x] Decorative canvases are `aria-hidden`; no information exists only in the art.
+- [x] At 390 px the banner does not push the title below the fold or cause horizontal scroll.
+- [x] Reduced-motion users see the same static result with no added animation.
+- [x] Rendering a grid of 100 posters does not block typing or scrolling for more than a frame.
 
 ## Test plan
 
@@ -135,3 +135,8 @@ artwork.
 - The proxy is the only new backend surface and must never become a general-purpose fetcher:
   allowlist, HTTPS only, size cap, private-IP resolution check.
 - If T-033 changes the kind glow or palette, reuse the same CSS variables; do not fork colours.
+
+Implemented in v1.2. The banner is hidden below 720 px via CSS (no layout height), the
+library backdrop is a single 320 px fade at 6% opacity, and the poster proxy is
+`GET /api/posters/proxy` with an HTTPS host allowlist, DNS public-address check, 8 MB cap
+and no disk writes.

@@ -3,7 +3,9 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { seasonLabel, episodesForSeason, seasonNumbers } from "../lib/episodes";
+import { hashString } from "../lib/dither";
 import type { Availability, Episode, Kind, SeasonInfo, TitleMetadata } from "../lib/api";
+import { DitherCanvas } from "./DitherCanvas";
 import { AvailabilityPill, EpisodeStatusPill, KindBadge } from "./Pills";
 import { ExpandableText } from "./ExpandableText";
 import { MetadataFacts } from "./MetadataFacts";
@@ -147,10 +149,30 @@ export function TitleView({
         {back.label}
       </Link>
 
-      <div className="grid gap-6 sm:grid-cols-[180px_minmax(0,1fr)]">
-        <div className="w-40 sm:w-full">
-          <PosterArt url={title.poster_url} title={title.title} />
+      <div className="relative">
+        <div
+          data-testid="title-banner"
+          className="title-banner-strip title-banner-art pointer-events-none absolute inset-x-0 top-0 h-52 overflow-hidden rounded-panel"
+          aria-hidden
+        >
+          <DitherCanvas
+            posterUrl={title.poster_url}
+            title={title.title}
+            year={title.year}
+            kind={title.kind}
+            width={160}
+            height={90}
+            seed={hashString(`${title.title}|${title.year ?? ""}`)}
+            className="h-full w-full"
+            testId="title-banner-art"
+          />
+          <div data-testid="title-banner-scrim" className="title-banner-scrim absolute inset-0" />
         </div>
+
+        <div className="relative grid gap-6 sm:grid-cols-[180px_minmax(0,1fr)] md:pt-6">
+          <div className="w-40 sm:w-full">
+            <PosterArt url={title.poster_url} title={title.title} />
+          </div>
 
         <div className="flex min-w-0 flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -202,6 +224,7 @@ export function TitleView({
           </dl>
 
           {actions ? <div className="flex flex-wrap items-center gap-2 pt-1">{actions}</div> : null}
+        </div>
         </div>
       </div>
 

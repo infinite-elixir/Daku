@@ -19,7 +19,17 @@ from daku.db import init_db
 from daku.errors import AppError
 from daku.events import EventBus
 from daku.logging_setup import configure_logging
-from daku.routers import downloads, events, health, magnets, releases, search, system, titles
+from daku.routers import (
+    downloads,
+    events,
+    health,
+    magnets,
+    posters,
+    releases,
+    search,
+    system,
+    titles,
+)
 from daku.routers import settings as settings_router
 from daku.services.engines.aria2 import Aria2Engine
 from daku.services.engines.qbittorrent import QbittorrentEngine
@@ -149,6 +159,7 @@ def create_app(settings: Settings | None = None, *, configure_logs: bool = True)
     app.include_router(magnets.router)
     app.include_router(settings_router.router)
     app.include_router(downloads.router)
+    app.include_router(posters.router)
 
     @app.exception_handler(AppError)
     async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:

@@ -116,4 +116,65 @@ describe("LibraryPage", () => {
       );
     });
   });
+
+  it("renders at most one quiet backdrop from a poster already in the grid", async () => {
+    const fetchMock = stubLibrary([
+      makeTitle({ id: "a", title: "Alpha", poster_url: "https://images.example/a.jpg" }),
+      makeTitle({ id: "b", title: "Beta", poster_url: "https://images.example/b.jpg" }),
+      makeTitle({ id: "c", title: "No art", poster_url: null }),
+    ]);
+
+    renderPage();
+
+    await screen.findByText("Alpha");
+    expect(await screen.findByTestId("library-backdrop")).toBeInTheDocument();
+    expect(screen.getAllByTestId("library-backdrop")).toHaveLength(1);
+    expect(screen.getByTestId("library-backdrop")).toHaveClass("library-backdrop", "h-80");
+    // The backdrop must not add a fetch beyond the library call itself.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits the backdrop on narrow screens", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query.includes("max-width"),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    );
+    stubLibrary([makeTitle()]);
+
+    renderPage();
+
+    await screen.findByText("Big Buck Bunny");
+    expect(screen.queryByTestId("library-backdrop")).not.toBeInTheDocument();
+  });
+
+  it("omits the backdrop when the user prefers reduced data", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query.includes("prefers-reduced-data"),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    );
+    stubLibrary([makeTitle()]);
+
+    renderPage();
+
+    await screen.findByText("Big Buck Bunny");
+    expect(screen.queryByTestId("library-backdrop")).not.toBeInTheDocument();
+  });
 });
