@@ -208,7 +208,7 @@ export function TitleView({
       {!isMovie ? (
         <section className="flex flex-col gap-4" aria-labelledby="episodes-heading">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 id="episodes-heading" className="text-h2 font-semibold text-fg">
+            <h2 id="episodes-heading" className="text-h2 font-semibold tracking-tight text-fg">
               Episodes
             </h2>
             {renderEpisodeExpanded ? (
@@ -219,7 +219,7 @@ export function TitleView({
           </div>
           {seasons.length === 0 ? (
             <div className="rounded-panel border border-border-subtle bg-panel px-4 py-6">
-              <p className="display-face text-title font-semibold text-fg">No episodes recorded yet</p>
+              <p className="text-h2 font-semibold tracking-tight text-fg">No episodes recorded yet</p>
               <p className="mt-1 max-w-[60ch] text-small text-fg-muted">
                 This title was added without an episode list, usually because metadata was
                 unreachable at the time. Refreshing its metadata will fill it in.

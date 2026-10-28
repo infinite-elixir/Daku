@@ -182,7 +182,7 @@ export function SearchPage() {
 
       {!enabled ? (
         <div className="rounded-panel border border-border-subtle bg-panel px-6 py-10 text-center">
-          <p className="display-face text-title font-semibold text-fg">Search the catalogue</p>
+          <p className="text-h2 font-semibold tracking-tight text-fg">Search the catalogue</p>
           <p className="mx-auto mt-1 max-w-[48ch] text-small text-fg-muted">
             Pick a movie, series or anime. It lands in your library as Saved, with no file and no
             download.
@@ -203,7 +203,7 @@ export function SearchPage() {
         <SkeletonGrid />
       ) : data && data.results.length === 0 ? (
         <div className="rounded-panel border border-border-subtle bg-panel px-6 py-10 text-center">
-          <p className="display-face text-title font-semibold text-fg">No results</p>
+          <p className="text-h2 font-semibold tracking-tight text-fg">No results</p>
           <p className="mt-1 text-small text-fg-muted">Try a different spelling or another kind.</p>
         </div>
       ) : data ? (

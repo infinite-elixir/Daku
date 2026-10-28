@@ -114,7 +114,7 @@ export function LibraryPage() {
           <p className="text-display font-bold leading-none tracking-tight text-border-strong" aria-hidden>
             01
           </p>
-          <p className="mt-4 display-face text-title font-semibold text-fg">
+          <p className="mt-4 text-h2 font-semibold tracking-tight text-fg">
             {filtered ? "No titles match these filters" : "Library is empty"}
           </p>
           <p className="mx-auto mt-1 max-w-[48ch] text-small text-fg-muted">

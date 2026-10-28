@@ -432,7 +432,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
         <div className="mx-auto mt-2 h-1 w-8 rounded-full bg-border-strong sm:hidden" />
         <header className="flex items-start justify-between gap-4 border-b border-border-subtle px-4 py-3 sm:px-5">
           <div>
-            <h2 id="fix-metadata-title" className="text-title font-semibold text-fg">
+            <h2 id="fix-metadata-title" className="text-h2 font-semibold tracking-tight text-fg">
               Fix metadata
             </h2>
             <p className="text-small text-fg-muted">{title.title}</p>

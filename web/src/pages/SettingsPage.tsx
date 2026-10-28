@@ -77,7 +77,7 @@ export function SettingsPage() {
         <p className="mt-1 text-small text-fg-muted">Release search defaults are shared by every browser.</p>
       </header>
       <section className="rounded-panel border border-border-subtle bg-panel p-4">
-        <h2 className="text-title font-semibold text-fg">Default providers</h2>
+        <h2 className="text-h2 font-semibold tracking-tight text-fg">Default providers</h2>
         <div className="mt-4 flex flex-col gap-4">
           {KINDS.map(({ key, label }) => (
             <fieldset key={key}>
@@ -110,7 +110,7 @@ export function SettingsPage() {
         </div>
       </section>
       <section className="rounded-panel border border-border-subtle bg-panel p-4">
-        <h2 className="text-title font-semibold text-fg">Anime sources</h2>
+        <h2 className="text-h2 font-semibold tracking-tight text-fg">Anime sources</h2>
         <p className="mt-1 text-small text-fg-muted">Nyaa uses RSS and has stricter rate limits than Torrentio.</p>
         <div className="mt-3 flex gap-2">
           {["torrentio", "nyaa"].map((source) => (
@@ -122,7 +122,7 @@ export function SettingsPage() {
         </div>
       </section>
       <section className="rounded-panel border border-border-subtle bg-panel p-4">
-        <h2 className="text-title font-semibold text-fg">Release search defaults</h2>
+        <h2 className="text-h2 font-semibold tracking-tight text-fg">Release search defaults</h2>
         <div className="mt-3 flex flex-wrap gap-3 text-small text-fg-muted">
           <label>Minimum quality <select value={minQuality ?? current.min_quality ?? ""} onChange={(e) => setMinQuality(e.target.value)} className="ml-2 rounded-control border border-border-strong bg-canvas p-1 text-fg">{QUALITIES.map((value) => <option key={value} value={value}>{value || "Any"}</option>)}</select></label>
           <label>Sort <select value={sort ?? current.sort} onChange={(e) => setSort(e.target.value as ReleaseSettings["release"]["sort"])} className="ml-2 rounded-control border border-border-strong bg-canvas p-1 text-fg">{SORTS.map((value) => <option key={value}>{value}</option>)}</select></label>
@@ -130,7 +130,7 @@ export function SettingsPage() {
         </div>
       </section>
       <section className="rounded-panel border border-border-subtle bg-panel p-4">
-        <h2 className="text-title font-semibold text-fg">Integrations</h2>
+        <h2 className="text-h2 font-semibold tracking-tight text-fg">Integrations</h2>
         <p className="mt-1 text-small text-fg-muted">Check qBittorrent, Jellyfin and metadata integrations on the <Link className="text-accent underline" to="/">System</Link> page.</p>
       </section>
       {mutation.error ? <p role="alert" className="text-small text-danger">{mutation.error.message}</p> : null}

@@ -71,7 +71,7 @@ export function RemoveDownloadDialog({
         aria-describedby={bodyId}
         className="max-h-[90vh] w-full max-w-[440px] overflow-y-auto rounded-t-panel border border-border-strong bg-panel px-5 py-5 text-fg shadow-xl sm:rounded-panel"
       >
-        <h2 id={titleId} className="text-title font-semibold">
+        <h2 id={titleId} className="text-h2 font-semibold tracking-tight">
           Remove download?
         </h2>
         <p id={bodyId} className="mt-2 break-words text-small text-fg-muted">

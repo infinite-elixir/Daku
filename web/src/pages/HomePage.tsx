@@ -17,7 +17,7 @@ export function HomePage() {
           to="/library"
           className="rounded-panel border border-border-subtle bg-panel p-5 transition-colors hover:border-border-strong"
         >
-          <h2 className="text-title font-semibold text-fg">Library</h2>
+          <h2 className="text-h2 font-semibold tracking-tight text-fg">Library</h2>
           <p className="mt-1 text-small text-fg-muted">
             Browse saved titles. An entry with no file is Saved, not an error.
           </p>
@@ -26,7 +26,7 @@ export function HomePage() {
           to="/search"
           className="rounded-panel border border-border-subtle bg-panel p-5 transition-colors hover:border-border-strong"
         >
-          <h2 className="text-title font-semibold text-fg">Search</h2>
+          <h2 className="text-h2 font-semibold tracking-tight text-fg">Search</h2>
           <p className="mt-1 text-small text-fg-muted">
             Find a movie, series or anime and add it without downloading anything.
           </p>

@@ -18,13 +18,14 @@ mandatory 2 px poster edge, no coloured glows) are still normative.
 
 ### Typography (STYLE.md §3)
 
-- Add **Orbitron** (SIL OFL) as a **headings-only** display face, bundled as a Latin subset at
-  `web/public/fonts/orbitron-latin.woff2`, `font-display: swap`, `local()` first if installed.
-- Orbitron applies to: the wordmark, `h1`, `h2` page/section headings, empty-state headline and
-  dialog titles. It does **not** apply to body copy, buttons, labels, badges, tables, inputs,
-  metadata, IDs or paths.
-- Keep Caskaydia Cove for everything else; keep a monospace fallback. Never fall back to a
-  sans-serif for body text.
+- **No display face.** Typography stays Caskaydia-only for every level: wordmark, `h1`, `h2`,
+  page/section headings, empty-state headlines and dialog titles included. (An Orbitron
+  headings-only face was tried in the first pass and removed on 2026-10-28; see the
+  follow-up note at the end.)
+- Hierarchy comes from **size and weight**, not a second family: `text-title` 17 for card
+  titles, `text-h2` 22 for page sections, dialog titles and empty-state headlines, `text-h1`
+  32 for the one page title, wordmark `text-h2` 700.
+- Keep a monospace fallback. Never fall back to a sans-serif for body text.
 - Raise the base from 14/22 to **15/23**, and shift the scale by roughly 1 px:
 
   | Token | Old | New |
@@ -37,10 +38,9 @@ mandatory 2 px poster edge, no coloured glows) are still normative.
   | `text-h1` | 28/36 | 32/40 |
 
   `text-display` and `text-mega` stay as they are; do not let the whole app inflate.
-- Orbitron headings use `letter-spacing: -0.01em` and uppercase only for the wordmark and
-  micro eyebrows; page titles stay sentence case.
-- `font-variant-ligatures: none` remains on `.font-data`; Orbitron headings must not use code
-  ligatures.
+- Large headings may use `tracking-tight`; never positive letter-spacing outside `text-micro`
+  eyebrow labels. Uppercase is reserved for micro eyebrows; page titles stay sentence case.
+- `font-variant-ligatures: none` remains on `.font-data`.
 - Check the 390 px layout first: no title wraps to three lines, no control under 32 px, no
   horizontal scroll.
 
@@ -86,7 +86,8 @@ the Tokyo Night palette, adding a second accent colour, animation beyond hover t
 
 ## Acceptance criteria
 
-- [x] Orbitron loads for headings only; body, controls and metadata remain Caskaydia.
+- [x] Every level — wordmark, page title, section heading, card title, body — is Caskaydia;
+      hierarchy is size and weight only.
 - [x] The base body size is 15 px and the scale is applied consistently; no layout overflow at
       390 px or 1440 px.
 - [x] Library, search and saved cards have no coloured top bar.
@@ -118,6 +119,17 @@ keyboard focus and reduced-motion behaviour are covered by the class/CSS contrac
 - Prefer CSS custom properties and Tailwind v4 `@theme` tokens over arbitrary values.
 - Do not remove the kind badge when removing the bar; that would make mixed grids unreadable.
 - Glow colour is `--kind-*`; do not introduce green/red as a kind colour.
-- If the Orbitron subset is missing a glyph used in a heading, fall back to Caskaydia rather
-  than showing tofu.
+- Keep the heading ramp deliberate: do not drop a section heading to body size to save space;
+  step it down one level (`text-h2` → `text-title`) instead.
 - Update the font subset recipe in STYLE.md and commit the generated woff2 plus its licence.
+
+## Follow-up (2026-10-28): Orbitron removed
+
+The Orbitron headings pass shipped in `2bca21a` was reverted. All text — wordmark, headings,
+body, controls, metadata, IDs — is Caskaydia again. What survives from T-033 is the **larger
+scale** (15/23 base, `text-title` 17, `text-h2` 22, `text-h1` 32), the card glow and the
+rating brand colours. Instead of shrinking headings to keep them in Caskaydia, levels were
+stepped up: section `h2`/dialog titles/empty-state headlines went from `text-title` to
+`text-h2`, card `h3` stayed `text-title`, and the wordmark moved from `text-h1` uppercase to
+`text-h2` 700 sentence case so it fits the 56px topbar. `web/public/fonts/orbitron-latin.woff2`
+and its licence were deleted along with `--font-display` and `.display-face`.

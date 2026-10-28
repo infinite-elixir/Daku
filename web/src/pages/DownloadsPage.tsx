@@ -186,7 +186,7 @@ export function DownloadsPage() {
         <p className="text-small text-fg-muted">Loading downloads…</p>
       ) : rows.length === 0 ? (
         <div className="rounded-panel border border-border-subtle bg-panel px-6 py-12 text-center">
-          <p className="display-face text-title font-semibold text-fg">Nothing downloading</p>
+          <p className="text-h2 font-semibold tracking-tight text-fg">Nothing downloading</p>
           <p className="mx-auto mt-1 max-w-[48ch] text-small text-fg-muted">
             Pick a release from a title and it will appear here with live progress.
           </p>
@@ -238,7 +238,7 @@ function DownloadSection({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-title font-semibold text-fg">{title}</h2>
+        <h2 className="text-h2 font-semibold tracking-tight text-fg">{title}</h2>
         <span className="text-small tabular-nums text-fg-muted">{rows.length}</span>
       </div>
       {rows.length === 0 ? (

@@ -1,6 +1,6 @@
 # Daku — Style Guide
 
-**Status:** v1.2 · **Applies to:** `web/` (React + Tailwind v4)
+**Status:** v1.3 · **Applies to:** `web/` (React + Tailwind v4)
 
 Daku is a LAN-only media librarian. The UI should feel like a quiet terminal that grew a
 good pair of eyes: dark, dense where it matters, never noisy. Content is the interface —
@@ -19,9 +19,10 @@ This document is normative. If a component disagrees with it, the component is w
    drop shadows or glassmorphism.
 3. **Density is a feature.** The library is for browsing, not for scrolling past whitespace.
    Use the 4px grid; prefer tighter vertical rhythm over airy marketing spacing.
-4. **Monospace is the voice.** Caskaydia Cove carries body copy, controls, metadata and
-   IDs. Orbitron is a headings-only display face. Respect Caskaydia's metrics: shorter line
-   lengths, no faux letter-spacing, alignment over indentation tricks.
+4. **Monospace is the voice.** Caskaydia Cove carries every piece of text, headings and the
+   wordmark included. Hierarchy comes from size and weight, not a second family. Respect
+   Caskaydia's metrics: shorter line lengths, no faux letter-spacing, alignment over
+   indentation tricks.
 5. **States are visible.** Queued, active, failed, available must be distinguishable by
    text and icon, never colour alone.
 6. **No decorative animation.** Motion only explains a state change or a spatial
@@ -163,9 +164,9 @@ Focus ring: 2px `--accent`, 2px offset, visible on all interactive elements.
 
 ### 3.1 Family
 
-Body and UI: **Caskaydia Cove Nerd Font** (Cascadia Code derivative, patched).
-Headings: **Orbitron** (SIL OFL), a display face used only for the wordmark, `h1`, `h2`,
-empty-state headlines and dialog titles.
+Body, UI and headings: **Caskaydia Cove Nerd Font** (Cascadia Code derivative, patched).
+There is **no display face**. Headings and the wordmark use the same family and separate
+themselves by size and weight only.
 
 Caskaydia is monospaced. Treat every label as if it were code: alignment is free, awkward
 line-breaks are not.
@@ -210,39 +211,6 @@ line-breaks are not.
   `font-variant-ligatures: none` on `.font-data`.
 - Fallback is always a monospace family. Never let the UI fall back to a sans-serif.
 
-Orbitron is bundled separately as a Latin subset at
-`web/public/fonts/orbitron-latin.woff2`, with its OFL licence beside it. It is headings-only:
-never body copy, buttons, labels, badges, tables, inputs, metadata, IDs or paths.
-
-```css
-@font-face {
-  font-family: "Orbitron";
-  src:
-    local("Orbitron"),
-    url("/fonts/orbitron-latin.woff2") format("woff2");
-  font-weight: 400 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-:root {
-  --font-display: "Orbitron", var(--font-sans);
-}
-```
-
-Orbitron heading subset recipe (the source is the variable Google Fonts TTF):
-
-```bash
-pyftsubset 'Orbitron[wght].ttf' \
-  --unicodes='U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD' \
-  --layout-features='kern,liga,calt' \
-  --output-file=orbitron-latin.ttf
-woff2_compress orbitron-latin.ttf
-```
-
-If Orbitron is missing a glyph used in a heading, the stack falls back to Caskaydia rather
-than showing tofu.
-
 ### 3.2 Scale
 
 Base **15 / 23**. Monospace runs wide; long prose is capped at `68ch`. The scale shifted up
@@ -254,8 +222,8 @@ by roughly 1px in T-033; `text-display` and `text-mega` did not change.
 | `text-small` | 13 / 19 | 400 | Helper text, metadata, timestamps |
 | `text-body` | 15 / 23 | 400 | Default UI text, table cells |
 | `text-body-strong` | 15 / 23 | 600 | Labels, selected nav, emphasis |
-| `text-title` | 17 / 25 | 600 | Card titles, section headers |
-| `text-h2` | 22 / 30 | 600 | Page sections |
+| `text-title` | 17 / 25 | 600 | Card titles, list-row titles, small dialog headers |
+| `text-h2` | 22 / 30 | 600 | Page sections, empty-state headlines, dialog titles |
 | `text-h1` | 32 / 40 | 700 | Page title (one per view) |
 | `text-display` | 40 / 48 | 700 | Empty-state index numeral or oversized empty-state headline only |
 | `text-mega` | 64 / 64 | 700 | Oversized index numerals, cropped brand type (§11) |
@@ -263,12 +231,13 @@ by roughly 1px in T-033; `text-display` and `text-mega` did not change.
 Rules:
 
 - Max two weights per view: 400 and 600. Reserve 700 for `h1` and the wordmark.
-- **Orbitron is the headings face.** It applies to the wordmark, `h1`, `h2` page/section
-  headings, empty-state headlines and dialog titles only. Use `letter-spacing: -0.01em`;
-  never code ligatures. Body, controls, labels, badges, tables, inputs, metadata, IDs and
-  paths stay Caskaydia.
-- Page titles stay sentence case. Uppercase is limited to the wordmark and `text-micro`
-  eyebrow labels with `letter-spacing: 0.08em`.
+- **Hierarchy is size and weight, not family.** Every heading is Caskaydia. `h1` is
+  `text-h1` 700, section `h2` and dialog titles are `text-h2` 600, card `h3` is `text-title`
+  600. Do not shrink a heading into body size to save space; step the level down instead
+  (`text-h2` → `text-title`). Large headings may use `tracking-tight`; never faux
+  letter-spacing (positive tracking) outside `text-micro` eyebrow labels.
+- Page titles stay sentence case. Uppercase is limited to `text-micro` eyebrow labels with
+  `letter-spacing: 0.08em`.
 - No uppercase prose.
 - No italics in UI copy (Cascadia italics are a different cut; they read as an accident).
 - Numbers in tables use `font-variant-numeric: tabular-nums`.
@@ -279,9 +248,10 @@ Rules:
 
 ### 3.3 Wordmark
 
-`Daku` set in Orbitron, `text-h1`, weight 700, uppercase, `letter-spacing: -0.01em`,
+`Daku` set in Caskaydia, `text-h2`, weight 700, sentence case, `tracking-tight`,
 `--text-primary`, with a single leading glyph (`󰐊`/`▸`) in `--accent` if an icon is wanted.
-No subtitle in the wordmark itself.
+No subtitle in the wordmark itself. The topbar keeps its 56px height: `text-h2` is the
+largest step that does not crowd it.
 
 ---
 
@@ -539,7 +509,6 @@ Tokens live in `web/src/styles/theme.css` and are imported once by `index.css`.
   --font-sans: "Caskaydia Cove NF", "CaskaydiaCove Nerd Font Mono",
     "JetBrainsMono Nerd Font", ui-monospace, monospace;
   --font-mono: var(--font-sans);
-  --font-display: "Orbitron", var(--font-sans);
 
   --radius-control: 6px;
   --radius-panel: 8px;
@@ -589,7 +558,7 @@ Tokyo Night and Caskaydia. The app must still read as a media librarian, not a g
 | Borrow | Don't borrow |
 |---|---|
 | Acid-lime signal colour (`--volt`) | Lime page or panel backgrounds |
-| Oversized condensed wordmark (SVG asset) | A display font beyond Orbitron |
+| Oversized condensed wordmark (SVG asset) | A second display family |
 | Registration crosses at hero corners | Crosses scattered across every card |
 | 45° hazard stripe bands | Stripes behind text or inside tables |
 | Barcode / ticker rails as dividers | Ticker noise around forms and settings |
@@ -631,12 +600,12 @@ labels separating them.
 
 ### 11.4 Wordmark
 
-The brand may be set in Orbitron (the headings face, §3.3) or use the condensed SVG asset
+The brand is set in Caskaydia (§3.3) or uses the condensed SVG asset
 at `web/src/assets/daku-wordmark.svg`. The SVG is built from condensed, bevel-cornered
 letterforms so it does not depend on a font. Either form may be set in `--volt`,
 `--text-primary` or knocked out of a volt block, and may bleed off the left or bottom
 edge on splash/404 only. It is never a clickable control and never appears inside tables
-or dialogs. The topbar wordmark uses Orbitron at `text-h1`.
+or dialogs. The topbar wordmark uses Caskaydia at `text-h2`, weight 700.
 
 ### 11.5 Glitch
 
@@ -693,7 +662,7 @@ If you want two, you are designing a poster, not an app.
 | # | Decision |
 |---|---|
 | 1 | **Palette:** Tokyo Night (`#1a1b26` surfaces, `#16161e` canvas). Not Storm/Moon. |
-| 2 | **Typography:** Caskaydia Cove Nerd Font carries body, controls, metadata and IDs; Orbitron carries headings and the wordmark only. No sans anywhere. Base body is 15/23. |
+| 2 | **Typography:** Caskaydia Cove Nerd Font carries every level — body, controls, metadata, IDs, headings and the wordmark. No display face, no sans anywhere. Hierarchy is size and weight only. Base body is 15/23. |
 | 3 | **Density:** 15px / 23px body, 32–36px controls, 40px table rows. |
 | 4 | **Icons:** hybrid — inline SVG for UI, Nerd Font glyphs only for terminal-native concepts from the bundled whitelist. |
 | 5 | **Accent model:** blue is the sole action accent. Movie = orange, series = cyan, anime = purple, used only as small identity marks (badge, filter chip, detail rule, hover glow). |
@@ -702,7 +671,7 @@ If you want two, you are designing a poster, not an app.
 | 8 | **Panels:** flat `--bg-panel` with a 1px `--border-subtle`; no shadows except overlays and the poster-card hover glow (§14.3). |
 | 9 | **Marathon layer:** allowed as a ~10% broadcast accent on brand/empty/error/progress moments only; never in forms, tables, settings or dialogs. |
 | 10 | **Volt:** `#c8ff3c`, four placements only — wordmark/splash, empty/404 rule or numeral, active-download progress fill, optional library hero ticker. Never buttons or status. |
-| 11 | **Wordmark:** set in Orbitron (headings face) or the condensed SVG asset; no third display face. |
+| 11 | **Wordmark:** set in Caskaydia (`text-h2`, 700) or the condensed SVG asset; no display face. |
 | 12 | **Graphic devices:** one per section — registration crosses *or* hazard band *or* index numeral. Glitch is hover-only and reduced-motion aware. |
 
 ---
@@ -710,12 +679,12 @@ If you want two, you are designing a poster, not an app.
 ## 14. Approved amendments (2026-10-25)
 
 These decisions were taken after v1.1. Amendments 1–4 (T-033) are now folded into the
-sections above as v1.2, replacing the old rules. Rows 5–9 remain roadmap notes until their
-tickets land.
+sections above as v1.2/v1.3, replacing the old rules. Rows 5–9 remain roadmap notes until
+their tickets land.
 
 | # | Amendment | Ticket |
 |---|---|---|
-| 1 | **Typography:** Orbitron (OFL, Latin subset) for headings and wordmark only. Body, controls, metadata and IDs stay Caskaydia. Base size becomes **15/23**, with the scale in T-033 §Typography. | T-033 |
+| 1 | **Typography:** Caskaydia-only — one family for body, controls, metadata, IDs, headings and the wordmark. Base size becomes **15/23**, with the scale in T-033 §Typography. A later T-033 follow-up removed the Orbitron display face; hierarchy is size and weight only (`text-title` 17 card titles, `text-h2` 22 sections, `text-h1` 32 page titles). | T-033 |
 | 2 | **Poster cards:** the mandatory 2 px kind-coloured top edge is removed. The kind badge remains the identity carrier. The detail-page 2 px left rule stays. | T-033 |
 | 3 | **Card glow:** clickable poster cards may use a soft kind-coloured `box-shadow` on hover and `:focus-visible`. This replaces the "no coloured glows" rule for this one case. No lift, no scale, no glow on touch, disabled under reduced motion. | T-033 |
 | 4 | **Rating colour:** IMDb, Rotten Tomatoes and Metacritic pills use their brand colours via `--rating-*` tokens, with a tinted background and AA-readable text. Colour never carries the meaning alone. | T-033 |

@@ -37,7 +37,7 @@ export function HealthCard() {
   return (
     <section className="rounded-panel border border-border-subtle bg-panel p-5">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-title font-semibold text-fg">System health</h2>
+        <h2 className="text-h2 font-semibold tracking-tight text-fg">System health</h2>
         <span
           className={
             error

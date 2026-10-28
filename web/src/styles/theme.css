@@ -1,15 +1,5 @@
 @import "tailwindcss";
 
-@font-face {
-  font-family: "Orbitron";
-  src:
-    local("Orbitron"),
-    url("/fonts/orbitron-latin.woff2") format("woff2");
-  font-weight: 400 900;
-  font-style: normal;
-  font-display: swap;
-}
-
 @theme {
   --color-canvas: #16161e;
   --color-canvas-deep: #0c0e14;
@@ -43,7 +33,6 @@
     "Caskaydia Cove NF", "CaskaydiaCove Nerd Font Mono", "JetBrainsMono Nerd Font",
     ui-monospace, "SFMono-Regular", Menlo, monospace;
   --font-mono: var(--font-sans);
-  --font-display: "Orbitron", var(--font-sans);
 
   --radius-control: 6px;
   --radius-panel: 8px;
@@ -84,14 +73,6 @@ body {
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 23px;
-}
-
-h1,
-h2,
-.display-face {
-  font-family: var(--font-display);
-  letter-spacing: -0.01em;
-  font-variant-ligatures: none;
 }
 
 :root {

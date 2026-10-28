@@ -391,7 +391,7 @@ export function ReleasesSection({
     <section className="flex flex-col gap-4">
       {mode === "find" ? null : (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-h2 font-semibold text-fg">
+          <h2 className="text-h2 font-semibold tracking-tight text-fg">
             {mode === "saved" ? "Saved releases" : "Releases"}
           </h2>
           {showTabs ? (

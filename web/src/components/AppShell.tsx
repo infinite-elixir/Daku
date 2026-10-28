@@ -83,7 +83,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mx-auto flex h-14 w-full max-w-[1440px] items-center justify-between px-4 sm:px-6">
           <Link
             to="/library"
-            className="display-face text-h1 font-bold uppercase text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="text-h2 font-bold tracking-tight text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <span className="mr-1 text-accent" aria-hidden>
               ▸
