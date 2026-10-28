@@ -52,67 +52,24 @@ const TAB_CLASS =
 const ROW_CLASS =
   "flex min-h-11 w-full items-center gap-3 px-4 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent";
 
-/**
- * Source artwork is 1920×1080 from Cinemeta/Metahub and 1900×400 from AniList.
- * Start from the provider ratio so the space is reserved, then use the real decoded
- * ratio. The frame always matches the image, so nothing is cropped.
- */
-function defaultBannerRatio(url: string | null): number {
-  if (!url) {
-    return 16 / 9;
-  }
-  try {
-    const host = new URL(url).hostname;
-    if (host === "s4.anilist.co" || host.endsWith(".anilist.co")) {
-      return 1900 / 400;
-    }
-  } catch {
-    // Keep the cinematic default for malformed URLs.
-  }
-  return 16 / 9;
-}
-
 /** Direct banner artwork. No canvas, no pixel read and no proxy are involved. */
 function BannerArt({ url }: { url: string | null }) {
   const [failed, setFailed] = useState(false);
-  const [ratio, setRatio] = useState(() => defaultBannerRatio(url));
-
-  useEffect(() => {
-    setFailed(false);
-    setRatio(defaultBannerRatio(url));
-  }, [url]);
 
   if (!url || failed) {
-    return (
-      <div
-        data-testid="title-banner-gradient"
-        className="dither-gradient h-full min-h-[300px] w-full"
-      />
-    );
+    return <div data-testid="title-banner-gradient" className="dither-gradient h-full w-full" />;
   }
 
   return (
-    <div
-      data-testid="title-banner-frame"
-      className="relative w-full bg-canvas-deep"
-      style={{ aspectRatio: String(ratio) }}
-    >
-      <img
-        data-testid="title-banner-image"
-        src={url}
-        alt=""
-        draggable={false}
-        decoding="async"
-        onLoad={(event) => {
-          const image = event.currentTarget;
-          if (image.naturalWidth > 0 && image.naturalHeight > 0) {
-            setRatio(image.naturalWidth / image.naturalHeight);
-          }
-        }}
-        onError={() => setFailed(true)}
-        className="block h-full w-full object-cover object-center"
-      />
-    </div>
+    <img
+      data-testid="title-banner-image"
+      src={url}
+      alt=""
+      draggable={false}
+      decoding="async"
+      onError={() => setFailed(true)}
+      className="h-full w-full object-cover object-center"
+    />
   );
 }
 
@@ -146,8 +103,8 @@ export function TitleView({
   );
   const tabRefs = useRef(new Map<number, HTMLButtonElement>());
   const isMovie = title.kind === "movie";
-  // Only real wide art sets the banner ratio; the portrait poster stays in the hero.
-  const bannerUrl = title.banner_url ?? metadata?.banner_url ?? null;
+  // Prefer real wide art so the banner is not a hard crop of a 2:3 poster.
+  const bannerUrl = title.banner_url ?? metadata?.banner_url ?? title.poster_url;
 
   // A deep link (or a click) selects an episode; follow it to the right tab.
   useEffect(() => {
@@ -214,17 +171,17 @@ export function TitleView({
         {back.label}
       </Link>
 
-      <div className="relative grid">
+      <div className="relative">
         <div
           data-testid="title-banner"
-          className="title-banner-strip title-banner-art pointer-events-none relative col-start-1 row-start-1 w-full self-start overflow-hidden rounded-panel"
+          className="title-banner-strip title-banner-art pointer-events-none absolute inset-x-0 top-0 h-[300px] overflow-hidden rounded-panel"
           aria-hidden
         >
           <BannerArt url={bannerUrl} />
           <div data-testid="title-banner-scrim" className="title-banner-scrim absolute inset-0" />
         </div>
 
-        <div className="relative col-start-1 row-start-1 grid gap-6 self-end sm:grid-cols-[180px_minmax(0,1fr)] md:pt-6">
+        <div className="relative grid gap-6 sm:grid-cols-[180px_minmax(0,1fr)] md:pt-6">
           <div className="w-40 sm:w-full">
             <PosterArt url={title.poster_url} title={title.title} />
           </div>
