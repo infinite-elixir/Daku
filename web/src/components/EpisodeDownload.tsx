@@ -155,7 +155,7 @@ export function EpisodeDownload({
           type="button"
           disabled={phase === "loading" || startMutation.isPending}
           onClick={() => void begin()}
-          className="min-h-9 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover disabled:opacity-40"
+          className="min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
         >
           {phase === "loading" ? "Checking files…" : `Download ${episodeLabel}`}
         </button>
@@ -164,7 +164,7 @@ export function EpisodeDownload({
       {phase === "confirm" && confirmed ? (
         <div
           role="status"
-          className="flex flex-col gap-2 rounded-control border border-border-subtle bg-canvas/60 p-2 text-[12px]"
+          className="flex flex-col gap-2 rounded-control border border-border-subtle bg-canvas/60 p-2 text-small"
         >
           <p className="break-words text-fg">
             Will download: <span className="font-mono">{confirmed.path}</span>
@@ -186,7 +186,7 @@ export function EpisodeDownload({
                 setPackConfirmed(false);
                 setPhase("choose");
               }}
-              className="min-h-8 rounded-control border border-border-strong px-2.5 text-[12px] font-semibold text-fg hover:bg-hover"
+              className="min-h-8 rounded-control border border-border-strong px-2.5 text-small font-semibold text-fg hover:bg-hover"
             >
               Change
             </button>
@@ -200,7 +200,7 @@ export function EpisodeDownload({
                     : { file_paths: [confirmed.path] },
                 )
               }
-              className="min-h-8 rounded-control border border-accent/50 bg-accent/15 px-2.5 text-[12px] font-semibold text-accent hover:bg-accent/25 disabled:opacity-40"
+              className="min-h-8 rounded-control border border-accent/50 bg-accent/15 px-2.5 text-small font-semibold text-accent hover:bg-accent/25 disabled:opacity-40"
             >
               {startMutation.isPending ? "Queueing…" : "Download"}
             </button>
@@ -214,7 +214,7 @@ export function EpisodeDownload({
           aria-label={`Choose a file for ${episodeLabel}`}
           className="flex flex-col gap-2 rounded-control border border-border-subtle bg-canvas/60 p-2"
         >
-          <p className="text-[12px] font-semibold text-fg">
+          <p className="text-small font-semibold text-fg">
             Choose the file for {chooser.label}
           </p>
           <ul className="flex flex-col gap-1">
@@ -224,7 +224,7 @@ export function EpisodeDownload({
               )?.reason;
               return (
                 <li key={`${file.index}-${file.path}`}>
-                  <label className="flex min-h-9 cursor-pointer items-start gap-2 rounded-control px-1 py-1 text-[12px] hover:bg-hover">
+                  <label className="flex min-h-9 cursor-pointer items-start gap-2 rounded-control px-1 py-1 text-small hover:bg-hover">
                     <input
                       type="radio"
                       name={`episode-file-${release.info_hash}`}
@@ -252,7 +252,7 @@ export function EpisodeDownload({
               onClick={() =>
                 selectedPath && startMutation.mutate({ file_paths: [selectedPath] })
               }
-              className="min-h-8 rounded-control border border-accent/50 bg-accent/15 px-2.5 text-[12px] font-semibold text-accent hover:bg-accent/25 disabled:opacity-40"
+              className="min-h-8 rounded-control border border-accent/50 bg-accent/15 px-2.5 text-small font-semibold text-accent hover:bg-accent/25 disabled:opacity-40"
             >
               Download selected file
             </button>
@@ -262,13 +262,13 @@ export function EpisodeDownload({
                 setPhase("idle");
                 setChooser(null);
               }}
-              className="min-h-8 rounded-control px-2.5 text-[12px] font-semibold text-fg-muted hover:bg-hover"
+              className="min-h-8 rounded-control px-2.5 text-small font-semibold text-fg-muted hover:bg-hover"
             >
               Cancel
             </button>
           </div>
           <div className="flex flex-col gap-2 border-t border-border-subtle pt-2">
-            <label className="flex items-start gap-2 text-[12px] text-fg-muted">
+            <label className="flex items-start gap-2 text-small text-fg-muted">
               <input
                 type="checkbox"
                 className="mt-1 shrink-0"
@@ -281,7 +281,7 @@ export function EpisodeDownload({
               type="button"
               disabled={!packConfirmed || startMutation.isPending}
               onClick={() => startMutation.mutate({ allow_pack: true })}
-              className="min-h-8 w-fit rounded-control border border-warning/50 px-2.5 text-[12px] font-semibold text-warning hover:bg-warning/10 disabled:opacity-40"
+              className="min-h-8 w-fit rounded-control border border-warning/50 px-2.5 text-small font-semibold text-warning hover:bg-warning/10 disabled:opacity-40"
             >
               Download whole pack
             </button>
@@ -290,12 +290,12 @@ export function EpisodeDownload({
       ) : null}
 
       {phase === "error" && error ? (
-        <div role="alert" className="flex flex-col gap-2 text-[12px] text-danger">
+        <div role="alert" className="flex flex-col gap-2 text-small text-danger">
           <p className="break-words">{error}</p>
           <button
             type="button"
             onClick={() => setPhase("idle")}
-            className="min-h-8 w-fit rounded-control border border-border-strong px-2.5 text-[12px] font-semibold text-fg hover:bg-hover"
+            className="min-h-8 w-fit rounded-control border border-border-strong px-2.5 text-small font-semibold text-fg hover:bg-hover"
           >
             Close
           </button>

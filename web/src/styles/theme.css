@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Orbitron";
+  src:
+    local("Orbitron"),
+    url("/fonts/orbitron-latin.woff2") format("woff2");
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   --color-canvas: #16161e;
   --color-canvas-deep: #0c0e14;
@@ -22,16 +32,40 @@
   --color-kind-anime: #bb9af7;
   --color-volt: #c8ff3c;
 
+  --rating-imdb: #f5c518;
+  --rating-rt: #fa320a;
+  --rating-metacritic: #66cc33;
+  --color-rating-imdb: var(--rating-imdb);
+  --color-rating-rt: var(--rating-rt);
+  --color-rating-metacritic: var(--rating-metacritic);
+
   --font-sans:
     "Caskaydia Cove NF", "CaskaydiaCove Nerd Font Mono", "JetBrainsMono Nerd Font",
     ui-monospace, "SFMono-Regular", Menlo, monospace;
   --font-mono: var(--font-sans);
+  --font-display: "Orbitron", var(--font-sans);
 
   --radius-control: 6px;
   --radius-panel: 8px;
 
-  --text-micro: 11px;
-  --text-micro--line-height: 16px;
+  --text-micro: 12px;
+  --text-micro--line-height: 17px;
+  --text-small: 13px;
+  --text-small--line-height: 19px;
+  --text-body: 15px;
+  --text-body--line-height: 23px;
+  --text-body-strong: 15px;
+  --text-body-strong--line-height: 23px;
+  --text-title: 17px;
+  --text-title--line-height: 25px;
+  --text-h2: 22px;
+  --text-h2--line-height: 30px;
+  --text-h1: 32px;
+  --text-h1--line-height: 40px;
+  --text-display: 40px;
+  --text-display--line-height: 48px;
+  --text-mega: 64px;
+  --text-mega--line-height: 64px;
 }
 
 :root {
@@ -48,8 +82,67 @@ body {
   background-color: var(--color-canvas);
   color: var(--color-fg);
   font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 15px;
+  line-height: 23px;
+}
+
+h1,
+h2,
+.display-face {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+  font-variant-ligatures: none;
+}
+
+:root {
+  --glow-movie:
+    0 0 0 1px color-mix(in srgb, var(--color-kind-movie) 38%, transparent),
+    0 12px 32px -12px color-mix(in srgb, var(--color-kind-movie) 62%, transparent);
+  --glow-series:
+    0 0 0 1px color-mix(in srgb, var(--color-kind-series) 38%, transparent),
+    0 12px 32px -12px color-mix(in srgb, var(--color-kind-series) 62%, transparent);
+  --glow-anime:
+    0 0 0 1px color-mix(in srgb, var(--color-kind-anime) 38%, transparent),
+    0 12px 32px -12px color-mix(in srgb, var(--color-kind-anime) 62%, transparent);
+}
+
+.poster-glow {
+  transition:
+    box-shadow 120ms cubic-bezier(0.2, 0, 0, 1),
+    border-color 120ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.kind-glow-movie {
+  --poster-glow: var(--glow-movie);
+}
+
+.kind-glow-series {
+  --poster-glow: var(--glow-series);
+}
+
+.kind-glow-anime {
+  --poster-glow: var(--glow-anime);
+}
+
+@media (hover: hover) {
+  .poster-glow:hover {
+    box-shadow: var(--poster-glow);
+  }
+}
+
+.poster-glow:focus-visible {
+  box-shadow: var(--poster-glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .poster-glow {
+    transition: none;
+  }
+
+  .poster-glow:hover,
+  .poster-glow:focus-visible {
+    box-shadow: none;
+  }
 }
 
 #root {

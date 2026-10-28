@@ -28,7 +28,7 @@ export function ExpandableText({
       <p
         id={id}
         className={[
-          "text-[14px] leading-6 text-fg-muted",
+          "text-body text-fg-muted",
           expandable && !expanded ? "line-clamp-3" : "",
         ]
           .join(" ")
@@ -42,7 +42,7 @@ export function ExpandableText({
           aria-expanded={expanded}
           aria-controls={id}
           onClick={() => setExpanded((value) => !value)}
-          className="min-h-9 w-fit text-[12px] font-semibold text-accent hover:text-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="min-h-9 w-fit text-small font-semibold text-accent hover:text-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           {expanded ? "Show less" : "Show more"}
         </button>

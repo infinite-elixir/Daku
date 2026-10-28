@@ -141,8 +141,8 @@ export function SearchPage() {
   return (
     <section className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-[28px] font-bold leading-9 tracking-tight text-fg">Search</h1>
-        <p className="text-[13px] text-fg-muted">
+        <h1 className="text-h1 font-bold text-fg">Search</h1>
+        <p className="text-small text-fg-muted">
           IMDb and AniList metadata. Adding a title never starts a download.
         </p>
       </header>
@@ -168,33 +168,33 @@ export function SearchPage() {
           placeholder="Search movies, series and anime"
           aria-label="Search titles"
           autoComplete="off"
-          className="h-11 w-full rounded-control border border-border-subtle bg-canvas pl-9 pr-3 text-[14px] text-fg placeholder:text-fg-comment focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+          className="h-11 w-full rounded-control border border-border-subtle bg-canvas pl-9 pr-3 text-body text-fg placeholder:text-fg-comment focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
         />
       </div>
 
       <KindTabs value={kind} onChange={(next) => updateParams({ kind: next })} />
 
       {add.error ? (
-        <p role="alert" className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3 text-[13px] text-danger">
+        <p role="alert" className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3 text-small text-danger">
           Could not add the title. {add.error.message}
         </p>
       ) : null}
 
       {!enabled ? (
         <div className="rounded-panel border border-border-subtle bg-panel px-6 py-10 text-center">
-          <p className="text-[16px] font-semibold text-fg">Search the catalogue</p>
-          <p className="mx-auto mt-1 max-w-[48ch] text-[13px] text-fg-muted">
+          <p className="display-face text-title font-semibold text-fg">Search the catalogue</p>
+          <p className="mx-auto mt-1 max-w-[48ch] text-small text-fg-muted">
             Pick a movie, series or anime. It lands in your library as Saved, with no file and no
             download.
           </p>
         </div>
       ) : error ? (
         <div className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3">
-          <p className="text-[13px] text-danger">{error.message}</p>
+          <p className="text-small text-danger">{error.message}</p>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="mt-2 min-h-9 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover"
+            className="mt-2 min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
           >
             Retry
           </button>
@@ -203,13 +203,13 @@ export function SearchPage() {
         <SkeletonGrid />
       ) : data && data.results.length === 0 ? (
         <div className="rounded-panel border border-border-subtle bg-panel px-6 py-10 text-center">
-          <p className="text-[16px] font-semibold text-fg">No results</p>
-          <p className="mt-1 text-[13px] text-fg-muted">Try a different spelling or another kind.</p>
+          <p className="display-face text-title font-semibold text-fg">No results</p>
+          <p className="mt-1 text-small text-fg-muted">Try a different spelling or another kind.</p>
         </div>
       ) : data ? (
         <>
           {data.stale ? (
-            <p className="text-[12px] text-warning">Showing cached results; the metadata source is unreachable.</p>
+            <p className="text-small text-warning">Showing cached results; the metadata source is unreachable.</p>
           ) : null}
           <div className={GRID}>
             {data.results.map((result) => {

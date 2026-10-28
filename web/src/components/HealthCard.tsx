@@ -37,14 +37,14 @@ export function HealthCard() {
   return (
     <section className="rounded-panel border border-border-subtle bg-panel p-5">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-[16px] font-semibold text-fg">System health</h2>
+        <h2 className="text-title font-semibold text-fg">System health</h2>
         <span
           className={
             error
-              ? "rounded-full bg-danger/15 px-3 py-1 text-[11px] font-medium text-danger"
+              ? "rounded-full bg-danger/15 px-3 py-1 text-micro font-medium text-danger"
               : isLoading
-                ? "rounded-full bg-warning/15 px-3 py-1 text-[11px] font-medium text-warning"
-                : "rounded-full bg-success/15 px-3 py-1 text-[11px] font-medium text-success"
+                ? "rounded-full bg-warning/15 px-3 py-1 text-micro font-medium text-warning"
+                : "rounded-full bg-success/15 px-3 py-1 text-micro font-medium text-success"
           }
         >
           {error ? "unreachable" : isLoading ? "checking" : (data?.status ?? "unknown")}
@@ -52,11 +52,11 @@ export function HealthCard() {
       </div>
 
       {error ? (
-        <p className="mt-3 text-[13px] text-danger">{(error as Error).message}</p>
+        <p className="mt-3 text-small text-danger">{(error as Error).message}</p>
       ) : isLoading || !data ? (
-        <p className="mt-3 text-[13px] text-fg-muted">Contacting the Daku service…</p>
+        <p className="mt-3 text-small text-fg-muted">Contacting the Daku service…</p>
       ) : (
-        <dl className="mt-4 grid gap-3 text-[13px] sm:grid-cols-3">
+        <dl className="mt-4 grid gap-3 text-small sm:grid-cols-3">
           <div>
             <dt className="text-fg-muted">Version</dt>
             <dd className="font-mono text-fg">{data.version}</dd>
@@ -67,7 +67,7 @@ export function HealthCard() {
           </div>
           <div className="sm:col-span-1">
             <dt className="text-fg-muted">Data directory</dt>
-            <dd className="break-all font-mono text-[12px] text-fg">{data.data_dir}</dd>
+            <dd className="break-all font-mono text-small text-fg">{data.data_dir}</dd>
           </div>
         </dl>
       )}

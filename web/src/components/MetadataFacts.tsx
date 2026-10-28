@@ -8,7 +8,7 @@ export interface MetadataFactsData {
 }
 
 const CHIP =
-  "inline-flex items-center rounded-full bg-hover px-2 py-0.5 text-[11px] font-medium leading-4 text-fg-muted";
+  "inline-flex items-center rounded-full bg-hover px-2 py-0.5 text-micro font-medium text-fg-muted";
 
 function Chips({ values }: { values: string[] }) {
   return (
@@ -25,8 +25,8 @@ function Chips({ values }: { values: string[] }) {
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-      <dt className="shrink-0 text-[12px] text-fg-comment">{label}</dt>
-      <dd className="min-w-0 text-[12px] text-fg-muted">{children}</dd>
+      <dt className="shrink-0 text-small text-fg-comment">{label}</dt>
+      <dd className="min-w-0 text-small text-fg-muted">{children}</dd>
     </div>
   );
 }
@@ -55,10 +55,10 @@ export function MetadataFacts({ facts }: { facts: MetadataFactsData }) {
   const extraCast = cast.length - shownCast.length;
 
   return (
-    <dl className="flex flex-col gap-2 text-[12px]">
+    <dl className="flex flex-col gap-2 text-small">
       {genres.length > 0 ? (
         <div className="flex flex-wrap items-baseline gap-x-2">
-          <dt className="shrink-0 text-[12px] text-fg-comment">Genres</dt>
+          <dt className="shrink-0 text-small text-fg-comment">Genres</dt>
           <dd>
             <Chips values={genres} />
           </dd>

@@ -159,10 +159,10 @@ function validate(form: FormState): string | null {
 }
 
 const FIELD_CLASS =
-  "h-10 w-full rounded-control border border-border-subtle bg-canvas px-3 text-[13px] text-fg placeholder:text-fg-comment focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30";
-const LABEL_CLASS = "flex flex-col gap-1 text-[12px] text-fg-muted";
+  "h-10 w-full rounded-control border border-border-subtle bg-canvas px-3 text-small text-fg placeholder:text-fg-comment focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30";
+const LABEL_CLASS = "flex flex-col gap-1 text-small text-fg-muted";
 const SMALL_INPUT =
-  "h-9 w-full rounded-control border border-border-subtle bg-canvas px-2 text-[12px] text-fg focus:border-accent focus:outline-none";
+  "h-9 w-full rounded-control border border-border-subtle bg-canvas px-2 text-small text-fg focus:border-accent focus:outline-none";
 
 export interface MetadataFixerDialogProps {
   title: TitleDetail;
@@ -413,7 +413,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
   if (overridesQuery.isLoading) {
     return (
       <div className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(12,14,20,0.7)] p-0 sm:items-center sm:p-4">
-        <div className="w-full max-w-[720px] rounded-t-panel border border-border-strong bg-panel px-5 py-6 text-[13px] text-fg-muted sm:rounded-panel">
+        <div className="w-full max-w-[720px] rounded-t-panel border border-border-strong bg-panel px-5 py-6 text-small text-fg-muted sm:rounded-panel">
           Loading metadata overrides…
         </div>
       </div>
@@ -432,15 +432,15 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
         <div className="mx-auto mt-2 h-1 w-8 rounded-full bg-border-strong sm:hidden" />
         <header className="flex items-start justify-between gap-4 border-b border-border-subtle px-4 py-3 sm:px-5">
           <div>
-            <h2 id="fix-metadata-title" className="text-[18px] font-semibold text-fg">
+            <h2 id="fix-metadata-title" className="text-title font-semibold text-fg">
               Fix metadata
             </h2>
-            <p className="text-[12px] text-fg-muted">{title.title}</p>
+            <p className="text-small text-fg-muted">{title.title}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="min-h-9 rounded-control border border-border-strong px-3 text-[12px] font-semibold text-fg hover:bg-hover"
+            className="min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
           >
             Close
           </button>
@@ -448,7 +448,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
 
         <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
           <section className="flex flex-col gap-3">
-            <h3 className="text-[13px] font-semibold uppercase tracking-wide text-fg-muted">
+            <h3 className="text-micro font-semibold uppercase tracking-[0.08em] text-fg-muted">
               Identity
             </h3>
             <div className="flex flex-wrap gap-2" role="group" aria-label="Media kind">
@@ -459,7 +459,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
                   aria-pressed={form.kind === option.value}
                   onClick={() => update("kind", option.value)}
                   className={[
-                    "min-h-9 rounded-control border px-3 text-[12px] font-semibold",
+                    "min-h-9 rounded-control border px-3 text-small font-semibold",
                     form.kind === option.value
                       ? "border-accent bg-accent/15 text-accent"
                       : "border-border-strong text-fg hover:bg-hover",
@@ -519,12 +519,12 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
                     <button
                       type="button"
                       onClick={() => remove.mutate(field)}
-                      className="text-[11px] font-semibold text-accent underline"
+                      className="text-micro font-semibold text-accent underline"
                     >
                       Remove override
                     </button>
                   ) : overridesQuery.data?.provider_values[field] ? (
-                    <span className="text-[11px] text-fg-comment">
+                    <span className="text-micro text-fg-comment">
                       provider says {String(overridesQuery.data.provider_values[field])}
                     </span>
                   ) : null}
@@ -541,23 +541,23 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
 
           <section className="mt-5 flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-[13px] font-semibold uppercase tracking-wide text-fg-muted">
+              <h3 className="text-micro font-semibold uppercase tracking-[0.08em] text-fg-muted">
                 Seasons
               </h3>
-              <span className="text-[12px] text-fg-comment">
+              <span className="text-small text-fg-comment">
                 {title.seasons?.length ?? 0} in the library
               </span>
             </div>
 
             <div className="rounded-panel border border-border-subtle">
               {(title.seasons ?? []).length === 0 ? (
-                <p className="px-3 py-2 text-[12px] text-fg-muted">No season rows recorded yet.</p>
+                <p className="px-3 py-2 text-small text-fg-muted">No season rows recorded yet.</p>
               ) : (
                 <ul className="divide-y divide-border-subtle">
                   {(title.seasons ?? []).map((season) => (
                     <li
                       key={season.library_season}
-                      className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-[12px]"
+                      className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-small"
                     >
                       <span className="font-semibold text-fg">
                         {season.library_season === 0
@@ -581,7 +581,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
                   type="button"
                   disabled={rebuild.isPending}
                   onClick={() => rebuild.mutate("imdb")}
-                  className="min-h-9 rounded-control border border-border-strong px-3 text-[12px] font-semibold text-fg hover:bg-hover disabled:opacity-50"
+                  className="min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-50"
                 >
                   Rebuild from IMDb
                 </button>
@@ -591,7 +591,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
                   type="button"
                   disabled={rebuild.isPending}
                   onClick={() => rebuild.mutate("tvdb")}
-                  className="min-h-9 rounded-control border border-border-strong px-3 text-[12px] font-semibold text-fg hover:bg-hover disabled:opacity-50"
+                  className="min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-50"
                 >
                   Rebuild from TVDB
                 </button>
@@ -601,20 +601,20 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
                   type="button"
                   disabled={rebuild.isPending}
                   onClick={() => rebuild.mutate("anilist")}
-                  className="min-h-9 rounded-control border border-border-strong px-3 text-[12px] font-semibold text-fg hover:bg-hover disabled:opacity-50"
+                  className="min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-50"
                 >
                   Rebuild from AniList
                 </button>
               ) : null}
             </div>
 
-            <p className="text-[12px] text-fg-muted">
+            <p className="text-small text-fg-muted">
               Rebuilding renumbers the current {title.episode_count} episode rows (
               {title.available_episode_count} with files). Episode ids, saved releases and
               files on disk are kept.
             </p>
             {rebuildConfirm ? (
-              <label className="flex items-center gap-2 text-[12px] text-danger">
+              <label className="flex items-center gap-2 text-small text-danger">
                 <input
                   type="checkbox"
                   checked={rebuildConfirm}
@@ -627,18 +627,18 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
             {anilistOnly ? (
               <div className="rounded-panel border border-border-subtle">
                 <div className="flex items-center justify-between border-b border-border-subtle px-3 py-2">
-                  <span className="text-[12px] font-semibold text-fg">Add related seasons</span>
+                  <span className="text-small font-semibold text-fg">Add related seasons</span>
                   <button
                     type="button"
                     onClick={() => setRelatedIds([...relatedIds, ""])}
-                    className="text-[12px] font-semibold text-accent"
+                    className="text-small font-semibold text-accent"
                   >
                     Add another
                   </button>
                 </div>
                 <div className="flex flex-col gap-2 p-3">
                   {relatedIds.map((value, index) => (
-                    <label key={index} className="text-[11px] text-fg-muted">
+                    <label key={index} className="text-micro text-fg-muted">
                       AniList id for season {(title.seasons?.length ?? 0) + index + 1}
                       <input
                         className={SMALL_INPUT}
@@ -658,7 +658,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
                     type="button"
                     disabled={saveSeasons.isPending}
                     onClick={() => saveSeasons.mutate()}
-                    className="min-h-9 w-fit rounded-control border border-border-strong px-3 text-[12px] font-semibold text-fg hover:bg-hover disabled:opacity-50"
+                    className="min-h-9 w-fit rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-50"
                   >
                     {saveSeasons.isPending ? "Saving…" : "Save seasons"}
                   </button>
@@ -667,7 +667,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
             ) : null}
 
             {seasonResult ? (
-              <p role="status" className="text-[12px] text-success">
+              <p role="status" className="text-small text-success">
                 {seasonResult}
               </p>
             ) : null}
@@ -675,17 +675,17 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
 
           <section className="mt-5 flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-[13px] font-semibold uppercase tracking-wide text-fg-muted">
+              <h3 className="text-micro font-semibold uppercase tracking-[0.08em] text-fg-muted">
                 Episodes
               </h3>
-              <span className="text-[12px] text-fg-comment">
+              <span className="text-small text-fg-comment">
                 {title.episode_count} episodes
               </span>
             </div>
 
             <div className="rounded-panel border border-border-subtle">
               <div className="flex items-center justify-between border-b border-border-subtle px-3 py-2">
-                <span className="text-[12px] font-semibold text-fg">Season offsets</span>
+                <span className="text-small font-semibold text-fg">Season offsets</span>
                 <button
                   type="button"
                   onClick={() =>
@@ -694,18 +694,18 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
                       { provider_season: "", library_season: "" },
                     ])
                   }
-                  className="text-[12px] font-semibold text-accent"
+                  className="text-small font-semibold text-accent"
                 >
                   Add offset
                 </button>
               </div>
               {form.offsets.length === 0 ? (
-                <p className="px-3 py-2 text-[12px] text-fg-muted">No season offsets.</p>
+                <p className="px-3 py-2 text-small text-fg-muted">No season offsets.</p>
               ) : (
                 <div className="flex flex-col gap-2 p-3">
                   {form.offsets.map((offset, index) => (
                     <div key={index} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
-                      <label className="text-[11px] text-fg-muted">
+                      <label className="text-micro text-fg-muted">
                         Provider season
                         <input
                           className={SMALL_INPUT}
@@ -716,7 +716,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
                           }
                         />
                       </label>
-                      <label className="text-[11px] text-fg-muted">
+                      <label className="text-micro text-fg-muted">
                         Library season
                         <input
                           className={SMALL_INPUT}
@@ -735,7 +735,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
                             form.offsets.filter((_, rowIndex) => rowIndex !== index),
                           )
                         }
-                        className="min-h-9 rounded-control border border-border-strong px-2 text-[11px] text-fg hover:bg-hover"
+                        className="min-h-9 rounded-control border border-border-strong px-2 text-micro text-fg hover:bg-hover"
                       >
                         Remove
                       </button>
@@ -747,7 +747,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
 
             <div className="rounded-panel border border-border-subtle">
               <div className="flex items-center justify-between border-b border-border-subtle px-3 py-2">
-                <span className="text-[12px] font-semibold text-fg">Episode overrides</span>
+                <span className="text-small font-semibold text-fg">Episode overrides</span>
                 <button
                   type="button"
                   onClick={() =>
@@ -762,13 +762,13 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
                       },
                     ])
                   }
-                  className="text-[12px] font-semibold text-accent"
+                  className="text-small font-semibold text-accent"
                 >
                   Add episode override
                 </button>
               </div>
               {form.episodes.length === 0 ? (
-                <p className="px-3 py-2 text-[12px] text-fg-muted">No episode overrides.</p>
+                <p className="px-3 py-2 text-small text-fg-muted">No episode overrides.</p>
               ) : (
                 <div className="flex flex-col gap-2 p-3">
                   {form.episodes.map((episode, index) => (
@@ -785,7 +785,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
                           ["absolute", "Absolute"],
                         ] as const
                       ).map(([field, label]) => (
-                        <label key={field} className="text-[11px] text-fg-muted">
+                        <label key={field} className="text-micro text-fg-muted">
                           {label}
                           <input
                             className={SMALL_INPUT}
@@ -803,7 +803,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
                             form.episodes.filter((_, rowIndex) => rowIndex !== index),
                           )
                         }
-                        className="min-h-9 self-end rounded-control border border-border-strong px-2 text-[11px] text-fg hover:bg-hover"
+                        className="min-h-9 self-end rounded-control border border-border-strong px-2 text-micro text-fg hover:bg-hover"
                       >
                         Remove
                       </button>
@@ -816,13 +816,13 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
 
           {destructive ? (
             <section className="mt-5 rounded-panel border-l-2 border-danger bg-panel px-3 py-2">
-              <p className="text-[13px] font-semibold text-danger">Destructive change</p>
-              <p className="mt-1 text-[12px] text-fg-muted">
+              <p className="text-small font-semibold text-danger">Destructive change</p>
+              <p className="mt-1 text-small text-fg-muted">
                 Changing this title to a movie removes its episode rows
                 ({title.episode_count} episodes, {title.available_episode_count} with files).
                 Files on disk are kept.
               </p>
-              <label className="mt-2 flex items-center gap-2 text-[12px] text-fg">
+              <label className="mt-2 flex items-center gap-2 text-small text-fg">
                 <input
                   type="checkbox"
                   checked={confirmDestructive}
@@ -830,7 +830,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
                 />
                 I understand this removes the episode list.
               </label>
-              <p className="mt-2 text-[12px] text-fg-muted">
+              <p className="mt-2 text-small text-fg-muted">
                 Safer alternative:{" "}
                 <Link
                   to={`/search?q=${encodeURIComponent(title.title)}`}
@@ -845,12 +845,12 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
           ) : null}
 
           {error ? (
-            <p role="alert" className="mt-4 text-[13px] text-danger">
+            <p role="alert" className="mt-4 text-small text-danger">
               {error}
             </p>
           ) : null}
           {result ? (
-            <p role="status" className="mt-4 text-[13px] text-success">
+            <p role="status" className="mt-4 text-small text-success">
               {result}
             </p>
           ) : null}
@@ -860,7 +860,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
           <button
             type="button"
             onClick={onClose}
-            className="min-h-10 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover"
+            className="min-h-10 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
           >
             Cancel
           </button>
@@ -868,7 +868,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
             type="button"
             disabled={save.isPending || overridesQuery.isLoading}
             onClick={submit}
-            className="min-h-10 rounded-control bg-accent px-4 text-[13px] font-semibold text-canvas hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-10 rounded-control bg-accent px-4 text-small font-semibold text-canvas hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
             {save.isPending ? "Saving…" : "Save changes"}
           </button>

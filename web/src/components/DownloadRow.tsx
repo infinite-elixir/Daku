@@ -58,7 +58,7 @@ function RowButton({
       type="button"
       onClick={() => onAction(id, action)}
       className={[
-        "min-h-8 rounded-control border px-3 text-[12px] font-semibold transition-colors",
+        "min-h-8 rounded-control border px-3 text-small font-semibold transition-colors",
         primary
           ? "border-accent/50 bg-accent/15 text-accent hover:bg-accent/25"
           : "border-border-subtle text-fg-muted hover:bg-hover hover:text-fg",
@@ -114,11 +114,11 @@ export const DownloadRow = memo(function DownloadRow({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="truncate text-[15px] font-semibold leading-5 text-fg">{name}</h3>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-muted">
+          <h3 className="truncate text-body font-semibold text-fg">{name}</h3>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-fg-muted">
             <span
               className={[
-                "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium leading-4",
+                "inline-flex items-center rounded-full px-2 py-0.5 text-micro font-medium",
                 failed ? "bg-danger/15 text-danger" : "bg-hover text-fg-muted",
               ].join(" ")}
             >
@@ -127,7 +127,7 @@ export const DownloadRow = memo(function DownloadRow({
             {download.episode_label ? <span>{download.episode_label}</span> : null}
             {selectionText ? (
               <span
-                className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium leading-4 text-accent"
+                className="rounded-full bg-accent/15 px-2 py-0.5 text-micro font-medium text-accent"
                 title="The magnet adds the whole torrent; Daku only fetches the selected files."
               >
                 {selectionText}
@@ -164,7 +164,7 @@ export const DownloadRow = memo(function DownloadRow({
             onClick={() => setConfirmingRemove(true)}
             aria-label="Remove download"
             title="Remove download"
-            className="inline-flex min-h-8 items-center gap-1.5 rounded-control border border-border-subtle px-2.5 text-[12px] font-semibold text-fg-muted hover:bg-hover hover:text-danger"
+            className="inline-flex min-h-8 items-center gap-1.5 rounded-control border border-border-subtle px-2.5 text-small font-semibold text-fg-muted hover:bg-hover hover:text-danger"
           >
             <svg
               aria-hidden
@@ -200,7 +200,7 @@ export const DownloadRow = memo(function DownloadRow({
             style={{ width: `${value}%` }}
           />
         </div>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[12px] text-fg-muted">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-small text-fg-muted">
           <span className="tabular-nums">
             {formatBytes(download.downloaded_bytes)} / {formatBytes(download.total_bytes)} ·{" "}
             {Math.round(value)}%
@@ -217,7 +217,7 @@ export const DownloadRow = memo(function DownloadRow({
       </div>
 
       {errorText ? (
-        <p className="mt-2 rounded-control border-l-2 border-danger bg-canvas px-3 py-2 text-[12px] leading-5 text-danger">
+        <p className="mt-2 rounded-control border-l-2 border-danger bg-canvas px-3 py-2 text-small text-danger">
           {errorText}
         </p>
       ) : null}

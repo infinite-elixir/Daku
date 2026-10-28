@@ -36,6 +36,23 @@ describe("RatingsRow", () => {
     expect(screen.queryByText(/Ratings via/)).not.toBeInTheDocument();
   });
 
+  it("uses brand tokens for IMDb, Rotten Tomatoes and Metacritic", () => {
+    render(
+      <RatingsRow
+        ratings={{ imdb_rating: 8.4, rt_rating: 92, metacritic_rating: 89 }}
+      />,
+    );
+
+    const imdb = screen.getByLabelText("IMDb rating 8.4 out of 10");
+    expect(imdb).toHaveClass("bg-rating-imdb/14", "text-rating-imdb");
+
+    const rt = screen.getByLabelText("Rotten Tomatoes 92 percent");
+    expect(rt).toHaveClass("border-rating-rt/40", "bg-rating-rt/14", "text-fg");
+
+    const metacritic = screen.getByLabelText("Metacritic 89 out of 100");
+    expect(metacritic).toHaveClass("bg-rating-metacritic/14", "text-rating-metacritic");
+  });
+
   it("shows the attribution once even when only Metacritic is present", () => {
     render(<RatingsRow ratings={{ metacritic_rating: 89 }} />);
 

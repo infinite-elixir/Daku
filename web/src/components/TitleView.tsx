@@ -47,7 +47,7 @@ export interface TitleViewProps {
 }
 
 const TAB_CLASS =
-  "min-h-11 shrink-0 rounded-control border px-4 text-[13px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  "min-h-11 shrink-0 rounded-control border px-4 text-small font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const ROW_CLASS =
   "flex min-h-11 w-full items-center gap-3 px-4 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent";
 
@@ -142,14 +142,14 @@ export function TitleView({
               }
             : undefined
         }
-        className="w-fit text-[13px] font-semibold text-fg-muted hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="w-fit text-small font-semibold text-fg-muted hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         {back.label}
       </Link>
 
       <div className="grid gap-6 sm:grid-cols-[180px_minmax(0,1fr)]">
         <div className="w-40 sm:w-full">
-          <PosterArt url={title.poster_url} title={title.title} kind={title.kind} />
+          <PosterArt url={title.poster_url} title={title.title} />
         </div>
 
         <div className="flex min-w-0 flex-col gap-3">
@@ -157,15 +157,15 @@ export function TitleView({
             <KindBadge kind={title.kind} />
             <AvailabilityPill availability={title.availability} />
             {title.wanted ? (
-              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium leading-4 text-accent">
+              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-micro font-medium text-accent">
                 Wanted
               </span>
             ) : null}
           </div>
 
           <div className="border-l-2 border-border-strong pl-3">
-            <h1 className="text-[28px] font-bold leading-9 tracking-tight text-fg">{title.title}</h1>
-            <p className="text-[13px] text-fg-muted">
+            <h1 className="line-clamp-2 break-words text-h1 font-bold text-fg">{title.title}</h1>
+            <p className="text-small text-fg-muted">
               {title.year ?? "Year unknown"}
               {title.imdb_id ? ` · ${title.imdb_id}` : ""}
               {title.anilist_id ? ` · AniList ${title.anilist_id}` : ""}
@@ -180,7 +180,7 @@ export function TitleView({
 
           {metadata ? <MetadataFacts facts={metadata} /> : null}
 
-          <dl className="flex flex-wrap gap-x-6 gap-y-2 text-[12px]">
+          <dl className="flex flex-wrap gap-x-6 gap-y-2 text-small">
             <div>
               <dt className="text-fg-comment">Saved releases</dt>
               <dd className="font-semibold text-fg">{title.saved_release_count}</dd>
@@ -208,19 +208,19 @@ export function TitleView({
       {!isMovie ? (
         <section className="flex flex-col gap-4" aria-labelledby="episodes-heading">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 id="episodes-heading" className="text-[20px] font-semibold leading-7 text-fg">
+            <h2 id="episodes-heading" className="text-h2 font-semibold text-fg">
               Episodes
             </h2>
             {renderEpisodeExpanded ? (
-              <p className="text-[12px] text-fg-comment">
+              <p className="text-small text-fg-comment">
                 Expand an episode to see its releases.
               </p>
             ) : null}
           </div>
           {seasons.length === 0 ? (
             <div className="rounded-panel border border-border-subtle bg-panel px-4 py-6">
-              <p className="text-[14px] font-semibold text-fg">No episodes recorded yet</p>
-              <p className="mt-1 max-w-[60ch] text-[13px] text-fg-muted">
+              <p className="display-face text-title font-semibold text-fg">No episodes recorded yet</p>
+              <p className="mt-1 max-w-[60ch] text-small text-fg-muted">
                 This title was added without an episode list, usually because metadata was
                 unreachable at the time. Refreshing its metadata will fill it in.
               </p>
@@ -230,7 +230,7 @@ export function TitleView({
                     type="button"
                     disabled
                     title="Metadata refresh arrives with T-022"
-                    className="min-h-11 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                    className="min-h-11 rounded-control border border-border-strong px-3 text-small font-semibold text-fg-muted disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Refresh metadata
                   </button>
@@ -311,24 +311,24 @@ export function TitleView({
                             <span
                               aria-hidden
                               className={[
-                                "text-[10px] transition-transform",
+                                "text-micro transition-transform",
                                 expanded ? "rotate-90 text-accent" : "text-fg-comment",
                               ].join(" ")}
                             >
                               ▶
                             </span>
                           ) : null}
-                          <span className="font-mono text-[12px] tabular-nums text-fg-muted">
+                          <span className="font-mono text-small tabular-nums text-fg-muted">
                             {episode.label}
                           </span>
-                          <span className="min-w-0 flex-1 truncate text-[14px] text-fg">
+                          <span className="min-w-0 flex-1 truncate text-body text-fg">
                             {episode.name ?? `Episode ${episode.episode}`}
                           </span>
                           {title.kind === "anime" && episode.absolute !== null ? (
-                            <span className="text-[11px] text-fg-comment">#{episode.absolute}</span>
+                            <span className="text-micro text-fg-comment">#{episode.absolute}</span>
                           ) : null}
                           {expanded ? (
-                            <span className="inline-flex items-center rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-semibold leading-4 text-accent">
+                            <span className="inline-flex items-center rounded-full bg-accent/15 px-2 py-0.5 text-micro font-semibold text-accent">
                               ✓ {expandable ? "Open" : "Selected"}
                             </span>
                           ) : null}

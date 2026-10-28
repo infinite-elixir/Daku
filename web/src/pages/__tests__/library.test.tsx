@@ -65,6 +65,9 @@ describe("LibraryPage", () => {
     renderPage();
 
     expect(await screen.findByText("Big Buck Bunny")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Library" })).toHaveClass("text-h1");
+    expect(screen.getByText("Big Buck Bunny")).toHaveClass("text-title");
+    expect(screen.getByText("2008")).toHaveClass("text-small");
     expect(screen.getByText("2008")).toBeInTheDocument();
     expect(screen.getByText("MOVIE")).toBeInTheDocument();
     expect(screen.getByText("Saved")).toBeInTheDocument();

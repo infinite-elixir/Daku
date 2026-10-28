@@ -81,7 +81,7 @@ export function CopyMagnet({
         disabled={!magnet}
         onClick={() => void handleCopy()}
         className={[
-          "rounded-control border border-border-strong text-[12px] font-semibold text-fg hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40",
+          "rounded-control border border-border-strong text-small font-semibold text-fg hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40",
           compact ? "min-h-7 px-2" : "min-h-8 px-2.5",
         ].join(" ")}
       >

@@ -66,12 +66,12 @@ const NAV_ITEMS: NavItem[] = [
 function navClass({ isActive }: { isActive: boolean }, mobile: boolean): string {
   if (mobile) {
     return [
-      "flex min-h-[52px] flex-col items-center justify-center gap-1 text-[11px] font-medium leading-4",
+      "flex min-h-[52px] flex-col items-center justify-center gap-1 text-micro font-medium",
       isActive ? "text-accent" : "text-fg-muted hover:text-fg",
     ].join(" ");
   }
   return [
-    "rounded-control px-3 py-1.5 text-[14px] transition-colors",
+    "rounded-control px-3 py-1.5 text-body transition-colors",
     isActive ? "bg-hover text-fg" : "text-fg-muted hover:bg-hover hover:text-fg",
   ].join(" ");
 }
@@ -83,7 +83,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mx-auto flex h-14 w-full max-w-[1440px] items-center justify-between px-4 sm:px-6">
           <Link
             to="/library"
-            className="text-[20px] font-bold leading-7 tracking-tight text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="display-face text-h1 font-bold uppercase text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <span className="mr-1 text-accent" aria-hidden>
               ▸

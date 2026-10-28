@@ -71,16 +71,16 @@ export function RemoveDownloadDialog({
         aria-describedby={bodyId}
         className="max-h-[90vh] w-full max-w-[440px] overflow-y-auto rounded-t-panel border border-border-strong bg-panel px-5 py-5 text-fg shadow-xl sm:rounded-panel"
       >
-        <h2 id={titleId} className="text-[16px] font-semibold leading-6">
+        <h2 id={titleId} className="text-title font-semibold">
           Remove download?
         </h2>
-        <p id={bodyId} className="mt-2 break-words text-[13px] leading-5 text-fg-muted">
+        <p id={bodyId} className="mt-2 break-words text-small text-fg-muted">
           This removes the queue entry. Files already in your library stay where they are.
         </p>
-        <p className="mt-2 break-all text-[12px] leading-5 text-fg-muted">{name}</p>
+        <p className="mt-2 break-all text-small text-fg-muted">{name}</p>
 
         {showDeleteFiles ? (
-          <label className="mt-4 flex items-start gap-2 rounded-control border border-border-subtle bg-canvas px-3 py-3 text-[13px] leading-5">
+          <label className="mt-4 flex items-start gap-2 rounded-control border border-border-subtle bg-canvas px-3 py-3 text-small">
             <input
               type="checkbox"
               checked={deleteFiles}
@@ -89,7 +89,7 @@ export function RemoveDownloadDialog({
             />
             <span>
               <span className="font-medium text-fg">Also delete the downloaded files</span>
-              <span className="mt-0.5 block text-[12px] text-fg-muted">
+              <span className="mt-0.5 block text-small text-fg-muted">
                 This deletes qBittorrent&apos;s copy from the download folder, not files already
                 organised into your library.
               </span>
@@ -102,14 +102,14 @@ export function RemoveDownloadDialog({
             ref={cancelRef}
             type="button"
             onClick={onCancel}
-            className="min-h-9 rounded-control border border-border-subtle px-4 text-[13px] font-semibold text-fg hover:bg-hover"
+            className="min-h-9 rounded-control border border-border-subtle px-4 text-small font-semibold text-fg hover:bg-hover"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={() => onConfirm(deleteFiles)}
-            className="min-h-9 rounded-control border border-danger/50 bg-danger/15 px-4 text-[13px] font-semibold text-danger hover:bg-danger/25"
+            className="min-h-9 rounded-control border border-danger/50 bg-danger/15 px-4 text-small font-semibold text-danger hover:bg-danger/25"
           >
             Remove
           </button>

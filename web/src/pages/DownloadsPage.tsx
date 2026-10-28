@@ -136,14 +136,14 @@ export function DownloadsPage() {
     <section className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h1 className="text-[28px] font-bold leading-9 tracking-tight text-fg">Downloads</h1>
-          <p className="text-[13px] text-fg-muted">
+          <h1 className="text-h1 font-bold text-fg">Downloads</h1>
+          <p className="text-small text-fg-muted">
             {data ? `${data.total} ${data.total === 1 ? "download" : "downloads"}` : "Queue and progress"}
           </p>
         </div>
         <span
           className={[
-            "inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-medium leading-4",
+            "inline-flex items-center gap-2 rounded-full px-3 py-1 text-micro font-medium",
             stream.connected
               ? "bg-accent/15 text-accent"
               : stream.polling
@@ -165,7 +165,7 @@ export function DownloadsPage() {
       {removeError ? (
         <div
           role="alert"
-          className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3 text-[13px] text-danger"
+          className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3 text-small text-danger"
         >
           {removeError}
         </div>
@@ -173,21 +173,21 @@ export function DownloadsPage() {
 
       {error ? (
         <div className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3">
-          <p className="text-[13px] text-danger">{error.message}</p>
+          <p className="text-small text-danger">{error.message}</p>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="mt-2 min-h-9 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover"
+            className="mt-2 min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
           >
             Retry
           </button>
         </div>
       ) : isLoading ? (
-        <p className="text-[13px] text-fg-muted">Loading downloads…</p>
+        <p className="text-small text-fg-muted">Loading downloads…</p>
       ) : rows.length === 0 ? (
         <div className="rounded-panel border border-border-subtle bg-panel px-6 py-12 text-center">
-          <p className="text-[16px] font-semibold text-fg">Nothing downloading</p>
-          <p className="mx-auto mt-1 max-w-[48ch] text-[13px] text-fg-muted">
+          <p className="display-face text-title font-semibold text-fg">Nothing downloading</p>
+          <p className="mx-auto mt-1 max-w-[48ch] text-small text-fg-muted">
             Pick a release from a title and it will appear here with live progress.
           </p>
         </div>
@@ -238,11 +238,11 @@ function DownloadSection({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-[16px] font-semibold text-fg">{title}</h2>
-        <span className="text-[12px] tabular-nums text-fg-muted">{rows.length}</span>
+        <h2 className="text-title font-semibold text-fg">{title}</h2>
+        <span className="text-small tabular-nums text-fg-muted">{rows.length}</span>
       </div>
       {rows.length === 0 ? (
-        empty ? <p className="text-[13px] text-fg-muted">{empty}</p> : null
+        empty ? <p className="text-small text-fg-muted">{empty}</p> : null
       ) : (
         <ul className="flex flex-col gap-3">
           {rows.map((row) => (

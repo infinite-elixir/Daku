@@ -6,7 +6,13 @@ export interface Ratings {
 }
 
 const BADGE =
-  "inline-flex items-center gap-1 rounded-full bg-hover px-2 py-0.5 text-[12px] font-semibold leading-5 text-fg";
+  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-small font-semibold";
+
+const RATING_STYLE = {
+  imdb: "bg-rating-imdb/14 text-rating-imdb",
+  rt: "border border-rating-rt/40 bg-rating-rt/14 text-fg",
+  metacritic: "bg-rating-metacritic/14 text-rating-metacritic",
+} as const;
 
 function formatImdb(value: number): string {
   return value.toFixed(1);
@@ -26,27 +32,35 @@ export function RatingsRow({ ratings }: { ratings: Ratings }) {
     <div className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2" aria-label="Ratings">
         {hasImdb ? (
-          <span className={BADGE} aria-label={`IMDb rating ${formatImdb(ratings.imdb_rating!)} out of 10`}>
+          <span
+            className={`${BADGE} ${RATING_STYLE.imdb}`}
+            aria-label={`IMDb rating ${formatImdb(ratings.imdb_rating!)} out of 10`}
+          >
             <span aria-hidden>★</span>
             <span>{formatImdb(ratings.imdb_rating!)}</span>
-            <span className="text-[11px] font-medium text-fg-comment">IMDb</span>
+            <span className="text-micro font-medium">IMDb</span>
           </span>
         ) : null}
         {hasRt ? (
-          <span className={BADGE} aria-label={`Rotten Tomatoes ${ratings.rt_rating} percent`}>
-            <span aria-hidden>🍅</span>
+          <span
+            className={`${BADGE} ${RATING_STYLE.rt}`}
+            aria-label={`Rotten Tomatoes ${ratings.rt_rating} percent`}
+          >
             <span>{ratings.rt_rating}%</span>
-            <span className="text-[11px] font-medium text-fg-comment">RT</span>
+            <span className="text-micro font-medium">RT</span>
           </span>
         ) : null}
         {hasMetacritic ? (
-          <span className={BADGE} aria-label={`Metacritic ${ratings.metacritic_rating} out of 100`}>
+          <span
+            className={`${BADGE} ${RATING_STYLE.metacritic}`}
+            aria-label={`Metacritic ${ratings.metacritic_rating} out of 100`}
+          >
             <span>{ratings.metacritic_rating}</span>
-            <span className="text-[11px] font-medium text-fg-comment">Metacritic</span>
+            <span className="text-micro font-medium">Metacritic</span>
           </span>
         ) : null}
       </div>
-      <p className="text-[11px] text-fg-comment">
+      <p className="text-micro text-fg-comment">
         Ratings via IMDb, Rotten Tomatoes and Metacritic.
       </p>
     </div>

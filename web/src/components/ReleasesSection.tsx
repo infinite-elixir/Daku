@@ -92,9 +92,9 @@ const QUALITY_CHOICES = [
 ];
 
 const DEAD_PILL =
-  "inline-flex items-center rounded-full bg-danger/15 px-2 py-0.5 text-[11px] font-medium leading-4 text-danger";
+  "inline-flex items-center rounded-full bg-danger/15 px-2 py-0.5 text-micro font-medium text-danger";
 const SAVED_PILL =
-  "inline-flex items-center rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium leading-4 text-accent";
+  "inline-flex items-center rounded-full bg-accent/15 px-2 py-0.5 text-micro font-medium text-accent";
 
 function formatSize(bytes: number | null): string {
   if (bytes === null || bytes <= 0) {
@@ -391,7 +391,7 @@ export function ReleasesSection({
     <section className="flex flex-col gap-4">
       {mode === "find" ? null : (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-[20px] font-semibold leading-7 text-fg">
+          <h2 className="text-h2 font-semibold text-fg">
             {mode === "saved" ? "Saved releases" : "Releases"}
           </h2>
           {showTabs ? (
@@ -401,7 +401,7 @@ export function ReleasesSection({
                 aria-pressed={tab === "find"}
                 onClick={() => setTab("find")}
                 className={[
-                  "min-h-8 rounded-control px-3 text-[12px] font-semibold",
+                  "min-h-8 rounded-control px-3 text-small font-semibold",
                   tab === "find" ? "bg-accent/15 text-accent" : "text-fg-muted hover:bg-hover",
                 ].join(" ")}
               >
@@ -412,7 +412,7 @@ export function ReleasesSection({
                 aria-pressed={tab === "saved"}
                 onClick={() => setTab("saved")}
                 className={[
-                  "min-h-8 rounded-control px-3 text-[12px] font-semibold",
+                  "min-h-8 rounded-control px-3 text-small font-semibold",
                   tab === "saved" ? "bg-accent/15 text-accent" : "text-fg-muted hover:bg-hover",
                 ].join(" ")}
               >
@@ -424,9 +424,9 @@ export function ReleasesSection({
       )}
 
       {!isMovie && mode === "all" ? (
-        <p className="flex flex-wrap items-center gap-2 rounded-panel border border-border-subtle bg-panel px-3 py-2 text-[12px] text-fg-muted">
+        <p className="flex flex-wrap items-center gap-2 rounded-panel border border-border-subtle bg-panel px-3 py-2 text-small text-fg-muted">
           <span>Searching releases for</span>
-          <span className="rounded-full bg-accent/15 px-2 py-0.5 font-mono text-[12px] font-semibold tabular-nums text-accent">
+          <span className="rounded-full bg-accent/15 px-2 py-0.5 font-mono text-small font-semibold tabular-nums text-accent">
             {selectedEpisode?.label ?? "no episode"}
           </span>
           {selectedEpisode?.name ? <span className="text-fg-comment">· {selectedEpisode.name}</span> : null}
@@ -434,12 +434,12 @@ export function ReleasesSection({
       ) : null}
 
       {notice ? (
-        <p role="status" className="text-[13px] text-success">
+        <p role="status" className="text-small text-success">
           {notice}
         </p>
       ) : null}
       {activeError ? (
-        <p role="alert" className="text-[13px] text-danger">
+        <p role="alert" className="text-small text-danger">
           {activeError.message}
         </p>
       ) : null}
@@ -447,7 +447,7 @@ export function ReleasesSection({
       {showFind && activeTab === "find" ? (
         <>
           {!isMovie && mode === "all" && seasons.length === 0 ? (
-            <p className="rounded-panel border border-border-subtle bg-panel px-4 py-6 text-[13px] text-fg-muted">
+            <p className="rounded-panel border border-border-subtle bg-panel px-4 py-6 text-small text-fg-muted">
               No episodes recorded yet, so there is nothing to search for.
             </p>
           ) : null}
@@ -456,7 +456,7 @@ export function ReleasesSection({
             aria-label="Release filters"
             className="flex flex-wrap items-center gap-3 rounded-panel border border-border-subtle bg-panel px-3 py-2"
           >
-            <label className="flex items-center gap-2 text-[12px] text-fg-muted">
+            <label className="flex items-center gap-2 text-small text-fg-muted">
               Minimum quality
               <select
                 aria-label="Minimum quality"
@@ -465,7 +465,7 @@ export function ReleasesSection({
                   setMinQuality(event.target.value);
                   setLimitOverride(null);
                 }}
-                className="min-h-8 rounded-control border border-border-strong bg-canvas px-2 text-[12px] text-fg"
+                className="min-h-8 rounded-control border border-border-strong bg-canvas px-2 text-small text-fg"
               >
                 <option value="">Any</option>
                 {MIN_QUALITY_CHOICES.map((value) => (
@@ -476,7 +476,7 @@ export function ReleasesSection({
               </select>
             </label>
 
-            <label className="flex items-center gap-2 text-[12px] text-fg-muted">
+            <label className="flex items-center gap-2 text-small text-fg-muted">
               Sort
               <select
                 aria-label="Release sort"
@@ -485,7 +485,7 @@ export function ReleasesSection({
                   setSortMode(event.target.value);
                   setLimitOverride(null);
                 }}
-                className="min-h-8 rounded-control border border-border-strong bg-canvas px-2 text-[12px] text-fg"
+                className="min-h-8 rounded-control border border-border-strong bg-canvas px-2 text-small text-fg"
               >
                 {SORT_CHOICES.map((value) => (
                   <option key={value} value={value}>
@@ -496,7 +496,7 @@ export function ReleasesSection({
             </label>
 
             <details className="relative">
-              <summary className="min-h-8 cursor-pointer list-none rounded-control border border-border-strong px-3 py-1.5 text-[12px] font-semibold text-fg hover:bg-hover">
+              <summary className="min-h-8 cursor-pointer list-none rounded-control border border-border-strong px-3 py-1.5 text-small font-semibold text-fg hover:bg-hover">
                 Providers ({providers === null ? "default" : effectiveProviders.length})
               </summary>
               <div className="absolute right-0 z-10 mt-1 flex w-56 flex-col gap-1 rounded-panel border border-border-strong bg-panel p-3 shadow-lg">
@@ -509,17 +509,17 @@ export function ReleasesSection({
                     storeProviderSelection(title.kind, null);
                     storage()?.removeItem("daku.releaseProviders");
                   }}
-                  className="min-h-7 rounded-control px-2 text-left text-[12px] font-semibold text-accent hover:bg-hover"
+                  className="min-h-7 rounded-control px-2 text-left text-small font-semibold text-accent hover:bg-hover"
                 >
                   Use defaults
                 </button>
                 {availableProviders.length === 0 ? (
-                  <p className="text-[11px] text-fg-comment">Loading providers…</p>
+                  <p className="text-micro text-fg-comment">Loading providers…</p>
                 ) : null}
                 {availableProviders.map((provider) => (
                   <label
                     key={provider}
-                    className="flex items-center gap-2 rounded-control px-2 py-1 text-[12px] text-fg-muted hover:bg-hover"
+                    className="flex items-center gap-2 rounded-control px-2 py-1 text-small text-fg-muted hover:bg-hover"
                   >
                     <input
                       type="checkbox"
@@ -532,9 +532,9 @@ export function ReleasesSection({
                 ))}
                 {title.kind === "anime" ? (
                   <>
-                    <p className="mt-2 border-t border-border-subtle pt-2 text-[11px] font-semibold text-fg-muted">Sources</p>
+                    <p className="mt-2 border-t border-border-subtle pt-2 text-micro font-semibold text-fg-muted">Sources</p>
                     {["torrentio", "nyaa"].map((source) => (
-                      <label key={source} className="flex items-center gap-2 rounded-control px-2 py-1 text-[12px] text-fg-muted hover:bg-hover">
+                      <label key={source} className="flex items-center gap-2 rounded-control px-2 py-1 text-small text-fg-muted hover:bg-hover">
                         <input type="checkbox" aria-label={`Source ${source}`} checked={effectiveSources.includes(source)} onChange={() => toggleSource(source)} />
                         {source === "nyaa" ? "Nyaa" : "Torrentio"}
                       </label>
@@ -542,7 +542,7 @@ export function ReleasesSection({
                   </>
                 ) : null}
                 {providerHint ? (
-                  <p role="status" className="text-[11px] text-warning">
+                  <p role="status" className="text-micro text-warning">
                     {providerHint}
                   </p>
                 ) : null}
@@ -553,24 +553,24 @@ export function ReleasesSection({
               type="button"
               onClick={resetFindFilters}
               disabled={!filtersActive && limitOverride === null && sortMode === ""}
-              className="min-h-8 rounded-control border border-border-strong px-3 text-[12px] font-semibold text-fg hover:bg-hover disabled:opacity-40"
+              className="min-h-8 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
             >
               Reset
             </button>
           </div>
 
           {findQuery.isLoading ? (
-            <p className="text-[13px] text-fg-muted">Searching Torrentio…</p>
+            <p className="text-small text-fg-muted">Searching Torrentio…</p>
           ) : null}
           {findQuery.error ? (
-            <p role="alert" className="text-[13px] text-danger">
+            <p role="alert" className="text-small text-danger">
               {findQuery.error.message}
             </p>
           ) : null}
 
           {findQuery.data ? (
             <>
-              <div className="flex flex-wrap items-center gap-2 text-[12px] text-fg-comment">
+              <div className="flex flex-wrap items-center gap-2 text-small text-fg-comment">
                 <span>
                   Showing {findQuery.data.returned} of {findQuery.data.total}
                   {findQuery.data.total_unfiltered > findQuery.data.total
@@ -591,7 +591,7 @@ export function ReleasesSection({
               </div>
               {findQuery.data.releases.length === 0 ? (
                 <div className="flex flex-col gap-2 rounded-panel border border-border-subtle bg-panel px-4 py-6">
-                  <p className="text-[13px] text-fg-muted">
+                  <p className="text-small text-fg-muted">
                     {filtersActive
                       ? `No releases match${
                           effectiveMinQuality ? ` a minimum of ${effectiveMinQuality}` : ""
@@ -608,7 +608,7 @@ export function ReleasesSection({
                     <button
                       type="button"
                       onClick={resetFindFilters}
-                      className="min-h-8 w-fit rounded-control border border-border-strong px-3 text-[12px] font-semibold text-fg hover:bg-hover"
+                      className="min-h-8 w-fit rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
                     >
                       Reset filters
                     </button>
@@ -628,17 +628,17 @@ export function ReleasesSection({
                     >
                       <div className="flex flex-wrap items-center gap-3">
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[14px] font-semibold text-fg">
+                          <p className="truncate text-body font-semibold text-fg">
                             {release.filename ?? release.info_hash}
                           </p>
-                          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-muted">
+                          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-fg-muted">
                             <span>{release.quality ?? "unknown"}</span>
                             <span>· {formatSize(release.size_bytes)}</span>
                             <span>· {release.seeders ?? 0} seeders</span>
-                            <span aria-label={`Source ${release.provider === "nyaa" ? "Nyaa" : "Torrentio"}`} className="rounded-full bg-fg-muted/10 px-1.5 py-0.5 text-[11px]">{release.provider === "nyaa" ? "NYAA" : "TORRENTIO"}</span>
+                            <span aria-label={`Source ${release.provider === "nyaa" ? "Nyaa" : "Torrentio"}`} className="rounded-full bg-fg-muted/10 px-1.5 py-0.5 text-micro">{release.provider === "nyaa" ? "NYAA" : "TORRENTIO"}</span>
                           </p>
                           {hintsLine(release) ? (
-                            <p className="mt-0.5 text-[11px] text-fg-comment">{hintsLine(release)}</p>
+                            <p className="mt-0.5 text-micro text-fg-comment">{hintsLine(release)}</p>
                           ) : null}
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -652,7 +652,7 @@ export function ReleasesSection({
                             disabled={saveMutation.isPending}
                             onClick={() => saveMutation.mutate(release)}
                             className={[
-                              "flex h-9 w-9 items-center justify-center rounded-control border text-[16px] disabled:opacity-40",
+                              "flex h-9 w-9 items-center justify-center rounded-control border text-title disabled:opacity-40",
                               release.is_saved
                                 ? "border-accent/50 bg-accent/15 text-accent"
                                 : "border-border-strong text-fg-muted hover:bg-hover",
@@ -665,7 +665,7 @@ export function ReleasesSection({
                             aria-label={`Download ${release.filename ?? release.info_hash}`}
                             disabled={downloadMutation.isPending}
                             onClick={() => downloadMutation.mutate(release)}
-                            className="min-h-9 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover disabled:opacity-40"
+                            className="min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
                           >
                             Download
                           </button>
@@ -698,7 +698,7 @@ export function ReleasesSection({
               )}
               {findQuery.data.releases.length > 0 ? (
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[12px] text-fg-comment">
+                  <span className="text-small text-fg-comment">
                     {findQuery.data.duplicates_removed > 0
                       ? `${findQuery.data.duplicates_removed} duplicate(s) collapsed`
                       : ""}
@@ -707,7 +707,7 @@ export function ReleasesSection({
                     type="button"
                     onClick={showMore}
                     disabled={!canShowMore}
-                    className="min-h-9 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover disabled:opacity-40"
+                    className="min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
                   >
                     Show more
                   </button>
@@ -719,12 +719,12 @@ export function ReleasesSection({
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-[12px] text-fg-muted">
+            <label className="flex items-center gap-2 text-small text-fg-muted">
               Quality
               <select
                 value={qualityFilter}
                 onChange={(event) => setQualityFilter(event.target.value)}
-                className="min-h-8 rounded-control border border-border-strong bg-canvas px-2 text-[12px] text-fg"
+                className="min-h-8 rounded-control border border-border-strong bg-canvas px-2 text-small text-fg"
               >
                 <option value="">All</option>
                 {QUALITY_CHOICES.map((value) => (
@@ -734,7 +734,7 @@ export function ReleasesSection({
                 ))}
               </select>
             </label>
-            <label className="flex items-center gap-2 text-[12px] text-fg-muted">
+            <label className="flex items-center gap-2 text-small text-fg-muted">
               <input
                 type="checkbox"
                 checked={hideDead}
@@ -743,7 +743,7 @@ export function ReleasesSection({
               Hide dead
             </label>
             {savedQuery.data ? (
-              <span className="text-[12px] text-fg-comment">
+              <span className="text-small text-fg-comment">
                 {savedQuery.data.total} saved
                 {savedQuery.data.refresh.found > 0
                   ? ` · ${savedQuery.data.refresh.found} re-checked`
@@ -753,15 +753,15 @@ export function ReleasesSection({
           </div>
 
           {savedQuery.isLoading ? (
-            <p className="text-[13px] text-fg-muted">Loading saved releases…</p>
+            <p className="text-small text-fg-muted">Loading saved releases…</p>
           ) : null}
           {savedQuery.error ? (
-            <p role="alert" className="text-[13px] text-danger">
+            <p role="alert" className="text-small text-danger">
               {savedQuery.error.message}
             </p>
           ) : null}
           {savedQuery.data && savedQuery.data.releases.length === 0 ? (
-            <p className="rounded-panel border border-border-subtle bg-panel px-4 py-6 text-[13px] text-fg-muted">
+            <p className="rounded-panel border border-border-subtle bg-panel px-4 py-6 text-small text-fg-muted">
               Nothing saved yet. Star a release or paste a magnet to keep it for later.
             </p>
           ) : null}
@@ -772,16 +772,16 @@ export function ReleasesSection({
                 <li key={release.id} className="flex flex-col gap-3 px-4 py-3">
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[14px] font-semibold text-fg">
+                      <p className="truncate text-body font-semibold text-fg">
                         {release.filename ?? release.info_hash}
                       </p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-muted">
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-fg-muted">
                         <span>{release.quality ?? "unknown"}</span>
                         <span>· {formatSize(release.size_bytes)}</span>
                         <span>· {release.seeders ?? 0} seeders</span>
-                        <span aria-label={`Source ${release.provider === "nyaa" ? "Nyaa" : "Torrentio"}`} className="rounded-full bg-fg-muted/10 px-1.5 py-0.5 text-[11px]">{release.provider === "nyaa" ? "NYAA" : "TORRENTIO"}</span>
+                        <span aria-label={`Source ${release.provider === "nyaa" ? "Nyaa" : "Torrentio"}`} className="rounded-full bg-fg-muted/10 px-1.5 py-0.5 text-micro">{release.provider === "nyaa" ? "NYAA" : "TORRENTIO"}</span>
                       </p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-fg-comment">
+                      <p className="mt-0.5 flex flex-wrap items-center gap-2 text-micro text-fg-comment">
                         <span>Checked {formatChecked(release.last_checked_at)}</span>
                         {release.dead ? <span className={DEAD_PILL}>Dead</span> : null}
                         {release.resolved_from === "manual" ? (
@@ -806,7 +806,7 @@ export function ReleasesSection({
                                 ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
                             }
                           }}
-                          className="min-h-9 rounded-control border border-warning/50 px-3 text-[12px] font-semibold text-warning hover:bg-warning/10"
+                          className="min-h-9 rounded-control border border-warning/50 px-3 text-small font-semibold text-warning hover:bg-warning/10"
                         >
                           Find another
                         </button>
@@ -817,7 +817,7 @@ export function ReleasesSection({
                         aria-label={`Unsave ${release.filename ?? release.info_hash}`}
                         disabled={saveMutation.isPending}
                         onClick={() => saveMutation.mutate(release)}
-                        className="flex h-9 w-9 items-center justify-center rounded-control border border-accent/50 bg-accent/15 text-[16px] text-accent disabled:opacity-40"
+                        className="flex h-9 w-9 items-center justify-center rounded-control border border-accent/50 bg-accent/15 text-title text-accent disabled:opacity-40"
                       >
                         ★
                       </button>
@@ -826,7 +826,7 @@ export function ReleasesSection({
                         aria-label={`Download ${release.filename ?? release.info_hash}`}
                         disabled={downloadMutation.isPending}
                         onClick={() => downloadMutation.mutate(release)}
-                        className="min-h-9 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover disabled:opacity-40"
+                        className="min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
                       >
                         Download
                       </button>
@@ -870,10 +870,10 @@ export function ReleasesSection({
             }
           }}
         >
-          <label htmlFor="manual-magnet" className="text-[12px] font-semibold text-fg">
+          <label htmlFor="manual-magnet" className="text-small font-semibold text-fg">
             Paste a magnet
           </label>
-          <p className="text-[11px] text-fg-comment">
+          <p className="text-micro text-fg-comment">
             {isMovie
               ? "Saved against this title. Parsing happens on the server; nothing is downloaded until you press Download."
               : ready
@@ -887,12 +887,12 @@ export function ReleasesSection({
               onChange={(event) => setMagnet(event.target.value)}
               placeholder="magnet:?xt=urn:btih:…"
               disabled={!ready}
-              className="min-h-9 min-w-0 flex-1 rounded-control border border-border-strong bg-canvas px-3 text-[13px] text-fg placeholder:text-fg-comment disabled:opacity-60"
+              className="min-h-9 min-w-0 flex-1 rounded-control border border-border-strong bg-canvas px-3 text-small text-fg placeholder:text-fg-comment disabled:opacity-60"
             />
             <button
               type="submit"
               disabled={!magnet.trim() || !ready || manualMutation.isPending}
-              className="min-h-9 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover disabled:opacity-40"
+              className="min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
             >
               {manualMutation.isPending ? "Saving…" : "Save magnet"}
             </button>

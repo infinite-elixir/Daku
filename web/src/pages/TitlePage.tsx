@@ -71,11 +71,11 @@ export function TitlePage() {
   if (error) {
     return (
       <section className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3">
-        <p className="text-[13px] text-danger">{error.message}</p>
+        <p className="text-small text-danger">{error.message}</p>
         <button
           type="button"
           onClick={() => void refetch()}
-          className="mt-2 min-h-9 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover"
+          className="mt-2 min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
         >
           Retry
         </button>
@@ -126,7 +126,7 @@ export function TitlePage() {
         disabled={wantedMutation.isPending}
         onClick={() => wantedMutation.mutate(!title.wanted)}
         className={[
-          "min-h-11 rounded-control border px-3 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+          "min-h-11 rounded-control border px-3 text-small font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40",
           title.wanted
             ? "border-accent/50 bg-accent/15 text-accent hover:bg-accent/20"
             : "border-border-strong text-fg hover:bg-hover",
@@ -138,7 +138,7 @@ export function TitlePage() {
       <button
         type="button"
         onClick={() => setFixerOpen(true)}
-        className="min-h-11 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover"
+        className="min-h-11 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
       >
         Fix metadata
       </button>
@@ -149,14 +149,14 @@ export function TitlePage() {
             type="button"
             disabled={deleteMutation.isPending}
             onClick={() => deleteMutation.mutate()}
-            className="min-h-11 rounded-control border border-danger bg-danger px-3 text-[13px] font-semibold text-canvas disabled:opacity-40"
+            className="min-h-11 rounded-control border border-danger bg-danger px-3 text-small font-semibold text-canvas disabled:opacity-40"
           >
             {deleteMutation.isPending ? "Removing…" : "Confirm remove"}
           </button>
           <button
             type="button"
             onClick={() => setConfirmingDelete(false)}
-            className="min-h-11 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover"
+            className="min-h-11 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
           >
             Cancel
           </button>
@@ -165,12 +165,12 @@ export function TitlePage() {
         <button
           type="button"
           onClick={() => setConfirmingDelete(true)}
-          className="min-h-11 rounded-control border border-danger px-3 text-[13px] font-semibold text-danger hover:bg-danger/10"
+          className="min-h-11 rounded-control border border-danger px-3 text-small font-semibold text-danger hover:bg-danger/10"
         >
           Remove
         </button>
       )}
-      <span className="text-[12px] text-fg-comment">Removing keeps files on disk.</span>
+      <span className="text-small text-fg-comment">Removing keeps files on disk.</span>
     </>
   );
 
@@ -179,7 +179,7 @@ export function TitlePage() {
       {title.classification?.is_anime && title.kind !== "anime" ? (
         <p
           role="status"
-          className="rounded-panel border-l-2 border-warning bg-panel px-3 py-2 text-[13px] text-warning"
+          className="rounded-panel border-l-2 border-warning bg-panel px-3 py-2 text-small text-warning"
         >
           This looks like anime.{" "}
           <button
@@ -192,12 +192,12 @@ export function TitlePage() {
         </p>
       ) : null}
       {wantedMutation.error ? (
-        <p role="alert" className="text-[13px] text-danger">
+        <p role="alert" className="text-small text-danger">
           {wantedMutation.error.message}
         </p>
       ) : null}
       {deleteMutation.error ? (
-        <p role="alert" className="text-[13px] text-danger">
+        <p role="alert" className="text-small text-danger">
           {deleteMutation.error.message}
         </p>
       ) : null}

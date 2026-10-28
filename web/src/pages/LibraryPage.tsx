@@ -37,7 +37,7 @@ function FilterChip({
       aria-pressed={active}
       onClick={onClick}
       className={[
-        "min-h-9 shrink-0 rounded-control border px-3 text-[13px] font-semibold transition-colors",
+        "min-h-9 shrink-0 rounded-control border px-3 text-small font-semibold transition-colors",
         active
           ? "border-accent/50 bg-accent/15 text-accent"
           : "border-border-subtle text-fg-muted hover:bg-hover hover:text-fg",
@@ -75,14 +75,14 @@ export function LibraryPage() {
     <section className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h1 className="text-[28px] font-bold leading-9 tracking-tight text-fg">Library</h1>
-          <p className="text-[13px] text-fg-muted">
+          <h1 className="text-h1 font-bold text-fg">Library</h1>
+          <p className="text-small text-fg-muted">
             {data ? `${data.total} ${data.total === 1 ? "title" : "titles"}` : "Your saved titles"}
           </p>
         </div>
         <Link
           to="/search"
-          className="inline-flex min-h-9 items-center rounded-control bg-accent px-3 text-[13px] font-semibold text-canvas hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="inline-flex min-h-9 items-center rounded-control bg-accent px-3 text-small font-semibold text-canvas hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           Search
         </Link>
@@ -98,11 +98,11 @@ export function LibraryPage() {
 
       {error ? (
         <div className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3">
-          <p className="text-[13px] text-danger">{error.message}</p>
+          <p className="text-small text-danger">{error.message}</p>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="mt-2 min-h-9 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover"
+            className="mt-2 min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
           >
             Retry
           </button>
@@ -111,20 +111,20 @@ export function LibraryPage() {
         <SkeletonGrid />
       ) : data && data.items.length === 0 ? (
         <div className="rounded-panel border border-border-subtle bg-panel px-6 py-12 text-center">
-          <p className="text-[40px] font-bold leading-none tracking-tight text-border-strong" aria-hidden>
+          <p className="text-display font-bold leading-none tracking-tight text-border-strong" aria-hidden>
             01
           </p>
-          <p className="mt-4 text-[16px] font-semibold text-fg">
+          <p className="mt-4 display-face text-title font-semibold text-fg">
             {filtered ? "No titles match these filters" : "Library is empty"}
           </p>
-          <p className="mx-auto mt-1 max-w-[48ch] text-[13px] text-fg-muted">
+          <p className="mx-auto mt-1 max-w-[48ch] text-small text-fg-muted">
             {filtered
               ? "Clear a filter or search for something new."
               : "Search for a title to add it. Saved entries stay here even with no file."}
           </p>
           <Link
             to="/search"
-            className="mt-4 inline-flex min-h-9 items-center rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover"
+            className="mt-4 inline-flex min-h-9 items-center rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
           >
             Search the catalogue
           </Link>

@@ -78,7 +78,7 @@ function FileList({
   return (
     <>
       <div className="hidden w-full sm:block">
-        <table className="w-full table-fixed text-left text-[12px]">
+        <table className="w-full table-fixed text-left text-small">
           <thead>
             <tr className="border-b border-border-subtle text-fg-comment">
               <th className="w-8 py-1 pr-1 font-medium">
@@ -125,7 +125,7 @@ function FileList({
               onChange={() => onToggle(file.index)}
             />
             <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="break-words font-mono text-[12px] text-fg" title={file.path}>
+              <span className="break-words font-mono text-small text-fg" title={file.path}>
                 {file.path}
               </span>
               <span className="text-micro tabular-nums text-fg-comment">
@@ -242,7 +242,7 @@ export function MagnetFiles({
               setOpen(true);
             }
           }}
-          className="min-h-8 rounded-control border border-border-strong px-2.5 text-[12px] font-semibold text-fg hover:bg-hover disabled:opacity-40"
+          className="min-h-8 rounded-control border border-border-strong px-2.5 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
         >
           {buttonLabel}
         </button>
@@ -252,12 +252,12 @@ export function MagnetFiles({
       {open && enabled ? (
         <div className="rounded-control border border-border-subtle bg-canvas/60 p-3">
           {query.isPending ? (
-            <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-fg-muted">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-small text-fg-muted">
               <span>Reading torrent metadata…</span>
               <button
                 type="button"
                 onClick={cancel}
-                className="min-h-7 rounded-control border border-border-strong px-2 text-[12px] font-semibold text-fg hover:bg-hover"
+                className="min-h-7 rounded-control border border-border-strong px-2 text-small font-semibold text-fg hover:bg-hover"
               >
                 Cancel
               </button>
@@ -266,7 +266,7 @@ export function MagnetFiles({
 
           {error ? (
             <div className="flex flex-col gap-2">
-              <p role="alert" className="text-[12px] text-danger">
+              <p role="alert" className="text-small text-danger">
                 {timeoutFlag.current
                   ? "The magnet timed out after 30 seconds."
                   : error instanceof ApiError
@@ -278,14 +278,14 @@ export function MagnetFiles({
                 <button
                   type="button"
                   onClick={retry}
-                  className="min-h-8 rounded-control border border-border-strong px-2.5 text-[12px] font-semibold text-fg hover:bg-hover"
+                  className="min-h-8 rounded-control border border-border-strong px-2.5 text-small font-semibold text-fg hover:bg-hover"
                 >
                   Retry
                 </button>
                 <button
                   type="button"
                   onClick={cancel}
-                  className="min-h-8 rounded-control px-2.5 text-[12px] font-semibold text-fg-muted hover:bg-hover"
+                  className="min-h-8 rounded-control px-2.5 text-small font-semibold text-fg-muted hover:bg-hover"
                 >
                   Close
                 </button>
@@ -296,10 +296,10 @@ export function MagnetFiles({
           {query.data ? (
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <p className="min-w-0 break-words text-[13px] font-semibold text-fg">
+                <p className="min-w-0 break-words text-small font-semibold text-fg">
                   {query.data.name || shortMagnet(magnet)}
                 </p>
-                <span className="text-[12px] text-fg-muted">
+                <span className="text-small text-fg-muted">
                   {formatBytes(query.data.total_size_bytes)} · {query.data.files.length}{" "}
                   {query.data.files.length === 1 ? "file" : "files"}
                 </span>
@@ -333,7 +333,7 @@ export function MagnetFiles({
                       downloadMutation.mutate(paths);
                     }
                   }}
-                  className="min-h-8 rounded-control border border-border-strong px-2.5 text-[12px] font-semibold text-fg hover:bg-hover disabled:opacity-40"
+                  className="min-h-8 rounded-control border border-border-strong px-2.5 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
                 >
                   {downloadMutation.isPending ? "Queueing…" : "Download selected"}
                 </button>
@@ -346,7 +346,7 @@ export function MagnetFiles({
                 </span>
               </div>
               {downloadMutation.error ? (
-                <p role="alert" className="text-[12px] text-danger">
+                <p role="alert" className="text-small text-danger">
                   {downloadMutation.error instanceof ApiError
                     ? downloadMutation.error.message
                     : "The selected files could not be queued."}

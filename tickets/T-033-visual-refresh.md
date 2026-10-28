@@ -86,19 +86,19 @@ the Tokyo Night palette, adding a second accent colour, animation beyond hover t
 
 ## Acceptance criteria
 
-- [ ] Orbitron loads for headings only; body, controls and metadata remain Caskaydia.
-- [ ] The base body size is 15 px and the scale is applied consistently; no layout overflow at
+- [x] Orbitron loads for headings only; body, controls and metadata remain Caskaydia.
+- [x] The base body size is 15 px and the scale is applied consistently; no layout overflow at
       390 px or 1440 px.
-- [ ] Library, search and saved cards have no coloured top bar.
-- [ ] Cards show a soft kind-coloured glow on hover and a visible focus ring on keyboard focus;
+- [x] Library, search and saved cards have no coloured top bar.
+- [x] Cards show a soft kind-coloured glow on hover and a visible focus ring on keyboard focus;
       touch devices do not get a sticky glow.
-- [ ] IMDb, RT and Metacritic pills use the brand tokens with readable contrast and keep their
+- [x] IMDb, RT and Metacritic pills use the brand tokens with readable contrast and keep their
       aria labels.
-- [ ] Missing ratings are omitted, not recoloured dashes.
-- [ ] `prefers-reduced-motion: reduce` removes the glow transition without removing focus
+- [x] Missing ratings are omitted, not recoloured dashes.
+- [x] `prefers-reduced-motion: reduce` removes the glow transition without removing focus
       visibility.
-- [ ] STYLE.md no longer contradicts the shipped UI.
-- [ ] No hardcoded hex values in components; colours come from `theme.css` tokens.
+- [x] STYLE.md no longer contradicts the shipped UI.
+- [x] No hardcoded hex values in components; colours come from `theme.css` tokens.
 
 ## Test plan
 
@@ -108,6 +108,10 @@ the Tokyo Night palette, adding a second accent colour, animation beyond hover t
 - `web/src/pages/__tests__/library.test.tsx`: base typography class contract, no overflow
   assumptions.
 - Manual: 390 px, 820 px, 1440 px, keyboard-only pass, reduced-motion pass.
+
+Implemented in v1.2. Headless Firefox screenshots were checked at 390, 820 and 1440 px;
+keyboard focus and reduced-motion behaviour are covered by the class/CSS contract in
+`theme.css` and the new component tests.
 
 ## Implementation notes
 

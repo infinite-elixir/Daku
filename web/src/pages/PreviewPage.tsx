@@ -92,8 +92,8 @@ export function PreviewPage() {
   if (!validKind) {
     return (
       <section className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3">
-        <p className="text-[13px] text-danger">Unknown kind: {kind}</p>
-        <Link to="/search" className="mt-2 inline-flex min-h-9 items-center text-[13px] font-semibold text-accent">
+        <p className="text-small text-danger">Unknown kind: {kind}</p>
+        <Link to="/search" className="mt-2 inline-flex min-h-9 items-center text-small font-semibold text-accent">
           Back to search
         </Link>
       </section>
@@ -106,11 +106,11 @@ export function PreviewPage() {
   if (preview.error && !outage) {
     return (
       <section className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3">
-        <p className="text-[13px] text-danger">{preview.error.message}</p>
+        <p className="text-small text-danger">{preview.error.message}</p>
         <button
           type="button"
           onClick={() => void preview.refetch()}
-          className="mt-2 min-h-11 rounded-control border border-border-strong px-3 text-[13px] font-semibold text-fg hover:bg-hover"
+          className="mt-2 min-h-11 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
         >
           Retry
         </button>
@@ -142,7 +142,7 @@ export function PreviewPage() {
     libraryId !== null ? (
       <Link
         to={`/title/${libraryId}`}
-        className="inline-flex min-h-11 items-center rounded-control bg-accent px-4 text-[13px] font-semibold text-canvas hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="inline-flex min-h-11 items-center rounded-control bg-accent px-4 text-small font-semibold text-canvas hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         Open
       </Link>
@@ -163,7 +163,7 @@ export function PreviewPage() {
             anilist_id: data.anilist_id,
           })
         }
-        className="inline-flex min-h-11 items-center rounded-control bg-accent px-4 text-[13px] font-semibold text-canvas hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="inline-flex min-h-11 items-center rounded-control bg-accent px-4 text-small font-semibold text-canvas hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         {add.isPending ? "Adding…" : data.anime ? "Add as anime" : "Add to library"}
       </button>
@@ -172,22 +172,22 @@ export function PreviewPage() {
   const notices = (
     <>
       {outage ? (
-        <p role="status" className="rounded-panel border-l-2 border-warning bg-panel px-3 py-2 text-[13px] text-warning">
+        <p role="status" className="rounded-panel border-l-2 border-warning bg-panel px-3 py-2 text-small text-warning">
           Metadata is unreachable right now. You can still add this title; its episode list can be
           repaired later.
         </p>
       ) : data.stale ? (
-        <p role="status" className="text-[12px] text-warning">
+        <p role="status" className="text-small text-warning">
           Showing cached metadata.
         </p>
       ) : null}
       {add.error ? (
-        <p role="alert" className="text-[13px] text-danger">
+        <p role="alert" className="text-small text-danger">
           Could not add the title. {add.error.message}
         </p>
       ) : null}
       {data.anime && libraryId !== null && data.kind === "series" ? (
-        <p role="status" className="rounded-panel border-l-2 border-warning bg-panel px-3 py-2 text-[13px] text-warning">
+        <p role="status" className="rounded-panel border-l-2 border-warning bg-panel px-3 py-2 text-small text-warning">
           This looks like anime.{" "}
           <Link to={`/title/${libraryId}?fix=classification`} className="font-semibold underline">
             Fix the classification?
@@ -205,7 +205,7 @@ export function PreviewPage() {
       actions={
         <>
           {actions}
-          <span className="text-[12px] text-fg-comment">
+          <span className="text-small text-fg-comment">
             Preview is metadata only. Nothing is downloaded.
           </span>
         </>

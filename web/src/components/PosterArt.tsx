@@ -1,8 +1,5 @@
 import { useState } from "react";
 
-import type { Kind } from "../lib/api";
-import { kindEdgeClass } from "./Pills";
-
 function initials(title: string): string {
   const words = title.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) {
@@ -14,20 +11,11 @@ function initials(title: string): string {
     .join("");
 }
 
-export function PosterArt({
-  url,
-  title,
-  kind,
-}: {
-  url: string | null;
-  title: string;
-  kind: Kind;
-}) {
+export function PosterArt({ url, title }: { url: string | null; title: string }) {
   const [failed, setFailed] = useState(false);
 
   return (
     <div className="relative aspect-[2/3] overflow-hidden rounded-panel border border-border-subtle bg-panel-alt">
-      <div className={`absolute inset-x-0 top-0 z-10 h-0.5 ${kindEdgeClass(kind)}`} aria-hidden />
       {url && !failed ? (
         <img
           src={url}
@@ -38,7 +26,7 @@ export function PosterArt({
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center">
-          <span className="text-[28px] font-semibold text-fg-comment" aria-hidden>
+          <span className="text-h1 font-semibold text-fg-comment" aria-hidden>
             {initials(title)}
           </span>
         </div>
