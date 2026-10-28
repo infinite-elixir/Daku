@@ -151,9 +151,9 @@ body {
   }
 }
 
+/* Direct banner artwork is shown whole; the bottom scrim carries text contrast. */
 .title-banner-art {
-  opacity: 0.6;
-  mask-image: linear-gradient(to left, #000 0%, #000 48%, transparent 100%);
+  opacity: 0.8;
 }
 
 .title-banner-scrim {

@@ -104,13 +104,19 @@ describe("TitlePage banner", () => {
     const banner = screen.getByTestId("title-banner");
     expect(banner).toBeInTheDocument();
     expect(banner).toHaveAttribute("aria-hidden", "true");
-    expect(banner).toHaveClass("title-banner-strip", "h-[300px]");
+    expect(banner).toHaveClass("title-banner-strip");
+    expect(banner).not.toHaveClass("h-[300px]");
+
+    const frame = screen.getByTestId("title-banner-frame");
+    expect(frame).toHaveClass("w-full");
+    expect(frame.getAttribute("style")).toContain("aspect-ratio");
 
     const image = screen.getByTestId("title-banner-image");
     expect(image).toHaveAttribute(
       "src",
       "https://images.metahub.space/background/tt1234567/medium.jpg",
     );
+    expect(image).toHaveClass("h-full", "w-full", "object-cover");
     expect(screen.queryByTestId("title-banner-art")).not.toBeInTheDocument();
 
     const scrim = screen.getByTestId("title-banner-scrim");
@@ -123,7 +129,7 @@ describe("TitlePage banner", () => {
     await screen.findByRole("heading", { level: 1, name: "Big Buck Bunny" });
     const banner = screen.getByTestId("title-banner");
     expect(banner).toHaveClass("title-banner-strip");
-    expect(banner).toHaveClass("absolute");
+    expect(banner).toHaveClass("col-start-1");
   });
 
   it("renders a gradient fallback when the title has no banner or poster", async () => {

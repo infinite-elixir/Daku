@@ -150,5 +150,7 @@ reuses the poster already present in the grid; it never fetches hidden banner ar
 
 Branch `direct-banner-art` (alternative to the dithered version): the title page renders the
 wide `banner_url` directly as an `<img>`. No canvas, pixel read or poster proxy is involved
-on that branch; the portrait poster stays visible in the hero and remains the fallback when
+on that branch. The banner takes the source's real aspect ratio — 1920×1080 for
+Cinemeta/Metahub and 1900×400 for AniList — so the image is never cropped; the hero sits over
+its lower edge. The portrait poster stays visible in the hero, and a gradient is used when
 no wide art exists. The library backdrop is unchanged.
