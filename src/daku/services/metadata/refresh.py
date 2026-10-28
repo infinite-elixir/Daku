@@ -375,6 +375,8 @@ async def refresh_title(
         updates["overview"] = detail.overview.strip()
     if detail.poster_url:
         updates["poster_url"] = detail.poster_url
+    if detail.banner_url:
+        updates["banner_url"] = detail.banner_url
     if source != "auto":
         updates["metadata_source"] = source
     updates["metadata_synced_at"] = utc_now_iso()

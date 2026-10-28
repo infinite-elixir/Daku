@@ -108,7 +108,6 @@ class TitleDetail:
                 "id_mal",
                 "format",
                 "episode_count",
-                "banner_url",
                 "studios",
                 "status",
                 "season",

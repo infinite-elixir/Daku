@@ -75,6 +75,7 @@ function makeTitle(overrides: Partial<TitleDetailShape> = {}): TitleDetailShape 
     mal_id: null,
     overview: "Noble families vie for control of Westeros.",
     poster_url: null,
+    banner_url: null,
     folder_name: null,
     added_at: "2026-10-23T10:00:00",
     wanted: false,

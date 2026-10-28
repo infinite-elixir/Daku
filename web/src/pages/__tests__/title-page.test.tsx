@@ -19,6 +19,7 @@ function makeTitle(overrides: Partial<TitleDetail> = {}): TitleDetail {
     mal_id: null,
     overview: "A large rabbit deals with three bullying rodents.",
     poster_url: "https://images.metahub.space/poster/tt1234567.jpg",
+    banner_url: "https://images.metahub.space/background/tt1234567/medium.jpg",
     folder_name: null,
     added_at: "2026-10-23T10:00:00",
     wanted: false,
@@ -96,14 +97,21 @@ describe("TitlePage banner", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders a dithered banner with a mandatory bottom-up scrim", async () => {
+  it("renders the wide banner image directly with a mandatory bottom-up scrim", async () => {
     renderTitle(makeTitle());
 
     expect(await screen.findByRole("heading", { level: 1, name: "Big Buck Bunny" })).toBeVisible();
     const banner = screen.getByTestId("title-banner");
     expect(banner).toBeInTheDocument();
     expect(banner).toHaveAttribute("aria-hidden", "true");
-    expect(banner).toHaveClass("title-banner-strip", "h-52");
+    expect(banner).toHaveClass("title-banner-strip", "h-[300px]");
+
+    const image = screen.getByTestId("title-banner-image");
+    expect(image).toHaveAttribute(
+      "src",
+      "https://images.metahub.space/background/tt1234567/medium.jpg",
+    );
+    expect(screen.queryByTestId("title-banner-art")).not.toBeInTheDocument();
 
     const scrim = screen.getByTestId("title-banner-scrim");
     expect(scrim).toHaveClass("title-banner-scrim");
@@ -118,11 +126,11 @@ describe("TitlePage banner", () => {
     expect(banner).toHaveClass("absolute");
   });
 
-  it("renders the procedural fallback when the title has no poster", async () => {
-    renderTitle(makeTitle({ poster_url: null }));
+  it("renders a gradient fallback when the title has no banner or poster", async () => {
+    renderTitle(makeTitle({ poster_url: null, banner_url: null }));
 
-    const fallback = await screen.findByTestId("dither-fallback");
-    expect(fallback.textContent?.trim().length).toBeGreaterThan(0);
+    expect(await screen.findByTestId("title-banner-gradient")).toBeInTheDocument();
+    expect(screen.queryByTestId("title-banner-image")).not.toBeInTheDocument();
     expect(screen.getByTestId("title-banner")).toHaveAttribute("data-testid", "title-banner");
   });
 

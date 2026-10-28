@@ -165,6 +165,7 @@ def display_payload(
         "directors": list(detail.directors),
         "writers": list(detail.writers),
         "studios": list(detail.studios),
+        "banner_url": detail.banner_url,
         "stale": stale,
         "sources": sources,
     }

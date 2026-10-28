@@ -38,6 +38,7 @@ def test_parse_meta_orders_episodes(load_fixture: Callable[[str], object]) -> No
     assert detail.title == "Game of Thrones"
     assert detail.year == 2011
     assert detail.kind == "series"
+    assert detail.banner_url == "https://images.example/got-banner.jpg"
     assert [episode.label for episode in detail.episodes] == [
         "S01E01",
         "S01E02",

@@ -71,6 +71,7 @@ class AddTitleRequest(BaseModel):
     title: str | None = Field(default=None, max_length=500)
     year: int | None = Field(default=None, ge=1800, le=2200)
     poster_url: str | None = None
+    banner_url: str | None = None
     wanted: bool = False
     # Chosen on the preview. Persistence lands with T-022 (migration v5); accepting
     # the field now keeps the preview/add contract stable.
@@ -209,6 +210,7 @@ def _title_payload(
         "mal_id": title.mal_id,
         "overview": title.overview,
         "poster_url": title.poster_url,
+        "banner_url": title.banner_url,
         "folder_name": title.folder_name,
         "added_at": title.added_at,
         "wanted": title.wanted,
@@ -387,6 +389,7 @@ def _empty_display_fields() -> dict[str, Any]:
         "directors": [],
         "writers": [],
         "studios": [],
+        "banner_url": None,
         "stale": True,
         "sources": [],
     }
@@ -461,6 +464,7 @@ async def add_title(
             title=body.title,
             year=body.year,
             poster_url=body.poster_url,
+            banner_url=body.banner_url,
         )
 
     is_anime = body.kind == "anime" or requested_anime
@@ -515,6 +519,7 @@ async def add_title(
             mal_id=detail.id_mal,
             overview=detail.overview,
             poster_url=detail.poster_url,
+            banner_url=detail.banner_url,
             metadata_source="anilist" if is_anime else body.metadata_source,
             wanted=body.wanted,
         )
@@ -1129,6 +1134,7 @@ async def metadata_preview(
         detail.year = identity.year if identity.year is not None else detail.year
         detail.overview = identity.overview or detail.overview
         detail.poster_url = identity.poster_url or detail.poster_url
+        detail.banner_url = identity.banner_url or detail.banner_url
         detail.id_mal = identity.id_mal or detail.id_mal
         structure_source = struct.source
         structure_id = struct.source_id
@@ -1185,6 +1191,7 @@ async def metadata_preview(
         "mal_id": detail.id_mal,
         "overview": detail.overview,
         "poster_url": detail.poster_url,
+        "banner_url": detail.banner_url,
         "folder_name": existing.folder_name if existing is not None else None,
         "added_at": existing.added_at if existing is not None else None,
         "wanted": existing.wanted if existing is not None else False,

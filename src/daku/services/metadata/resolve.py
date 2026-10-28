@@ -302,6 +302,7 @@ def fallback_detail(
     title: str | None = None,
     year: int | None = None,
     poster_url: str | None = None,
+    banner_url: str | None = None,
 ) -> TitleDetail:
     """Minimal entry used when metadata is unreachable.
 
@@ -315,4 +316,5 @@ def fallback_detail(
         title=(title or "").strip() or source_id.strip(),
         year=year,
         poster_url=poster_url,
+        banner_url=banner_url,
     )

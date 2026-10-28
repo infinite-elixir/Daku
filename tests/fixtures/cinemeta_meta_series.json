@@ -5,6 +5,7 @@
     "name": "Game of Thrones",
     "releaseInfo": "2011–2019",
     "poster": "https://images.example/got-cinemeta.jpg",
+    "background": "https://images.example/got-banner.jpg",
     "description": "Noble families vie for control of Westeros.",
     "videos": [
       {

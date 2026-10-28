@@ -333,6 +333,13 @@ def _migration_009(engine: Engine) -> None:
             conn.exec_driver_sql(statement)
 
 
+def _migration_010(engine: Engine) -> None:
+    """T-035: keep a wide banner/backdrop URL next to the portrait poster."""
+
+    with engine.begin() as conn:
+        conn.exec_driver_sql("ALTER TABLE titles ADD COLUMN banner_url TEXT")
+
+
 class Migration:
     __slots__ = ("name", "upgrade", "version")
 
@@ -352,6 +359,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(7, "manual metadata overrides", _migration_007),
     Migration(8, "per-season provider structure", _migration_008),
     Migration(9, "selective torrent file downloads", _migration_009),
+    Migration(10, "wide banner art for title pages", _migration_010),
 )
 SCHEMA_VERSION = MIGRATIONS[-1].version
 

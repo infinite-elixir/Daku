@@ -37,6 +37,7 @@ export interface TitleSummary {
   mal_id: number | null;
   overview: string | null;
   poster_url: string | null;
+  banner_url: string | null;
   folder_name: string | null;
   added_at: string;
   wanted: boolean;
@@ -106,6 +107,7 @@ export interface TitleMetadata {
   directors?: string[];
   writers?: string[];
   studios?: string[];
+  banner_url?: string | null;
   stale: boolean;
   sources?: string[];
 }
@@ -126,6 +128,7 @@ export interface PreviewTitle {
   mal_id: number | null;
   overview: string | null;
   poster_url: string | null;
+  banner_url: string | null;
   folder_name: string | null;
   wanted: boolean;
   availability: Availability;
@@ -179,6 +182,7 @@ export interface AddTitleBody {
   title?: string | null;
   year?: number | null;
   poster_url?: string | null;
+  banner_url?: string | null;
   wanted?: boolean;
   metadata_source?: "cinemeta" | "tvdb" | "anilist" | null;
   anime?: boolean;
@@ -569,6 +573,16 @@ export interface DownloadRecord {
   file_match?: Record<string, unknown> | null;
   selection_label?: string | null;
   selection_size_bytes?: number | null;
+  downloaded_files?: DownloadFile[];
+}
+
+export interface DownloadFile {
+  id: string;
+  episode_id: string | null;
+  episode_label: string | null;
+  file_name: string;
+  size_bytes: number | null;
+  is_primary: boolean;
 }
 
 export interface DownloadsResponse {

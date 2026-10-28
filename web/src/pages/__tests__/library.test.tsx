@@ -20,6 +20,7 @@ function makeTitle(overrides: Partial<TitleSummary> = {}): TitleSummary {
     mal_id: null,
     overview: null,
     poster_url: overrides.poster_url ?? "https://images.example/bbb.jpg",
+    banner_url: overrides.banner_url ?? null,
     folder_name: null,
     added_at: "2026-10-23T10:00:00",
     wanted: overrides.wanted ?? false,

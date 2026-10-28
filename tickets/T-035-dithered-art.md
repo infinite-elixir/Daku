@@ -140,3 +140,15 @@ Implemented in v1.2. The banner is hidden below 720 px via CSS (no layout height
 library backdrop is a single 320 px fade at 6% opacity, and the poster proxy is
 `GET /api/posters/proxy` with an HTTPS host allowlist, DNS public-address check, 8 MB cap
 and no disk writes.
+
+v1.3 follow-up: the title banner is 300 px tall (the poster column is 180 × 270 px) and
+prefers real wide art from metadata — Cinemeta `background` for movies/series and AniList
+`bannerImage` for anime — persisted as `titles.banner_url` (migration v10). The `/metadata`
+display response also carries `banner_url`, so existing rows get a banner before their next
+refresh. When no wide art exists the poster remains the source. The library backdrop still
+reuses the poster already present in the grid; it never fetches hidden banner art.
+
+Branch `direct-banner-art` (alternative to the dithered version): the title page renders the
+wide `banner_url` directly as an `<img>`. No canvas, pixel read or poster proxy is involved
+on that branch; the portrait poster stays visible in the hero and remains the fallback when
+no wide art exists. The library backdrop is unchanged.

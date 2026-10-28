@@ -53,6 +53,8 @@ class Title(Base):
     mal_id: Mapped[int | None] = mapped_column(Integer)
     overview: Mapped[str | None] = mapped_column(Text)
     poster_url: Mapped[str | None] = mapped_column(Text)
+    # Wide 16:9 art for the title banner. Optional: older rows fall back to the poster.
+    banner_url: Mapped[str | None] = mapped_column(Text)
     folder_name: Mapped[str | None] = mapped_column(Text)
     metadata_source: Mapped[str | None] = mapped_column(String(16))
     metadata_synced_at: Mapped[str | None] = mapped_column(String(40))

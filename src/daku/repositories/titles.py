@@ -32,6 +32,7 @@ def create_title(
     mal_id: int | None = None,
     overview: str | None = None,
     poster_url: str | None = None,
+    banner_url: str | None = None,
     folder_name: str | None = None,
     metadata_source: str | None = None,
     wanted: bool = False,
@@ -49,6 +50,7 @@ def create_title(
         mal_id=mal_id,
         overview=overview,
         poster_url=poster_url,
+        banner_url=banner_url,
         folder_name=folder_name,
         metadata_source=metadata_source,
         added_at=now,
@@ -257,6 +259,7 @@ def update_title(session: Session, title_id: str, **fields: Any) -> Title | None
         "mal_id",
         "overview",
         "poster_url",
+        "banner_url",
         "folder_name",
     }
     row = session.get(Title, title_id)

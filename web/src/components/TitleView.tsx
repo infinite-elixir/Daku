@@ -3,9 +3,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { seasonLabel, episodesForSeason, seasonNumbers } from "../lib/episodes";
-import { hashString } from "../lib/dither";
 import type { Availability, Episode, Kind, SeasonInfo, TitleMetadata } from "../lib/api";
-import { DitherCanvas } from "./DitherCanvas";
 import { AvailabilityPill, EpisodeStatusPill, KindBadge } from "./Pills";
 import { ExpandableText } from "./ExpandableText";
 import { MetadataFacts } from "./MetadataFacts";
@@ -20,6 +18,7 @@ export interface TitleViewData {
   anilist_id: number | null;
   overview: string | null;
   poster_url: string | null;
+  banner_url: string | null;
   folder_name: string | null;
   availability: Availability;
   wanted: boolean;
@@ -53,6 +52,27 @@ const TAB_CLASS =
 const ROW_CLASS =
   "flex min-h-11 w-full items-center gap-3 px-4 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent";
 
+/** Direct banner artwork. No canvas, no pixel read and no proxy are involved. */
+function BannerArt({ url }: { url: string | null }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!url || failed) {
+    return <div data-testid="title-banner-gradient" className="dither-gradient h-full w-full" />;
+  }
+
+  return (
+    <img
+      data-testid="title-banner-image"
+      src={url}
+      alt=""
+      draggable={false}
+      decoding="async"
+      onError={() => setFailed(true)}
+      className="h-full w-full object-cover object-center"
+    />
+  );
+}
+
 export function TitleView({
   title,
   metadata = null,
@@ -83,6 +103,8 @@ export function TitleView({
   );
   const tabRefs = useRef(new Map<number, HTMLButtonElement>());
   const isMovie = title.kind === "movie";
+  // Prefer real wide art so the banner is not a hard crop of a 2:3 poster.
+  const bannerUrl = title.banner_url ?? metadata?.banner_url ?? title.poster_url;
 
   // A deep link (or a click) selects an episode; follow it to the right tab.
   useEffect(() => {
@@ -152,20 +174,10 @@ export function TitleView({
       <div className="relative">
         <div
           data-testid="title-banner"
-          className="title-banner-strip title-banner-art pointer-events-none absolute inset-x-0 top-0 h-52 overflow-hidden rounded-panel"
+          className="title-banner-strip title-banner-art pointer-events-none absolute inset-x-0 top-0 h-[300px] overflow-hidden rounded-panel"
           aria-hidden
         >
-          <DitherCanvas
-            posterUrl={title.poster_url}
-            title={title.title}
-            year={title.year}
-            kind={title.kind}
-            width={160}
-            height={90}
-            seed={hashString(`${title.title}|${title.year ?? ""}`)}
-            className="h-full w-full"
-            testId="title-banner-art"
-          />
+          <BannerArt url={bannerUrl} />
           <div data-testid="title-banner-scrim" className="title-banner-scrim absolute inset-0" />
         </div>
 

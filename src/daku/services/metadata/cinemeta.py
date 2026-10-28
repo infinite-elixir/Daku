@@ -156,6 +156,7 @@ def parse_meta(payload: Any, kind: str, imdb_id: str) -> TitleDetail | None:
 
     title = meta.get("name") or meta.get("title") or imdb_id
     poster = meta.get("poster")
+    banner = meta.get("background")
     overview = meta.get("description") or meta.get("overview")
 
     episodes: dict[tuple[int, int], EpisodeRef] = {}
@@ -191,6 +192,7 @@ def parse_meta(payload: Any, kind: str, imdb_id: str) -> TitleDetail | None:
         title=title if isinstance(title, str) and title else imdb_id,
         year=_as_year(meta.get("releaseInfo")) or _as_year(meta.get("year")),
         poster_url=poster if isinstance(poster, str) and poster else None,
+        banner_url=banner if isinstance(banner, str) and banner else None,
         overview=overview if isinstance(overview, str) and overview else None,
         episodes=[episodes[key] for key in sorted(episodes)],
         raw_type=meta.get("type") if isinstance(meta.get("type"), str) else None,

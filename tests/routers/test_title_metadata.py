@@ -21,6 +21,7 @@ RICH_META: dict[str, Any] = {
         "name": "Dune: Part Two",
         "releaseInfo": "2024",
         "poster": "https://images.example/dune.jpg",
+        "background": "https://images.example/dune-banner.jpg",
         "description": "Paul Atreides unites with the Fremen.",
         "imdbRating": "8.5",
         "runtime": "167 min",
@@ -77,6 +78,7 @@ def test_metadata_endpoint_renders_cinemeta_without_a_key(settings: Settings) ->
     assert response.status_code == 200
     payload = response.json()
     assert payload["imdb_rating"] == 8.5
+    assert payload["banner_url"] == "https://images.example/dune-banner.jpg"
     assert payload["rt_rating"] is None
     assert payload["metacritic_rating"] is None
     assert payload["runtime_minutes"] == 167

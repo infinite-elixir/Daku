@@ -67,6 +67,7 @@ function makeTitle(overrides: Partial<TitleDetail> = {}): TitleDetail {
     mal_id: null,
     overview: null,
     poster_url: null,
+    banner_url: null,
     folder_name: null,
     added_at: "2026-10-23T10:00:00",
     wanted: false,
