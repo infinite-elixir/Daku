@@ -186,10 +186,6 @@ body {
 }
 
 @container (min-width: 720px) {
-  .title-hero {
-    padding-top: var(--spacing-gutter);
-  }
-
   .title-hero-poster {
     width: 180px;
   }
@@ -217,7 +213,6 @@ body {
   @media (min-width: 720px) {
     .title-hero {
       grid-template-columns: 180px minmax(0, 1fr);
-      padding-top: var(--spacing-gutter);
     }
 
     .title-hero-poster {
