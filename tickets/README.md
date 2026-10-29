@@ -38,8 +38,8 @@ contracts. If a ticket contradicts `AGENTS.md`, `AGENTS.md` wins and the ticket 
 | [T-030](T-030-magnet-inspection.md) | 8 | T-007, T-008 | Magnet metadata probe, file list, copy link |
 | [T-031](T-031-episode-file-selection.md) | 8 | T-009, T-012, T-013, T-030 | Episode file matching, selective download |
 | [T-032](T-032-watch-status-tracker.md) | 9 | T-006, T-021 | Planning/watching/completed tracker |
-| [T-033](T-033-visual-refresh.md) | 9 | T-018, T-024 | Orbitron headings, larger type, card glow, rating colours |
-| [T-034](T-034-title-detail-layout.md) | 9 | T-024, T-033 | Two-column title page with facts rail |
+| [T-033](T-033-visual-refresh.md) | 9 | T-018, T-024 | Caskaydia-only type scale, card glow, rating colours |
+| [T-034](T-034-title-detail-layout.md) | 9 | — | ~~Two-column title page with facts rail~~ (superseded by T-045) |
 | [T-035](T-035-dithered-art.md) | 9 | T-018, T-024, T-033 | **Reverted** — dithered banner/backdrop removed; direct banner art |
 | [T-036](T-036-anime-episode-titles.md) | 10 | T-004, T-021, T-028, T-029 | Anime episode titles + air dates |
 | [T-037](T-037-anime-season-structure.md) | 10 | T-005, T-022, T-028, T-029, T-036 | Aggregate anime season structure |
@@ -47,6 +47,13 @@ contracts. If a ticket contradicts `AGENTS.md`, `AGENTS.md` wins and the ticket 
 | [T-039](T-039-remove-from-download-queue.md) | 11 | T-011, T-031 | Remove a download from the queue |
 | [T-040](T-040-qbittorrent-5x-compatibility.md) | 11 | T-009 | qBittorrent 5.x add response and start/stop |
 | [T-041](T-041-enforce-selective-downloads.md) | 11 | T-031, T-040 | Enforce selective downloads (T-031 regression) |
+| [T-042](T-042-episode-from-finished-pack.md) | 11 | T-031, T-039, T-041 | Download a later episode from an already-finished pack |
+| [T-043](T-043-spacing-tokens.md) | 12 | T-018 | Spacing tokens and app-wide density |
+| [T-044](T-044-downloads-page-redesign.md) | 12 | T-039, T-042, T-043 | Downloads page: sections, grouped cards, honest sizes |
+| [T-045](T-045-title-hero-layout.md) | 12 | T-024, T-043 | Poster-matched title hero (supersedes T-034) |
+| [T-046](T-046-release-panel.md) | 12 | T-030, T-031, T-043, T-045 | Taller release panel, single action row |
+| [T-047](T-047-downloaded-files.md) | 12 | T-014, T-043, T-044, T-045 | Downloaded-files carousel, files page, thumbnails, library filter |
+| [T-048](T-048-mpv-playback.md) | 12 | T-043, T-044, T-047 | Launch a downloaded file in the host's mpv |
 
 ## Rules
 

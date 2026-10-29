@@ -74,9 +74,12 @@ LAN, with no *arr stack and no config files.** The zero-tap alternative matters 
 | 17 | Torrent metadata | Standalone libtorrent session, metadata-only, no payload and no download row | T-030; qBittorrent remains the only torrent engine |
 | 18 | Season packs | Match the episode and download only the matching file; ask when ambiguous | T-031; qBittorrent file priorities, never a silent full pack |
 | 19 | Watch state | Local statuses `planning/watching/completed/dropped/on_hold` + per-episode progress | T-032 replaces the boolean watched plan in T-025; no sync in v1 |
-| 20 | Visual identity | Orbitron headings only, 15px body, card hover glow instead of kind bars | T-033; STYLE.md is amended by the ticket |
-| 21 | Title layout | Ratings/facts in a right rail on wide containers, stacked below 1024px | T-034; one DOM tree, container queries |
+| 20 | Visual identity | Caskaydia-only type with a size/weight ramp, 15px body, card hover glow instead of kind bars | T-033; STYLE.md is amended by the ticket |
+| 21 | Title layout | Ratings/facts in a right rail on wide containers, stacked below 1024px | T-034 — superseded by T-045 (decision 24) |
 | 22 | Release provider defaults | Persist provider lists per media kind in SQLite; explicit searches override them | T-026; shared across browsers and restart-safe |
+| 23 | Density | One named spacing scale, one step looser app-wide; components consume tokens, never arbitrary values | T-043; replaces the "tighter rhythm" rule in STYLE §1.3 |
+| 24 | Title layout | Poster and identity are one object; actions sit on the poster's bottom edge; overview and facts run full width below | T-045 supersedes T-034 and rejects the facts rail |
+| 25 | Playback | Daku still decodes nothing; on explicit request it launches the host's mpv with a library path it resolved itself | T-048; amends AGENTS.md §1, no Jellyfin play links in the UI |
 
 ---
 
@@ -378,7 +381,7 @@ Tickets live in `tickets/`. Each is independently shippable and lists acceptance
 |---|---|
 | T-032 | Local watch-status tracker and per-episode progress |
 | T-033 | Visual refresh: typography, card glow, rating colours |
-| T-034 | Two-column title detail with a facts rail |
+| T-034 | ~~Two-column title detail with a facts rail~~ — superseded by T-045 |
 | T-035 | Poster-derived dithered banner and library backdrop |
 
 ### Phase 10 — Anime fidelity and UI fixes
@@ -400,6 +403,21 @@ Tickets live in `tickets/`. Each is independently shippable and lists acceptance
 Phase 11 is a correctness pass over the download engine. T-040 is the blocker: until the
 qBittorrent 5.x add response is parsed, a successful add is recorded as a failure and T-041
 never gets the chance to apply file priorities.
+
+### Phase 12 — Library surface and local playback
+
+| Ticket | Deliverable |
+|---|---|
+| T-043 | Spacing tokens and app-wide density |
+| T-044 | Downloads page: three sections, grouped cards, honest sizes |
+| T-045 | Title hero rewrite (supersedes T-034) |
+| T-046 | Taller release panel with one action row |
+| T-047 | Downloaded-files carousel, files page, ffmpeg thumbnails, library filter |
+| T-048 | Launch a downloaded file in the host's mpv |
+
+Phase 12 is presentation plus one new capability. T-043 lands first because every later
+ticket describes tokens rather than pixels. T-048 is gated on T-047: it needs file cards to
+attach a launch to.
 
 T-021 and T-023 are the two halves of "search → pick → watch"; T-022 is the repair path for
 entries added while metadata was offline. Phase 7 makes classification and provider selection
@@ -425,12 +443,20 @@ T-023 → T-026 → T-027
 T-005 → T-028 → T-029 (also needs T-021, T-022)
 T-008 → T-030 → T-031 (also needs T-009, T-012, T-013)
 T-021 → T-032
-T-024 → T-033 → T-034, T-035
+T-024 → T-033 → T-035
+T-024 → T-045 (T-034 is superseded by it)
 T-021 → T-038 (also needs T-023)
 T-028, T-029 → T-036 → T-037 (T-036 also needs T-004, T-021)
 T-005, T-022, T-028, T-029 → T-037
 T-011, T-031 → T-039
 T-009 → T-040 → T-041 (T-041 also needs T-031)
+
+T-018 → T-043 → T-044, T-045, T-046, T-047
+T-039, T-042 → T-044
+T-030, T-031 → T-046 (also needs T-043, T-045)
+T-014 → T-047 (also needs T-043, T-044, T-045)
+T-047 → T-048 (also needs T-043)
+T-033 consumes the T-043 spacing tokens.
 ```
 
 Note: T-008 depends on T-006 *and* T-007, and is usable before T-009. You can build a

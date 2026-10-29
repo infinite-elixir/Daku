@@ -1,6 +1,12 @@
 # T-034 — Title detail two-column layout
 
-**Phase:** 9 · **Depends on:** T-024, T-033 · **Estimate:** M
+> **SUPERSEDED by T-045 — do not implement.** The right-rail layout below was rejected in
+> review: a page with one subject should not split its identity across three columns. T-045
+> keeps the poster and identity as one object and moves overview and facts full width
+> underneath. This file is retained for the phase history and for the parts of its scope
+> that survive (container queries, skeleton parity, preview parity, 200% zoom).
+
+**Phase:** 9 · **Depends on:** T-024, T-033 · **Estimate:** M · **Status:** superseded
 
 ## Goal
 
