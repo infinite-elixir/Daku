@@ -269,8 +269,13 @@ export function TitleView({
       </div>
 
       <div data-testid="title-facts-scope" className="title-facts-scope">
-        <ExpandableText text={title.overview} />
-        {metadata ? <MetadataFacts facts={metadata} /> : null}
+        <div
+          data-testid="title-body"
+          className="grid grid-cols-1 items-start gap-section @min-[900px]:grid-cols-[minmax(0,68ch)_minmax(200px,1fr)]"
+        >
+          <ExpandableText text={title.overview} />
+          {metadata ? <MetadataFacts facts={metadata} /> : null}
+        </div>
       </div>
 
       {!isMovie ? (

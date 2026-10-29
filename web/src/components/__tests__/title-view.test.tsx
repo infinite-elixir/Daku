@@ -120,25 +120,29 @@ describe("TitleView hero", () => {
     expect(container.querySelector("[data-testid*='rail']")).not.toBeInTheDocument();
   });
 
-  it("moves overview and facts outside the hero grid, full width", () => {
+  it("stacks facts vertically beside the overview below the hero", () => {
     renderView();
 
     const hero = screen.getByTestId("title-hero");
-    const factsScope = screen.getByTestId("title-facts-scope");
-    expect(hero).not.toContainElement(factsScope);
-
-    expect(factsScope).toHaveTextContent(/A street kid tries to survive/);
-    const facts = factsScope.querySelector(".title-facts");
-    expect(facts).not.toBeNull();
-    expect(facts).toHaveClass(
+    const body = screen.getByTestId("title-body");
+    expect(hero).not.toContainElement(body);
+    expect(body).toHaveClass(
       "grid",
       "grid-cols-1",
-      "@min-[720px]:grid-cols-2",
-      "@min-[1024px]:grid-cols-[repeat(auto-fill,minmax(220px,1fr))]",
-      "gap-panel",
+      "gap-section",
+      "@min-[900px]:grid-cols-[minmax(0,68ch)_minmax(200px,1fr)]",
     );
+
+    const overview = screen.getByText(/A street kid tries to survive/);
+    const facts = body.querySelector(".title-facts");
+    expect(facts).not.toBeNull();
+    expect(facts).toHaveClass("flex", "flex-col", "gap-tight");
+    expect(body).toContainElement(overview);
     expect(facts).toHaveTextContent("Animation");
     expect(facts).toHaveTextContent("Trigger");
+
+    // Overview comes first in reading order, facts second.
+    expect(overview.compareDocumentPosition(facts as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("keeps the episodes section full width below the hero", () => {

@@ -42,13 +42,20 @@ function TitleSkeleton() {
         </div>
       </div>
       <div className="title-facts-scope">
-        <div
-          data-testid="title-skeleton-facts"
-          className="title-facts grid grid-cols-1 gap-panel @min-[720px]:grid-cols-2 @min-[1024px]:grid-cols-[repeat(auto-fill,minmax(220px,1fr))]"
-        >
-          <div className="h-16 animate-pulse rounded-panel bg-hover" />
-          <div className="h-16 animate-pulse rounded-panel bg-hover" />
-          <div className="h-16 animate-pulse rounded-panel bg-hover" />
+        <div className="grid grid-cols-1 items-start gap-section @min-[900px]:grid-cols-[minmax(0,68ch)_minmax(200px,1fr)]">
+          <div className="flex flex-col gap-grid">
+            <div className="h-4 w-full animate-pulse rounded bg-hover" />
+            <div className="h-4 w-5/6 animate-pulse rounded bg-hover" />
+            <div className="h-4 w-2/3 animate-pulse rounded bg-hover" />
+          </div>
+          <div
+            data-testid="title-skeleton-facts"
+            className="title-facts flex flex-col gap-tight"
+          >
+            <div className="h-4 w-3/4 animate-pulse rounded bg-hover" />
+            <div className="h-4 w-2/3 animate-pulse rounded bg-hover" />
+            <div className="h-4 w-4/5 animate-pulse rounded bg-hover" />
+          </div>
         </div>
       </div>
     </div>

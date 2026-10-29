@@ -89,7 +89,8 @@ into the hero, a persistent sidebar of related titles, a desktop-only component 
 - [x] Actions render once, in the identity column on wide and as a full-width row below the
       identity on narrow; never both.
 - [x] Ratings appear once, under the title; no rail exists anywhere on the page.
-- [x] Overview and facts are full width below the hero and cap at 68ch / auto-fill columns.
+- [x] Overview caps at 68ch; facts stack vertically beside it on wide containers and below
+      it, with a section gap, on narrow ones.
 - [x] Below 720px the poster is ≤ 160px wide and everything stacks in one column.
 - [ ] No horizontal scroll at 390, 820, 1024, 1440px or at 200% zoom. *(Manual browser pass
       not run in this environment.)*
@@ -124,9 +125,10 @@ container. The grid is `grid-cols-1` below 720px and two columns above it, with 
 browsers without container queries. The identity column is a flex column whose last child is
 the one action row with `mt-auto`, so it pins to the poster's bottom edge. Counters became a
 single inline `<dl>` row and `showCounters={false}` hides them in the preview. Overview and
-`MetadataFacts` moved outside the hero into a full-width `title-facts-scope`; the facts grid
-is one column below 720px, two above it and auto-fill (min 220px) from 1024px. The skeleton
-mirrors both regions and the hero is a labelled `<section>`.
+`MetadataFacts` moved outside the hero into a `title-facts-scope`: from 900px container width
+the overview stays capped at `68ch` on the left and the facts stack vertically on the right;
+below 900px they stack with a `--spacing-section` gap, so the description is no longer flush
+against the facts. The skeleton mirrors both regions and the hero is a labelled `<section>`.
 
 Tests: `web/src/components/__tests__/title-view.test.tsx` (new),
 `web/src/pages/__tests__/title-page.test.tsx` (skeleton) and

@@ -300,9 +300,10 @@ content container, not the viewport.
   Below 720px that row spans the full width and its buttons share it equally.
 - Poster aspect is always 2:3 and never stretched. The identity order is badges, `h1`,
   year/ids, ratings, counters (one inline `<dl>` row), actions.
-- Overview (capped at `68ch`) and facts are full width below the hero, never inside the
-  identity column. Facts are one column below 720px, two columns from 720px and auto-fill
-  (minimum 220px) from 1024px.
+- Below the hero, the overview (capped at `68ch`) and the facts share one block: overview on
+  the left, facts stacked vertically on the right from 900px container width. Below 900px
+  they stack in that order with a `--spacing-section` gap. Facts are never spread as a
+  horizontal row of columns.
 - The 2px detail rule belongs to the hero, not the title block: one rule per page.
 
 ### 4.2 App shell
