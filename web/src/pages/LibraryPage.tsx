@@ -1,26 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
-import { DitherCanvas } from "../components/DitherCanvas";
 import { KindTabs, type KindFilter } from "../components/KindTabs";
 import { LibraryCard } from "../components/LibraryCard";
-import { daySeed, selectBackdropIndex } from "../lib/dither";
 import { listTitles, type LibraryResponse } from "../lib/api";
 
 const GRID = "grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6";
-
-function mediaMatches(query: string): boolean {
-  return typeof window !== "undefined" && typeof window.matchMedia === "function"
-    ? window.matchMedia(query).matches
-    : false;
-}
-
-function canShowBackdrop(): boolean {
-  return (
-    !mediaMatches("(prefers-reduced-data: reduce)") && !mediaMatches("(max-width: 479px)")
-  );
-}
 
 function SkeletonGrid() {
   return (
@@ -85,39 +71,8 @@ export function LibraryPage() {
 
   const filtered = kind !== "all" || wantedOnly || noFileOnly;
 
-  const backdrop = useMemo(() => {
-    if (!data) {
-      return null;
-    }
-    const posters = data.items
-      .filter((item) => item.poster_url)
-      .slice()
-      .sort((left, right) => (left.poster_url ?? "").localeCompare(right.poster_url ?? ""));
-    const index = selectBackdropIndex(posters.length, daySeed());
-    return posters[index] ?? null;
-  }, [data]);
-
   return (
     <section className="relative flex flex-col gap-6">
-      {backdrop && backdrop.poster_url && canShowBackdrop() ? (
-        <div
-          data-testid="library-backdrop"
-          className="library-backdrop pointer-events-none absolute inset-x-0 top-0 h-80"
-          aria-hidden
-        >
-          <DitherCanvas
-            posterUrl={backdrop.poster_url}
-            title={backdrop.title}
-            year={backdrop.year}
-            kind={backdrop.kind}
-            width={160}
-            height={40}
-            className="h-full w-full"
-            testId="library-backdrop-art"
-          />
-        </div>
-      ) : null}
-
       <header className="relative flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h1 className="text-h1 font-bold text-fg">Library</h1>

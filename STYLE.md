@@ -689,12 +689,12 @@ their tickets land.
 | 3 | **Card glow:** clickable poster cards may use a soft kind-coloured `box-shadow` on hover and `:focus-visible`. This replaces the "no coloured glows" rule for this one case. No lift, no scale, no glow on touch, disabled under reduced motion. | T-033 |
 | 4 | **Rating colour:** IMDb, Rotten Tomatoes and Metacritic pills use their brand colours via `--rating-*` tokens, with a tinted background and AA-readable text. Colour never carries the meaning alone. | T-033 |
 | 5 | **Title layout:** at container width ≥ 1024 px, ratings and metadata facts move to a 300–340 px right rail. Below that they stack. One DOM tree; no duplicated desktop/mobile content. | T-034 — **superseded by T-045 / amendment 8** |
-| 6 | **Artwork:** a poster-derived dithered banner on the title page and one low-opacity library backdrop are allowed. They are decorative (`aria-hidden`), deterministic, and must fall back to procedural ASCII when CORS or decoding fails. | T-035 |
+| 6 | **Artwork:** the poster-derived dithered banner, the library backdrop and the same-origin poster proxy are removed (T-035 reverted). The title page may render wide banner art from metadata directly as an image with a gradient fallback; nothing is generated or cached on the server. | T-035 — **reverted** |
 | 7 | **Spacing:** one named spacing scale, one step looser than v1.1 — 32px section gaps, 16px panel padding, 16px list-row padding, 20px card gaps, 44px table rows, 36/40px controls. Components consume `--spacing-*` tokens; arbitrary spacing values are banned. Overrides the "tighter vertical rhythm" sentence in §1.3 and the values in §4.1/§5.1/§5.3/§5.5. | T-043 |
 | 8 | **Title hero:** the right rail is rejected. Poster and identity are one object — the identity column is as tall as the poster with its actions pinned to the poster's bottom edge; overview and facts run full width below. Below 720px container width the poster is capped at 160px and everything stacks. Replaces amendment 5. | T-045 |
 | 9 | **Playback:** Daku launches no in-app player and decodes nothing, but on explicit request it may spawn the host's mpv with a library path resolved server-side from a media-file id. No Jellyfin play URL is rendered. Feature is off by default. Amends AGENTS.md §1. | T-048 |
 
 The "one accent", "posters are the only large colour fields", "borders over shadows" and
 "no decorative animation" principles still apply. The glow is a **hover affordance**, not a
-second accent; the dither is **texture**, not a second palette.
+second accent; there is no generated texture or second palette.
 

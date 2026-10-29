@@ -52,12 +52,12 @@ const TAB_CLASS =
 const ROW_CLASS =
   "flex min-h-11 w-full items-center gap-3 px-4 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent";
 
-/** Direct banner artwork. No canvas, no pixel read and no proxy are involved. */
+/** Direct banner artwork, with a gradient fallback when there is no wide art. */
 function BannerArt({ url }: { url: string | null }) {
   const [failed, setFailed] = useState(false);
 
   if (!url || failed) {
-    return <div data-testid="title-banner-gradient" className="dither-gradient h-full w-full" />;
+    return <div data-testid="title-banner-gradient" className="banner-fallback h-full w-full" />;
   }
 
   return (

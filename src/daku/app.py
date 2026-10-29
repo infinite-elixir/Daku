@@ -24,7 +24,6 @@ from daku.routers import (
     events,
     health,
     magnets,
-    posters,
     releases,
     search,
     system,
@@ -159,7 +158,6 @@ def create_app(settings: Settings | None = None, *, configure_logs: bool = True)
     app.include_router(magnets.router)
     app.include_router(settings_router.router)
     app.include_router(downloads.router)
-    app.include_router(posters.router)
 
     @app.exception_handler(AppError)
     async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:

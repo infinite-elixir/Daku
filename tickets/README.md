@@ -40,7 +40,7 @@ contracts. If a ticket contradicts `AGENTS.md`, `AGENTS.md` wins and the ticket 
 | [T-032](T-032-watch-status-tracker.md) | 9 | T-006, T-021 | Planning/watching/completed tracker |
 | [T-033](T-033-visual-refresh.md) | 9 | T-018, T-024 | Orbitron headings, larger type, card glow, rating colours |
 | [T-034](T-034-title-detail-layout.md) | 9 | T-024, T-033 | Two-column title page with facts rail |
-| [T-035](T-035-dithered-art.md) | 9 | T-018, T-024, T-033 | Poster-derived dither banner and backdrop |
+| [T-035](T-035-dithered-art.md) | 9 | T-018, T-024, T-033 | **Reverted** — dithered banner/backdrop removed; direct banner art |
 | [T-036](T-036-anime-episode-titles.md) | 10 | T-004, T-021, T-028, T-029 | Anime episode titles + air dates |
 | [T-037](T-037-anime-season-structure.md) | 10 | T-005, T-022, T-028, T-029, T-036 | Aggregate anime season structure |
 | [T-038](T-038-providers-popover-clipping.md) | 10 | T-021, T-023 | Unclipped providers popover |

@@ -1,5 +1,10 @@
 # T-035 — Poster-derived dithered banner and library backdrop
 
+**Status: reverted.** The dithered engine (`dither.ts`, `DitherCanvas`), the library
+backdrop and the same-origin poster proxy (`/api/posters/proxy`) were removed. The title
+page now renders wide banner art from metadata directly as an `<img>` with a gradient
+fallback. The original scope below is kept for history.
+
 **Phase:** 9 · **Depends on:** T-018, T-024, T-033 · **Estimate:** M
 
 ## Goal
