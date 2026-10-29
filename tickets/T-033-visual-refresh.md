@@ -133,3 +133,9 @@ stepped up: section `h2`/dialog titles/empty-state headlines went from `text-tit
 `text-h2`, card `h3` stayed `text-title`, and the wordmark moved from `text-h1` uppercase to
 `text-h2` 700 sentence case so it fits the 56px topbar. `web/public/fonts/orbitron-latin.woff2`
 and its licence were deleted along with `--font-display` and `.display-face`.
+
+## Follow-up (2026-10-29): spacing tokens
+
+T-043 owns the spacing scale. T-033's sizes are unchanged, but components now consume the
+`--spacing-*` tokens (`gap-section`, `p-panel`, `py-row`, `min-h-control-sm`) instead of
+defining their own pixel steps.

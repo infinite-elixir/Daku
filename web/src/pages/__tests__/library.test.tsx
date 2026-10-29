@@ -74,6 +74,8 @@ describe("LibraryPage", () => {
     expect(screen.getByText("Saved")).toBeInTheDocument();
     expect(screen.queryByText("Missing")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Big Buck Bunny/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Big Buck Bunny/i })).toHaveClass("p-panel");
+    expect(screen.getByText("Big Buck Bunny").closest(".grid")).toHaveClass("gap-card");
   });
 
   it("renders the empty state when the library has no titles", async () => {

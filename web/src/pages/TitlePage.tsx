@@ -18,7 +18,7 @@ import {
 
 function TitleSkeleton() {
   return (
-    <div className="grid gap-6 sm:grid-cols-[180px_minmax(0,1fr)]" aria-hidden>
+    <div className="grid gap-gutter sm:grid-cols-[180px_minmax(0,1fr)]" aria-hidden>
       <div className="aspect-[2/3] animate-pulse rounded-panel bg-hover" />
       <div className="flex flex-col gap-3">
         <div className="h-8 w-2/3 animate-pulse rounded bg-hover" />
@@ -70,12 +70,12 @@ export function TitlePage() {
 
   if (error) {
     return (
-      <section className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3">
+      <section className="rounded-panel border-l-2 border-danger bg-panel px-panel py-panel-compact">
         <p className="text-small text-danger">{error.message}</p>
         <button
           type="button"
           onClick={() => void refetch()}
-          className="mt-2 min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
+          className="mt-2 min-h-control-sm rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
         >
           Retry
         </button>
@@ -126,7 +126,7 @@ export function TitlePage() {
         disabled={wantedMutation.isPending}
         onClick={() => wantedMutation.mutate(!title.wanted)}
         className={[
-          "min-h-11 rounded-control border px-3 text-small font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+          "min-h-control rounded-control border px-3 text-small font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40",
           title.wanted
             ? "border-accent/50 bg-accent/15 text-accent hover:bg-accent/20"
             : "border-border-strong text-fg hover:bg-hover",
@@ -138,7 +138,7 @@ export function TitlePage() {
       <button
         type="button"
         onClick={() => setFixerOpen(true)}
-        className="min-h-11 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
+        className="min-h-control rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
       >
         Fix metadata
       </button>
@@ -149,14 +149,14 @@ export function TitlePage() {
             type="button"
             disabled={deleteMutation.isPending}
             onClick={() => deleteMutation.mutate()}
-            className="min-h-11 rounded-control border border-danger bg-danger px-3 text-small font-semibold text-canvas disabled:opacity-40"
+            className="min-h-control rounded-control border border-danger bg-danger px-3 text-small font-semibold text-canvas disabled:opacity-40"
           >
             {deleteMutation.isPending ? "Removing…" : "Confirm remove"}
           </button>
           <button
             type="button"
             onClick={() => setConfirmingDelete(false)}
-            className="min-h-11 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
+            className="min-h-control rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
           >
             Cancel
           </button>
@@ -165,7 +165,7 @@ export function TitlePage() {
         <button
           type="button"
           onClick={() => setConfirmingDelete(true)}
-          className="min-h-11 rounded-control border border-danger px-3 text-small font-semibold text-danger hover:bg-danger/10"
+          className="min-h-control rounded-control border border-danger px-3 text-small font-semibold text-danger hover:bg-danger/10"
         >
           Remove
         </button>

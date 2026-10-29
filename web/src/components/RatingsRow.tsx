@@ -6,7 +6,7 @@ export interface Ratings {
 }
 
 const BADGE =
-  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-small font-semibold";
+  "inline-flex items-center gap-grid rounded-full px-2 py-0.5 text-small font-semibold";
 
 const RATING_STYLE = {
   imdb: "bg-rating-imdb/14 text-rating-imdb",
@@ -29,8 +29,8 @@ export function RatingsRow({ ratings }: { ratings: Ratings }) {
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex flex-wrap items-center gap-2" aria-label="Ratings">
+    <div className="flex flex-col gap-grid">
+      <div className="flex flex-wrap items-center gap-tight" aria-label="Ratings">
         {hasImdb ? (
           <span
             className={`${BADGE} ${RATING_STYLE.imdb}`}

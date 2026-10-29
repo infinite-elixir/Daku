@@ -69,7 +69,7 @@ export function RemoveDownloadDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={bodyId}
-        className="max-h-[90vh] w-full max-w-[440px] overflow-y-auto rounded-t-panel border border-border-strong bg-panel px-5 py-5 text-fg shadow-xl sm:rounded-panel"
+        className="max-h-[90vh] w-full max-w-[440px] overflow-y-auto rounded-t-panel border border-border-strong bg-panel p-panel text-fg shadow-xl sm:rounded-panel"
       >
         <h2 id={titleId} className="text-h2 font-semibold tracking-tight">
           Remove download?
@@ -102,14 +102,14 @@ export function RemoveDownloadDialog({
             ref={cancelRef}
             type="button"
             onClick={onCancel}
-            className="min-h-9 rounded-control border border-border-subtle px-4 text-small font-semibold text-fg hover:bg-hover"
+            className="min-h-control-sm rounded-control border border-border-subtle px-4 text-small font-semibold text-fg hover:bg-hover"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={() => onConfirm(deleteFiles)}
-            className="min-h-9 rounded-control border border-danger/50 bg-danger/15 px-4 text-small font-semibold text-danger hover:bg-danger/25"
+            className="min-h-control-sm rounded-control border border-danger/50 bg-danger/15 px-4 text-small font-semibold text-danger hover:bg-danger/25"
           >
             Remove
           </button>

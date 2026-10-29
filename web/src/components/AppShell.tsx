@@ -66,7 +66,7 @@ const NAV_ITEMS: NavItem[] = [
 function navClass({ isActive }: { isActive: boolean }, mobile: boolean): string {
   if (mobile) {
     return [
-      "flex min-h-[52px] flex-col items-center justify-center gap-1 text-micro font-medium",
+      "flex min-h-12 flex-col items-center justify-center gap-1 text-micro font-medium",
       isActive ? "text-accent" : "text-fg-muted hover:text-fg",
     ].join(" ");
   }
@@ -80,7 +80,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-canvas text-fg">
       <header className="sticky top-0 z-20 border-b border-border-subtle bg-canvas/95">
-        <div className="mx-auto flex h-14 w-full max-w-[1440px] items-center justify-between px-4 sm:px-6">
+        <div className="mx-auto flex h-14 w-full max-w-[1440px] items-center justify-between px-gutter">
           <Link
             to="/library"
             className="text-h2 font-bold tracking-tight text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -100,7 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1440px] px-4 pb-24 pt-6 sm:px-6 md:pb-10">{children}</main>
+      <main className="mx-auto w-full max-w-[1440px] px-gutter pb-24 pt-section md:pb-10">{children}</main>
 
       <nav
         aria-label="Primary mobile"

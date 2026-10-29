@@ -24,7 +24,7 @@ export function ExpandableText({
   const expandable = text.length > threshold;
 
   return (
-    <div className={["flex max-w-[68ch] flex-col gap-1", className ?? ""].join(" ").trim()}>
+    <div className={["flex max-w-[68ch] flex-col gap-grid", className ?? ""].join(" ").trim()}>
       <p
         id={id}
         className={[
@@ -42,7 +42,7 @@ export function ExpandableText({
           aria-expanded={expanded}
           aria-controls={id}
           onClick={() => setExpanded((value) => !value)}
-          className="min-h-9 w-fit text-small font-semibold text-accent hover:text-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="min-h-control-sm w-fit text-small font-semibold text-accent hover:text-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           {expanded ? "Show less" : "Show more"}
         </button>

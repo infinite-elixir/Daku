@@ -39,7 +39,7 @@ export function SearchResultCard({
       }}
       tabIndex={0}
       aria-label={`Preview ${result.title}`}
-      className={`flex cursor-pointer flex-col rounded-panel border border-border-subtle bg-panel p-2 hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${kindGlowClass(result.kind)}`}
+      className={`flex cursor-pointer flex-col rounded-panel border border-border-subtle bg-panel p-panel hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${kindGlowClass(result.kind)}`}
     >
       <Link
         to={href}
@@ -81,7 +81,7 @@ export function SearchResultCard({
             to={`/title/${libraryId}`}
             onClick={(event) => event.stopPropagation()}
             aria-label={`Open ${result.title}`}
-            className="inline-flex min-h-11 items-center justify-center rounded-control border border-accent/50 bg-accent/15 px-3 text-small font-semibold text-accent hover:bg-accent/20"
+            className="inline-flex min-h-control items-center justify-center rounded-control border border-accent/50 bg-accent/15 px-3 text-small font-semibold text-accent hover:bg-accent/20"
           >
             Open
           </Link>
@@ -94,7 +94,7 @@ export function SearchResultCard({
             }}
             disabled={pending}
             aria-label={`Add ${result.title} to library`}
-            className="inline-flex min-h-11 items-center justify-center rounded-control border border-border-strong px-3 text-small font-semibold text-fg transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:text-fg-muted"
+            className="inline-flex min-h-control items-center justify-center rounded-control border border-border-strong px-3 text-small font-semibold text-fg transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:text-fg-muted"
           >
             {pending ? "Adding…" : "Add"}
           </button>

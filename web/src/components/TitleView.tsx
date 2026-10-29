@@ -48,9 +48,9 @@ export interface TitleViewProps {
 }
 
 const TAB_CLASS =
-  "min-h-11 shrink-0 rounded-control border px-4 text-small font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  "min-h-row-lg shrink-0 rounded-control border px-4 text-small font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const ROW_CLASS =
-  "flex min-h-11 w-full items-center gap-3 px-4 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent";
+  "flex min-h-row-lg w-full items-center gap-3 px-4 py-row text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent";
 
 /** Direct banner artwork. The gradient sits underneath while the image loads. */
 function BannerArt({ url }: { url: string | null }) {
@@ -160,7 +160,7 @@ export function TitleView({
   }
 
   return (
-    <section className="flex flex-col gap-8">
+    <section className="flex flex-col gap-section">
       <Link
         to={back.to ?? "/search"}
         onClick={
@@ -186,7 +186,7 @@ export function TitleView({
           <div data-testid="title-banner-scrim" className="title-banner-scrim absolute inset-0" />
         </div>
 
-        <div className="relative grid gap-6 sm:grid-cols-[180px_minmax(0,1fr)] md:pt-6">
+        <div className="relative grid gap-gutter sm:grid-cols-[180px_minmax(0,1fr)] md:pt-6">
           <div className="w-40 sm:w-full">
             <PosterArt url={title.poster_url} title={title.title} />
           </div>
@@ -258,7 +258,7 @@ export function TitleView({
             ) : null}
           </div>
           {seasons.length === 0 ? (
-            <div className="rounded-panel border border-border-subtle bg-panel px-4 py-6">
+            <div className="rounded-panel border border-border-subtle bg-panel px-panel py-gutter">
               <p className="text-h2 font-semibold tracking-tight text-fg">No episodes recorded yet</p>
               <p className="mt-1 max-w-[60ch] text-small text-fg-muted">
                 This title was added without an episode list, usually because metadata was
@@ -270,7 +270,7 @@ export function TitleView({
                     type="button"
                     disabled
                     title="Metadata refresh arrives with T-022"
-                    className="min-h-11 rounded-control border border-border-strong px-3 text-small font-semibold text-fg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                    className="min-h-control rounded-control border border-border-strong px-3 text-small font-semibold text-fg-muted disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Refresh metadata
                   </button>

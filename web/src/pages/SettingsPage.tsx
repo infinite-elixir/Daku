@@ -71,12 +71,12 @@ export function SettingsPage() {
   }
 
   return (
-    <section className="flex max-w-3xl flex-col gap-6">
+    <section className="flex max-w-3xl flex-col gap-section">
       <header>
         <h1 className="text-h1 font-bold text-fg">Settings</h1>
         <p className="mt-1 text-small text-fg-muted">Release search defaults are shared by every browser.</p>
       </header>
-      <section className="rounded-panel border border-border-subtle bg-panel p-4">
+      <section className="rounded-panel border border-border-subtle bg-panel p-panel">
         <h2 className="text-h2 font-semibold tracking-tight text-fg">Default providers</h2>
         <div className="mt-4 flex flex-col gap-4">
           {KINDS.map(({ key, label }) => (
@@ -84,7 +84,7 @@ export function SettingsPage() {
               <legend className="text-small font-semibold text-fg">{label}</legend>
               <div className="mt-2 flex flex-wrap gap-2">
                 {[...new Set([...CATALOGUE, ...selected(key)])].map((provider) => (
-                  <label key={provider} className="rounded-control border border-border-strong px-2 py-1 text-small text-fg">
+                  <label key={provider} className="inline-flex min-h-control-sm items-center rounded-control border border-border-strong px-panel-compact py-grid text-small text-fg">
                     <input type="checkbox" className="mr-1" checked={selected(key).includes(provider)} onChange={() => toggle(key, provider)} />
                     {provider}
                   </label>
@@ -96,45 +96,45 @@ export function SettingsPage() {
                   value={custom[key] ?? ""}
                   onChange={(event) => setCustom((old) => ({ ...old, [key]: event.target.value }))}
                   placeholder="Additional provider"
-                  className="min-h-8 flex-1 rounded-control border border-border-strong bg-canvas px-2 text-small text-fg"
+                  className="min-h-control flex-1 rounded-control border border-border-strong bg-canvas px-panel-compact text-small text-fg"
                 />
-                <button type="button" className="rounded-control border border-border-strong px-2 text-small" onClick={() => {
+                <button type="button" className="min-h-control-sm rounded-control border border-border-strong px-panel-compact text-small" onClick={() => {
                   const value = (custom[key] ?? "").trim().toLowerCase();
                   if (value && !selected(key).includes(value)) setProviders((old) => ({ ...old, [key]: [...selected(key), value] }));
                   setCustom((old) => ({ ...old, [key]: "" }));
                 }}>Add</button>
-                <button type="button" className="rounded-control border border-border-strong px-2 text-small" onClick={() => setProviders((old) => ({ ...old, [key]: current.config_providers[key] }))}>Reset to config</button>
+                <button type="button" className="min-h-control-sm rounded-control border border-border-strong px-panel-compact text-small" onClick={() => setProviders((old) => ({ ...old, [key]: current.config_providers[key] }))}>Reset to config</button>
               </div>
             </fieldset>
           ))}
         </div>
       </section>
-      <section className="rounded-panel border border-border-subtle bg-panel p-4">
+      <section className="rounded-panel border border-border-subtle bg-panel p-panel">
         <h2 className="text-h2 font-semibold tracking-tight text-fg">Anime sources</h2>
         <p className="mt-1 text-small text-fg-muted">Nyaa uses RSS and has stricter rate limits than Torrentio.</p>
         <div className="mt-3 flex gap-2">
           {["torrentio", "nyaa"].map((source) => (
-            <label key={source} className="rounded-control border border-border-strong px-2 py-1 text-small text-fg">
+            <label key={source} className="inline-flex min-h-control-sm items-center rounded-control border border-border-strong px-panel-compact py-grid text-small text-fg">
               <input type="checkbox" className="mr-1" checked={selectedSources.includes(source)} onChange={() => toggleSource(source)} />
               {source === "nyaa" ? "Nyaa" : "Torrentio"}
             </label>
           ))}
         </div>
       </section>
-      <section className="rounded-panel border border-border-subtle bg-panel p-4">
+      <section className="rounded-panel border border-border-subtle bg-panel p-panel">
         <h2 className="text-h2 font-semibold tracking-tight text-fg">Release search defaults</h2>
         <div className="mt-3 flex flex-wrap gap-3 text-small text-fg-muted">
-          <label>Minimum quality <select value={minQuality ?? current.min_quality ?? ""} onChange={(e) => setMinQuality(e.target.value)} className="ml-2 rounded-control border border-border-strong bg-canvas p-1 text-fg">{QUALITIES.map((value) => <option key={value} value={value}>{value || "Any"}</option>)}</select></label>
-          <label>Sort <select value={sort ?? current.sort} onChange={(e) => setSort(e.target.value as ReleaseSettings["release"]["sort"])} className="ml-2 rounded-control border border-border-strong bg-canvas p-1 text-fg">{SORTS.map((value) => <option key={value}>{value}</option>)}</select></label>
-          <label>Page size <select value={limit ?? current.limit} onChange={(e) => setLimit(Number(e.target.value))} className="ml-2 rounded-control border border-border-strong bg-canvas p-1 text-fg">{[20, 50, 100, 200].map((value) => <option key={value}>{value}</option>)}</select></label>
+          <label>Minimum quality <select value={minQuality ?? current.min_quality ?? ""} onChange={(e) => setMinQuality(e.target.value)} className="ml-2 min-h-control rounded-control border border-border-strong bg-canvas px-2 text-fg">{QUALITIES.map((value) => <option key={value} value={value}>{value || "Any"}</option>)}</select></label>
+          <label>Sort <select value={sort ?? current.sort} onChange={(e) => setSort(e.target.value as ReleaseSettings["release"]["sort"])} className="ml-2 min-h-control rounded-control border border-border-strong bg-canvas px-2 text-fg">{SORTS.map((value) => <option key={value}>{value}</option>)}</select></label>
+          <label>Page size <select value={limit ?? current.limit} onChange={(e) => setLimit(Number(e.target.value))} className="ml-2 min-h-control rounded-control border border-border-strong bg-canvas px-2 text-fg">{[20, 50, 100, 200].map((value) => <option key={value}>{value}</option>)}</select></label>
         </div>
       </section>
-      <section className="rounded-panel border border-border-subtle bg-panel p-4">
+      <section className="rounded-panel border border-border-subtle bg-panel p-panel">
         <h2 className="text-h2 font-semibold tracking-tight text-fg">Integrations</h2>
         <p className="mt-1 text-small text-fg-muted">Check qBittorrent, Jellyfin and metadata integrations on the <Link className="text-accent underline" to="/">System</Link> page.</p>
       </section>
       {mutation.error ? <p role="alert" className="text-small text-danger">{mutation.error.message}</p> : null}
-      <button type="button" disabled={!changed || mutation.isPending} onClick={() => mutation.mutate()} className="min-h-11 self-start rounded-control bg-accent px-5 text-small font-semibold text-canvas disabled:opacity-40">{mutation.isPending ? "Saving…" : "Save settings"}</button>
+      <button type="button" disabled={!changed || mutation.isPending} onClick={() => mutation.mutate()} className="min-h-control self-start rounded-control bg-accent px-panel text-small font-semibold text-canvas disabled:opacity-40">{mutation.isPending ? "Saving…" : "Save settings"}</button>
     </section>
   );
 }

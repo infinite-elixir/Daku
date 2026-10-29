@@ -15,7 +15,7 @@ import {
   type TitleSummary,
 } from "../lib/api";
 
-const GRID = "grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6";
+const GRID = "grid grid-cols-2 gap-card sm:grid-cols-4 lg:grid-cols-6";
 const SEARCH_LIMIT = 30;
 const KINDS: Kind[] = ["movie", "series", "anime"];
 
@@ -53,7 +53,7 @@ function SkeletonGrid() {
   return (
     <div className={GRID} aria-hidden data-testid="search-skeleton">
       {Array.from({ length: 12 }, (_, index) => (
-        <div key={index} className="rounded-panel border border-border-subtle bg-panel p-2">
+        <div key={index} className="rounded-panel border border-border-subtle bg-panel p-panel">
           <div className="aspect-[2/3] animate-pulse rounded-panel bg-hover" />
           <div className="mt-3 h-3 w-4/5 animate-pulse rounded bg-hover" />
           <div className="mt-2 h-3 w-2/5 animate-pulse rounded bg-hover" />
@@ -139,7 +139,7 @@ export function SearchPage() {
   }
 
   return (
-    <section className="flex flex-col gap-6">
+    <section className="flex flex-col gap-section">
       <header className="flex flex-col gap-1">
         <h1 className="text-h1 font-bold text-fg">Search</h1>
         <p className="text-small text-fg-muted">
@@ -175,7 +175,7 @@ export function SearchPage() {
       <KindTabs value={kind} onChange={(next) => updateParams({ kind: next })} />
 
       {add.error ? (
-        <p role="alert" className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3 text-small text-danger">
+        <p role="alert" className="rounded-panel border-l-2 border-danger bg-panel px-panel py-panel-compact text-small text-danger">
           Could not add the title. {add.error.message}
         </p>
       ) : null}
@@ -189,12 +189,12 @@ export function SearchPage() {
           </p>
         </div>
       ) : error ? (
-        <div className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3">
+        <div className="rounded-panel border-l-2 border-danger bg-panel px-panel py-panel-compact">
           <p className="text-small text-danger">{error.message}</p>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="mt-2 min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
+            className="mt-2 min-h-control-sm rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
           >
             Retry
           </button>

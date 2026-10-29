@@ -401,7 +401,7 @@ export function ReleasesSection({
                 aria-pressed={tab === "find"}
                 onClick={() => setTab("find")}
                 className={[
-                  "min-h-8 rounded-control px-3 text-small font-semibold",
+                  "min-h-control-sm rounded-control px-3 text-small font-semibold",
                   tab === "find" ? "bg-accent/15 text-accent" : "text-fg-muted hover:bg-hover",
                 ].join(" ")}
               >
@@ -412,7 +412,7 @@ export function ReleasesSection({
                 aria-pressed={tab === "saved"}
                 onClick={() => setTab("saved")}
                 className={[
-                  "min-h-8 rounded-control px-3 text-small font-semibold",
+                  "min-h-control-sm rounded-control px-3 text-small font-semibold",
                   tab === "saved" ? "bg-accent/15 text-accent" : "text-fg-muted hover:bg-hover",
                 ].join(" ")}
               >
@@ -447,7 +447,7 @@ export function ReleasesSection({
       {showFind && activeTab === "find" ? (
         <>
           {!isMovie && mode === "all" && seasons.length === 0 ? (
-            <p className="rounded-panel border border-border-subtle bg-panel px-4 py-6 text-small text-fg-muted">
+            <p className="rounded-panel border border-border-subtle bg-panel px-panel py-gutter text-small text-fg-muted">
               No episodes recorded yet, so there is nothing to search for.
             </p>
           ) : null}
@@ -465,7 +465,7 @@ export function ReleasesSection({
                   setMinQuality(event.target.value);
                   setLimitOverride(null);
                 }}
-                className="min-h-8 rounded-control border border-border-strong bg-canvas px-2 text-small text-fg"
+                className="min-h-control rounded-control border border-border-strong bg-canvas px-2 text-small text-fg"
               >
                 <option value="">Any</option>
                 {MIN_QUALITY_CHOICES.map((value) => (
@@ -485,7 +485,7 @@ export function ReleasesSection({
                   setSortMode(event.target.value);
                   setLimitOverride(null);
                 }}
-                className="min-h-8 rounded-control border border-border-strong bg-canvas px-2 text-small text-fg"
+                className="min-h-control rounded-control border border-border-strong bg-canvas px-2 text-small text-fg"
               >
                 {SORT_CHOICES.map((value) => (
                   <option key={value} value={value}>
@@ -496,7 +496,7 @@ export function ReleasesSection({
             </label>
 
             <details className="relative">
-              <summary className="min-h-8 cursor-pointer list-none rounded-control border border-border-strong px-3 py-1.5 text-small font-semibold text-fg hover:bg-hover">
+              <summary className="min-h-control-sm cursor-pointer list-none rounded-control border border-border-strong px-3 py-1.5 text-small font-semibold text-fg hover:bg-hover">
                 Providers ({providers === null ? "default" : effectiveProviders.length})
               </summary>
               <div className="absolute right-0 z-10 mt-1 flex w-56 flex-col gap-1 rounded-panel border border-border-strong bg-panel p-3 shadow-lg">
@@ -509,7 +509,7 @@ export function ReleasesSection({
                     storeProviderSelection(title.kind, null);
                     storage()?.removeItem("daku.releaseProviders");
                   }}
-                  className="min-h-7 rounded-control px-2 text-left text-small font-semibold text-accent hover:bg-hover"
+                  className="min-h-control-sm rounded-control px-2 text-left text-small font-semibold text-accent hover:bg-hover"
                 >
                   Use defaults
                 </button>
@@ -553,7 +553,7 @@ export function ReleasesSection({
               type="button"
               onClick={resetFindFilters}
               disabled={!filtersActive && limitOverride === null && sortMode === ""}
-              className="min-h-8 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
+              className="min-h-control-sm rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
             >
               Reset
             </button>
@@ -590,7 +590,7 @@ export function ReleasesSection({
                 ) : null}
               </div>
               {findQuery.data.releases.length === 0 ? (
-                <div className="flex flex-col gap-2 rounded-panel border border-border-subtle bg-panel px-4 py-6">
+                <div className="flex flex-col gap-2 rounded-panel border border-border-subtle bg-panel px-panel py-gutter">
                   <p className="text-small text-fg-muted">
                     {filtersActive
                       ? `No releases match${
@@ -608,7 +608,7 @@ export function ReleasesSection({
                     <button
                       type="button"
                       onClick={resetFindFilters}
-                      className="min-h-8 w-fit rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
+                      className="min-h-control-sm w-fit rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
                     >
                       Reset filters
                     </button>
@@ -624,7 +624,7 @@ export function ReleasesSection({
                   {findQuery.data.releases.map((release) => (
                     <li
                       key={release.info_hash}
-                      className="flex flex-col gap-3 px-4 py-3"
+                      className="flex flex-col gap-3 px-panel py-row"
                     >
                       <div className="flex flex-wrap items-center gap-3">
                         <div className="min-w-0 flex-1">
@@ -665,7 +665,7 @@ export function ReleasesSection({
                             aria-label={`Download ${release.filename ?? release.info_hash}`}
                             disabled={downloadMutation.isPending}
                             onClick={() => downloadMutation.mutate(release)}
-                            className="min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
+                            className="min-h-control-sm rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
                           >
                             Download
                           </button>
@@ -707,7 +707,7 @@ export function ReleasesSection({
                     type="button"
                     onClick={showMore}
                     disabled={!canShowMore}
-                    className="min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
+                    className="min-h-control-sm rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
                   >
                     Show more
                   </button>
@@ -724,7 +724,7 @@ export function ReleasesSection({
               <select
                 value={qualityFilter}
                 onChange={(event) => setQualityFilter(event.target.value)}
-                className="min-h-8 rounded-control border border-border-strong bg-canvas px-2 text-small text-fg"
+                className="min-h-control rounded-control border border-border-strong bg-canvas px-2 text-small text-fg"
               >
                 <option value="">All</option>
                 {QUALITY_CHOICES.map((value) => (
@@ -761,7 +761,7 @@ export function ReleasesSection({
             </p>
           ) : null}
           {savedQuery.data && savedQuery.data.releases.length === 0 ? (
-            <p className="rounded-panel border border-border-subtle bg-panel px-4 py-6 text-small text-fg-muted">
+            <p className="rounded-panel border border-border-subtle bg-panel px-panel py-gutter text-small text-fg-muted">
               Nothing saved yet. Star a release or paste a magnet to keep it for later.
             </p>
           ) : null}
@@ -769,7 +769,7 @@ export function ReleasesSection({
           {savedQuery.data && savedQuery.data.releases.length > 0 ? (
             <ul className="divide-y divide-border-subtle rounded-panel border border-border-subtle bg-panel">
               {savedQuery.data.releases.map((release) => (
-                <li key={release.id} className="flex flex-col gap-3 px-4 py-3">
+                <li key={release.id} className="flex flex-col gap-3 px-panel py-row">
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-body font-semibold text-fg">
@@ -806,7 +806,7 @@ export function ReleasesSection({
                                 ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
                             }
                           }}
-                          className="min-h-9 rounded-control border border-warning/50 px-3 text-small font-semibold text-warning hover:bg-warning/10"
+                          className="min-h-control-sm rounded-control border border-warning/50 px-3 text-small font-semibold text-warning hover:bg-warning/10"
                         >
                           Find another
                         </button>
@@ -826,7 +826,7 @@ export function ReleasesSection({
                         aria-label={`Download ${release.filename ?? release.info_hash}`}
                         disabled={downloadMutation.isPending}
                         onClick={() => downloadMutation.mutate(release)}
-                        className="min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
+                        className="min-h-control-sm rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
                       >
                         Download
                       </button>
@@ -862,7 +862,7 @@ export function ReleasesSection({
 
       {mode !== "find" ? (
         <form
-          className="flex flex-col gap-2 rounded-panel border border-border-subtle bg-panel px-4 py-3"
+          className="flex flex-col gap-2 rounded-panel border border-border-subtle bg-panel px-panel py-row"
           onSubmit={(event) => {
             event.preventDefault();
             if (magnet.trim() && ready) {
@@ -887,12 +887,12 @@ export function ReleasesSection({
               onChange={(event) => setMagnet(event.target.value)}
               placeholder="magnet:?xt=urn:btih:…"
               disabled={!ready}
-              className="min-h-9 min-w-0 flex-1 rounded-control border border-border-strong bg-canvas px-3 text-small text-fg placeholder:text-fg-comment disabled:opacity-60"
+              className="min-h-control-sm min-w-0 flex-1 rounded-control border border-border-strong bg-canvas px-3 text-small text-fg placeholder:text-fg-comment disabled:opacity-60"
             />
             <button
               type="submit"
               disabled={!magnet.trim() || !ready || manualMutation.isPending}
-              className="min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
+              className="min-h-control-sm rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
             >
               {manualMutation.isPending ? "Saving…" : "Save magnet"}
             </button>

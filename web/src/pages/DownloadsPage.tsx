@@ -133,7 +133,7 @@ export function DownloadsPage() {
   const failed = rows.filter(isFailedDownload);
 
   return (
-    <section className="flex flex-col gap-6">
+    <section className="flex flex-col gap-section">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h1 className="text-h1 font-bold text-fg">Downloads</h1>
@@ -165,19 +165,19 @@ export function DownloadsPage() {
       {removeError ? (
         <div
           role="alert"
-          className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3 text-small text-danger"
+          className="rounded-panel border-l-2 border-danger bg-panel px-panel py-panel-compact text-small text-danger"
         >
           {removeError}
         </div>
       ) : null}
 
       {error ? (
-        <div className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3">
+        <div className="rounded-panel border-l-2 border-danger bg-panel px-panel py-panel-compact">
           <p className="text-small text-danger">{error.message}</p>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="mt-2 min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
+            className="mt-2 min-h-control-sm rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
           >
             Retry
           </button>
@@ -192,7 +192,7 @@ export function DownloadsPage() {
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-section">
           <DownloadSection
             title="Active"
             rows={active}

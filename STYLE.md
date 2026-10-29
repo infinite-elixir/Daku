@@ -18,7 +18,8 @@ This document is normative. If a component disagrees with it, the component is w
 2. **Borders over shadows.** Separation comes from 1px lines and background steps, not
    drop shadows or glassmorphism.
 3. **Density is a feature.** The library is for browsing, not for scrolling past whitespace.
-   Use the 4px grid; prefer tighter vertical rhythm over airy marketing spacing.
+   Use the 4px grid. Density comes from compact information per card, not from cramped cards:
+   whitespace inside a card is what makes a dense page readable.
 4. **Monospace is the voice.** Caskaydia Cove carries every piece of text, headings and the
    wordmark included. Hierarchy comes from size and weight, not a second family. Respect
    Caskaydia's metrics: shorter line lengths, no faux letter-spacing, alignment over
@@ -260,8 +261,25 @@ largest step that does not crowd it.
 ### 4.1 Grid
 
 - Base unit: **4px**. Approved steps: `4, 8, 12, 16, 20, 24, 32, 40, 48, 64`.
-- Component padding: 12px (compact), 16px (default), 24px (page sections).
-- Vertical gap between sections: 24px; between related controls: 8px.
+- Components consume the named tokens from `web/src/styles/theme.css`; arbitrary spacing
+  values (`p-[13px]`, `gap-[26px]`) are banned.
+
+| Token | Value | Use |
+|---|---|---|
+| `--spacing-grid` | 4px | Base unit |
+| `--spacing-tight` | 8px | Related controls, icon + label |
+| `--spacing-panel-compact` | 12px | Nested blocks, table cells |
+| `--spacing-panel` | 16px | Cards, panels |
+| `--spacing-row` | 16px | List row vertical padding |
+| `--spacing-card` | 20px | Card grid gaps |
+| `--spacing-gutter` | 24px | Content gutters |
+| `--spacing-section` | 32px | Page sections, hero gaps |
+| `--spacing-control-sm` | 36px | Small control height |
+| `--spacing-control` | 40px | Default control height |
+| `--spacing-row-lg` | 44px | Table/tab row min height |
+
+- See §4.1 for the named spacing scale. Components consume tokens (`p-panel`,
+  `gap-section`, `py-row`, `min-h-control-sm`); arbitrary spacing values are banned.
 
 ### 4.2 App shell
 
@@ -277,8 +295,8 @@ largest step that does not crowd it.
 - Sidebar: `--bg-panel`, right border `--border-subtle`. Collapses to a top bar + drawer
   below 900px.
 - Topbar: 56px, sticky, `--bg-canvas` at 92% opacity with a 1px bottom border. No blur.
-- Content: single column by default; posters use a responsive `auto-fill` grid with
-  `minmax(140px, 1fr)` and 16px gaps.
+- Content: single column by default; poster grids use 2/4/6 responsive columns with 20px
+  gaps (`gap-card`).
 - Breakpoints: `480 / 768 / 900 / 1200 / 1440`. Mobile-first CSS.
 - Safe areas: pad for iOS notch/home indicator when installed as a PWA.
 
@@ -312,7 +330,7 @@ Each component lists its states. If a state is not listed, it does not exist yet
 
 ### 5.1 Button
 
-- Height 32px (sm) / 36px (md); padding 12px horizontal; radius 6px; `text-body-strong`.
+- Height 36px (sm) / 40px (md); padding 12px horizontal; radius 6px; `text-body-strong`.
 - **Primary:** `--accent` background, `#16161e` text (dark-on-accent for contrast),
   hover `--accent-hover`. One per view.
 - **Secondary:** transparent, `--border-strong` border, `--text-primary`; hover
@@ -327,7 +345,7 @@ Each component lists its states. If a state is not listed, it does not exist yet
 
 ### 5.2 Input / Select / Search
 
-- Height 34px; `--bg-canvas` fill; 1px `--border-subtle`; radius 6px; 10px padding.
+- Height 40px; `--bg-canvas` fill; 1px `--border-subtle`; radius 6px; 10px padding.
 - Placeholder `--text-muted`; entered text `--text-primary`.
 - Focus: border `--accent` + 2px ring at 30% opacity (do not rely on the ring alone).
 - Invalid: border `--danger`; message in `text-small` below, prefixed with `!`.
@@ -361,7 +379,7 @@ Each component lists its states. If a state is not listed, it does not exist yet
 ### 5.5 Table
 
 - Header: `text-micro` uppercase, `--text-muted`, `--bg-panel-alt`, 1px bottom border.
-- Rows: 40px min height, 1px `--border-subtle` divider, hover `--bg-hover`.
+- Rows: 44px min height, 1px `--border-subtle` divider, hover `--bg-hover`.
 - Numeric columns right-aligned with tabular numerals.
 - Sticky header inside scroll containers.
 - Empty table is not an empty box: show an empty state instead.
@@ -663,7 +681,7 @@ If you want two, you are designing a poster, not an app.
 |---|---|
 | 1 | **Palette:** Tokyo Night (`#1a1b26` surfaces, `#16161e` canvas). Not Storm/Moon. |
 | 2 | **Typography:** Caskaydia Cove Nerd Font carries every level — body, controls, metadata, IDs, headings and the wordmark. No display face, no sans anywhere. Hierarchy is size and weight only. Base body is 15/23. |
-| 3 | **Density:** 15px / 23px body, 32–36px controls, 40px table rows. |
+| 3 | **Density:** 15px / 23px body, 36/40px controls, 44px table rows (T-043). |
 | 4 | **Icons:** hybrid — inline SVG for UI, Nerd Font glyphs only for terminal-native concepts from the bundled whitelist. |
 | 5 | **Accent model:** blue is the sole action accent. Movie = orange, series = cyan, anime = purple, used only as small identity marks (badge, filter chip, detail rule, hover glow). |
 | 6 | **Font delivery:** bundled Latin subset (`web/public/fonts/caskaydia-cove-nf.woff2`) plus a curated Nerd Font glyph whitelist; `local()` tried first. |

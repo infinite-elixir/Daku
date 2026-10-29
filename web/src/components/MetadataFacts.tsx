@@ -12,7 +12,7 @@ const CHIP =
 
 function Chips({ values }: { values: string[] }) {
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex flex-wrap gap-grid">
       {values.map((value) => (
         <span key={value} className={CHIP}>
           {value}
@@ -24,7 +24,7 @@ function Chips({ values }: { values: string[] }) {
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+    <div className="flex min-w-0 flex-wrap items-baseline gap-x-tight">
       <dt className="shrink-0 text-small text-fg-comment">{label}</dt>
       <dd className="min-w-0 text-small text-fg-muted">{children}</dd>
     </div>
@@ -55,9 +55,9 @@ export function MetadataFacts({ facts }: { facts: MetadataFactsData }) {
   const extraCast = cast.length - shownCast.length;
 
   return (
-    <dl className="flex flex-col gap-2 text-small">
+    <dl className="flex flex-col gap-tight text-small">
       {genres.length > 0 ? (
-        <div className="flex flex-wrap items-baseline gap-x-2">
+        <div className="flex flex-wrap items-baseline gap-x-tight">
           <dt className="shrink-0 text-small text-fg-comment">Genres</dt>
           <dd>
             <Chips values={genres} />
@@ -73,7 +73,7 @@ export function MetadataFacts({ facts }: { facts: MetadataFactsData }) {
           <span>{shownCast.join(", ")}</span>
           {extraCast > 0 ? (
             <span
-              className="ml-1 text-fg-comment"
+              className="ml-grid text-fg-comment"
               title={cast.slice(shownCast.length).join(", ")}
             >
               +{extraCast}

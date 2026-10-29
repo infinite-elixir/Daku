@@ -37,6 +37,19 @@
   --radius-control: 6px;
   --radius-panel: 8px;
 
+  /* Spacing scale (T-043). Components consume these names, not arbitrary values. */
+  --spacing-grid: 4px;
+  --spacing-tight: 8px;
+  --spacing-panel-compact: 12px;
+  --spacing-panel: 16px;
+  --spacing-card: 20px;
+  --spacing-gutter: 24px;
+  --spacing-section: 32px;
+  --spacing-row: 16px;
+  --spacing-row-lg: 44px;
+  --spacing-control-sm: 36px;
+  --spacing-control: 40px;
+
   --text-micro: 12px;
   --text-micro--line-height: 17px;
   --text-small: 13px;

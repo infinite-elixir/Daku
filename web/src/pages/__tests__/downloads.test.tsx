@@ -133,6 +133,7 @@ describe("DownloadsPage qBittorrent 5 progress", () => {
     renderPage();
 
     await screen.findByTestId("download-row-d1");
+    expect(screen.getByTestId("download-row-d1")).toHaveClass("p-panel");
     fireEvent.click(screen.getByRole("button", { name: "Remove download" }));
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 

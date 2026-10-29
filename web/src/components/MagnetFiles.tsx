@@ -242,7 +242,7 @@ export function MagnetFiles({
               setOpen(true);
             }
           }}
-          className="min-h-8 rounded-control border border-border-strong px-2.5 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
+          className="min-h-control-sm rounded-control border border-border-strong px-panel-compact text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
         >
           {buttonLabel}
         </button>
@@ -257,7 +257,7 @@ export function MagnetFiles({
               <button
                 type="button"
                 onClick={cancel}
-                className="min-h-7 rounded-control border border-border-strong px-2 text-small font-semibold text-fg hover:bg-hover"
+                className="min-h-control-sm rounded-control border border-border-strong px-2 text-small font-semibold text-fg hover:bg-hover"
               >
                 Cancel
               </button>
@@ -278,14 +278,14 @@ export function MagnetFiles({
                 <button
                   type="button"
                   onClick={retry}
-                  className="min-h-8 rounded-control border border-border-strong px-2.5 text-small font-semibold text-fg hover:bg-hover"
+                  className="min-h-control-sm rounded-control border border-border-strong px-panel-compact text-small font-semibold text-fg hover:bg-hover"
                 >
                   Retry
                 </button>
                 <button
                   type="button"
                   onClick={cancel}
-                  className="min-h-8 rounded-control px-2.5 text-small font-semibold text-fg-muted hover:bg-hover"
+                  className="min-h-control-sm rounded-control px-panel-compact text-small font-semibold text-fg-muted hover:bg-hover"
                 >
                   Close
                 </button>
@@ -333,7 +333,7 @@ export function MagnetFiles({
                       downloadMutation.mutate(paths);
                     }
                   }}
-                  className="min-h-8 rounded-control border border-border-strong px-2.5 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
+                  className="min-h-control-sm rounded-control border border-border-strong px-panel-compact text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
                 >
                   {downloadMutation.isPending ? "Queueing…" : "Download selected"}
                 </button>

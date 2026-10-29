@@ -8,14 +8,14 @@ export function LibraryCard({ title }: { title: TitleSummary }) {
   return (
     <Link
       to={`/title/${title.id}`}
-      className={`group block rounded-panel border border-border-subtle bg-panel p-2 hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${kindGlowClass(title.kind)}`}
+      className={`group block rounded-panel border border-border-subtle bg-panel p-panel hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${kindGlowClass(title.kind)}`}
     >
       <PosterArt url={title.poster_url} title={title.title} />
-      <div className="mt-2 min-w-0">
+      <div className="mt-panel-compact min-w-0">
         <h3 className="truncate text-title font-semibold text-fg">{title.title}</h3>
         <p className="text-small text-fg-muted">{title.year ?? "Year unknown"}</p>
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-2">
+      <div className="mt-tight flex flex-wrap items-center gap-2">
         <KindBadge kind={title.kind} />
         <AvailabilityPill availability={title.availability} />
         {title.saved_release_count > 0 ? (

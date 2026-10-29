@@ -110,7 +110,7 @@ export const DownloadRow = memo(function DownloadRow({
   return (
     <article
       data-testid={`download-row-${download.id}`}
-      className="rounded-panel border border-border-subtle bg-panel p-4"
+      className="rounded-panel border border-border-subtle bg-panel p-panel"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">

@@ -92,9 +92,9 @@ export function PreviewPage() {
 
   if (!validKind) {
     return (
-      <section className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3">
+      <section className="rounded-panel border-l-2 border-danger bg-panel px-panel py-panel-compact">
         <p className="text-small text-danger">Unknown kind: {kind}</p>
-        <Link to="/search" className="mt-2 inline-flex min-h-9 items-center text-small font-semibold text-accent">
+        <Link to="/search" className="mt-2 inline-flex min-h-control-sm items-center text-small font-semibold text-accent">
           Back to search
         </Link>
       </section>
@@ -106,12 +106,12 @@ export function PreviewPage() {
 
   if (preview.error && !outage) {
     return (
-      <section className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3">
+      <section className="rounded-panel border-l-2 border-danger bg-panel px-panel py-panel-compact">
         <p className="text-small text-danger">{preview.error.message}</p>
         <button
           type="button"
           onClick={() => void preview.refetch()}
-          className="mt-2 min-h-11 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
+          className="mt-2 min-h-control rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
         >
           Retry
         </button>
@@ -143,7 +143,7 @@ export function PreviewPage() {
     libraryId !== null ? (
       <Link
         to={`/title/${libraryId}`}
-        className="inline-flex min-h-11 items-center rounded-control bg-accent px-4 text-small font-semibold text-canvas hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="inline-flex min-h-control items-center rounded-control bg-accent px-4 text-small font-semibold text-canvas hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         Open
       </Link>
@@ -165,7 +165,7 @@ export function PreviewPage() {
             anilist_id: data.anilist_id,
           })
         }
-        className="inline-flex min-h-11 items-center rounded-control bg-accent px-4 text-small font-semibold text-canvas hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="inline-flex min-h-control items-center rounded-control bg-accent px-4 text-small font-semibold text-canvas hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         {add.isPending ? "Adding…" : data.anime ? "Add as anime" : "Add to library"}
       </button>

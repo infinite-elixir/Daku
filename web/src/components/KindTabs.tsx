@@ -40,7 +40,7 @@ export function KindTabs({
             aria-pressed={selected}
             onClick={() => onChange(option.value)}
             className={[
-              "min-h-9 shrink-0 rounded-control border px-3 text-small font-semibold transition-colors",
+              "min-h-control-sm shrink-0 rounded-control border px-3 text-small font-semibold transition-colors",
               selected
                 ? SELECTED[option.value]
                 : "border-border-subtle text-fg-muted hover:bg-hover hover:text-fg",

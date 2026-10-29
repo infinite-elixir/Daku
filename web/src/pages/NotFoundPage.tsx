@@ -12,7 +12,7 @@ export function NotFoundPage() {
       </p>
       <Link
         to="/library"
-        className="mt-2 inline-flex min-h-9 items-center rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
+        className="mt-2 inline-flex min-h-control-sm items-center rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
       >
         Go to library
       </Link>

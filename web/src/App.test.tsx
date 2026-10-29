@@ -44,6 +44,14 @@ describe("App", () => {
     }
   });
 
+  it("renders the shell with the gutter and section tokens", () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
+
+    renderApp();
+
+    expect(screen.getByRole("main")).toHaveClass("px-gutter", "pt-section");
+  });
+
   it("renders the health card with the API response", async () => {
     vi.stubGlobal(
       "fetch",

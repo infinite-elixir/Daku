@@ -6,13 +6,13 @@ import { KindTabs, type KindFilter } from "../components/KindTabs";
 import { LibraryCard } from "../components/LibraryCard";
 import { listTitles, type LibraryResponse } from "../lib/api";
 
-const GRID = "grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6";
+const GRID = "grid grid-cols-2 gap-card sm:grid-cols-4 lg:grid-cols-6";
 
 function SkeletonGrid() {
   return (
     <div className={GRID} aria-hidden data-testid="library-skeleton">
       {Array.from({ length: 12 }, (_, index) => (
-        <div key={index} className="rounded-panel border border-border-subtle bg-panel p-2">
+        <div key={index} className="rounded-panel border border-border-subtle bg-panel p-panel">
           <div className="aspect-[2/3] animate-pulse rounded-panel bg-hover" />
           <div className="mt-3 h-3 w-4/5 animate-pulse rounded bg-hover" />
           <div className="mt-2 h-3 w-2/5 animate-pulse rounded bg-hover" />
@@ -37,7 +37,7 @@ function FilterChip({
       aria-pressed={active}
       onClick={onClick}
       className={[
-        "min-h-9 shrink-0 rounded-control border px-3 text-small font-semibold transition-colors",
+        "min-h-control-sm shrink-0 rounded-control border px-3 text-small font-semibold transition-colors",
         active
           ? "border-accent/50 bg-accent/15 text-accent"
           : "border-border-subtle text-fg-muted hover:bg-hover hover:text-fg",
@@ -72,7 +72,7 @@ export function LibraryPage() {
   const filtered = kind !== "all" || wantedOnly || noFileOnly;
 
   return (
-    <section className="relative flex flex-col gap-6">
+    <section className="relative flex flex-col gap-section">
       <header className="relative flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h1 className="text-h1 font-bold text-fg">Library</h1>
@@ -82,7 +82,7 @@ export function LibraryPage() {
         </div>
         <Link
           to="/search"
-          className="inline-flex min-h-9 items-center rounded-control bg-accent px-3 text-small font-semibold text-canvas hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="inline-flex min-h-control-sm items-center rounded-control bg-accent px-3 text-small font-semibold text-canvas hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           Search
         </Link>
@@ -97,12 +97,12 @@ export function LibraryPage() {
       </div>
 
       {error ? (
-        <div className="rounded-panel border-l-2 border-danger bg-panel px-4 py-3">
+        <div className="rounded-panel border-l-2 border-danger bg-panel px-panel py-panel-compact">
           <p className="text-small text-danger">{error.message}</p>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="mt-2 min-h-9 rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
+            className="mt-2 min-h-control-sm rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
           >
             Retry
           </button>
@@ -124,7 +124,7 @@ export function LibraryPage() {
           </p>
           <Link
             to="/search"
-            className="mt-4 inline-flex min-h-9 items-center rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
+            className="mt-4 inline-flex min-h-control-sm items-center rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
           >
             Search the catalogue
           </Link>
