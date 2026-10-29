@@ -152,6 +152,55 @@ async def test_a_rejected_selection_fails_with_the_stable_code(
     assert row.progress == 0.0
 
 
+class AdoptingSelectionEngine(SelectionEngine):
+    """A qBittorrent that already knows the torrent (finished pack re-selection)."""
+
+    async def poll(self, external_ids: Sequence[str]) -> dict[str, EngineStatus]:
+        return {
+            external_id: EngineStatus(
+                external_id=external_id,
+                status="complete",
+                progress=1.0,
+                downloaded_bytes=100,
+                total_bytes=100,
+            )
+            for external_id in external_ids
+        }
+
+
+async def test_a_finished_pack_requeued_for_another_episode_is_adopted_and_reselected(
+    db: tuple[Any, Any], settings: Settings
+) -> None:
+    _engine, factory = db
+    download_id = _queued(factory)
+    with factory() as session:
+        downloads_repo.update_download(
+            session,
+            download_id,
+            status="queued",
+            selected_files_json="[5]",
+            file_match_json=json.dumps(
+                {
+                    "reason": "S02E06 exact",
+                    "file_paths": ["Show.S02E06.1080p.mkv"],
+                    "total_files": 12,
+                }
+            ),
+        )
+    engine = AdoptingSelectionEngine()
+    engine.effective = [5]
+    worker = Worker(factory, settings, {"qbittorrent": engine}, auto_inspect=False)
+
+    await worker.tick()
+
+    row = _row(factory, download_id)
+    assert row.status == "active"
+    assert row.selected_files_json == "[5]"
+    # The existing torrent is reused instead of adding the magnet again.
+    assert engine.added == []
+    assert engine.selections == [(HASH, [5], ["Show.S02E06.1080p.mkv"])]
+
+
 async def test_five_selection_failures_stop_retrying(
     db: tuple[Any, Any], settings: Settings
 ) -> None:

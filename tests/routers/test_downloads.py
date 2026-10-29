@@ -331,6 +331,206 @@ def test_a_rejected_live_reselection_restores_priorities_and_returns_409(
     assert row.selected_files_json == "[4]"
 
 
+def test_a_finished_pack_can_download_the_next_episode(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, settings = app_client
+    _install(client, FakeProbe())
+    release_id, first_episode_id = _seed(client)
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        release = releases_repo.get_release(session, release_id)
+        assert release is not None
+        second = episodes_repo.create_episode(
+            session, title_id=release.title_id, season=2, episode=6, name="Next"
+        )
+        second_episode_id = second.id
+        row = downloads_repo.create_download(
+            session,
+            source="torrent",
+            engine="qbittorrent",
+            external_id=HASH,
+            release_id=release_id,
+            status="complete",
+            save_path=str(settings.downloads_dir),
+            selected_files_json="[4]",
+            file_match_json='{"file_paths": ["Show.S02E05.1080p.mkv"]}',
+        )
+        download_id = row.id
+        media = media_repo.create_media_file(
+            session,
+            title_id=release.title_id,
+            episode_id=first_episode_id,
+            download_id=row.id,
+            src_path=str(settings.downloads_dir / "Show.S02E05.1080p.mkv"),
+            is_primary=True,
+        )
+        first_media_id = media.id
+
+    response = client.post(
+        "/api/downloads",
+        json={"release_id": release_id, "episode_id": second_episode_id},
+    )
+
+    assert response.status_code == 202, response.text
+    body = response.json()
+    assert body["id"] == download_id
+    assert body["status"] == "queued"
+    assert body["selected_files"] == [5]
+    assert body["selection_label"] == "S02E06 only"
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        rows = downloads_repo.list_downloads(session)
+        assert [item.id for item in rows] == [download_id]
+        assert rows[0].selected_files_json == "[5]"
+        # The first episode stays owned by the torrent, so the row can list both.
+        kept = media_repo.get_media_file(session, first_media_id)
+        assert kept is not None
+        assert kept.download_id == download_id
+        assert kept.episode_id == first_episode_id
+    assert [item["episode_label"] for item in body["downloaded_files"]] == ["S02E05"]
+
+
+def test_downloading_an_episode_that_is_already_available_is_a_duplicate(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, settings = app_client
+    _install(client, FakeProbe())
+    release_id, episode_id = _seed(client)
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        release = releases_repo.get_release(session, release_id)
+        assert release is not None
+        row = downloads_repo.create_download(
+            session,
+            source="torrent",
+            engine="qbittorrent",
+            external_id=HASH,
+            release_id=release_id,
+            status="complete",
+            save_path=str(settings.downloads_dir),
+            selected_files_json="[4]",
+            file_match_json='{"file_paths": ["Show.S02E05.1080p.mkv"]}',
+        )
+        media_repo.create_media_file(
+            session,
+            title_id=release.title_id,
+            episode_id=episode_id,
+            download_id=row.id,
+            src_path=str(settings.downloads_dir / "Show.S02E05.1080p.mkv"),
+        )
+        download_id = row.id
+
+    response = client.post(
+        "/api/downloads",
+        json={"release_id": release_id, "episode_id": episode_id},
+    )
+
+    assert response.status_code == 409, response.text
+    body = response.json()
+    assert body["code"] == "DOWNLOAD_ALREADY_TRACKED"
+    assert "already in your library" in body["message"]
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        row = downloads_repo.get_download(session, download_id)
+    assert row is not None
+    assert row.status == "complete"
+    assert row.selected_files_json == "[4]"
+
+
+def test_downloads_payload_lists_every_episode_the_torrent_downloaded(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, settings = app_client
+    release_id, first_episode_id = _seed(client)
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        release = releases_repo.get_release(session, release_id)
+        assert release is not None
+        second = episodes_repo.create_episode(
+            session, title_id=release.title_id, season=2, episode=6, name="Next"
+        )
+        row = downloads_repo.create_download(
+            session,
+            source="torrent",
+            engine="qbittorrent",
+            external_id=HASH,
+            release_id=release_id,
+            status="complete",
+            save_path=str(settings.downloads_dir),
+            selected_files_json="[5]",
+            file_match_json='{"file_paths": ["Show.S02E06.1080p.mkv"]}',
+        )
+        folder = settings.downloads_dir / "Show.S02"
+        media_repo.create_media_file(
+            session,
+            title_id=release.title_id,
+            episode_id=first_episode_id,
+            download_id=row.id,
+            src_path=str(folder / "Show.S02E05.1080p.mkv"),
+        )
+        media_repo.create_media_file(
+            session,
+            title_id=release.title_id,
+            episode_id=second.id,
+            download_id=row.id,
+            src_path=str(folder / "Show.S02E06.1080p.mkv"),
+        )
+
+    response = client.get("/api/downloads")
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert [entry["episode_label"] for entry in item["downloaded_files"]] == [
+        "S02E05",
+        "S02E06",
+    ]
+    assert [entry["file_name"] for entry in item["downloaded_files"]] == [
+        "Show.S02E05.1080p.mkv",
+        "Show.S02E06.1080p.mkv",
+    ]
+
+
+def test_downloads_payload_recovers_episodes_detached_before_t042(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, settings = app_client
+    release_id, first_episode_id = _seed(client)
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        release = releases_repo.get_release(session, release_id)
+        assert release is not None
+        second = episodes_repo.create_episode(
+            session, title_id=release.title_id, season=2, episode=6, name="Next"
+        )
+        folder = settings.downloads_dir / "Show.S02"
+        row = downloads_repo.create_download(
+            session,
+            source="torrent",
+            engine="qbittorrent",
+            external_id=HASH,
+            release_id=release_id,
+            status="complete",
+            save_path=str(settings.downloads_dir),
+            selected_files_json="[5]",
+            file_match_json='{"file_paths": ["Show.S02E06.1080p.mkv"]}',
+        )
+        # The old requeue path detached the previous episode instead of keeping it.
+        media_repo.create_media_file(
+            session,
+            title_id=release.title_id,
+            episode_id=first_episode_id,
+            download_id=None,
+            src_path=str(folder / "Show.S02E05.1080p.mkv"),
+        )
+        media_repo.create_media_file(
+            session,
+            title_id=release.title_id,
+            episode_id=second.id,
+            download_id=row.id,
+            src_path=str(folder / "Show.S02E06.1080p.mkv"),
+        )
+
+    response = client.get("/api/downloads")
+
+    entries = response.json()["items"][0]["downloaded_files"]
+    assert [entry["episode_label"] for entry in entries] == ["S02E05", "S02E06"]
+
+
 class FakeRemoveEngine:
     def __init__(self, error: Exception | None = None) -> None:
         self.error = error

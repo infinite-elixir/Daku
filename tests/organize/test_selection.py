@@ -138,6 +138,50 @@ async def test_stale_unselected_files_on_disk_are_ignored(
     assert [Path(item.src_path).name for item in files] == ["Show.S02E05.mkv"]
 
 
+async def test_a_later_episode_does_not_delete_the_earlier_episode_rows(
+    db: tuple[Any, sessionmaker[Session]], tmp_path: Path
+) -> None:
+    _engine, factory = db
+    root = tmp_path / "downloads"
+    make_file(root / "Show.S02E05.mkv", 120 * MB)
+    make_file(root / "Show.S02E06.mkv", 140 * MB)
+    _title_id, episodes, download = _series(factory, root)
+
+    with factory() as session:
+        downloads_repo.update_download(
+            session,
+            download.id,
+            selected_files_json="[0]",
+            file_match_json=json.dumps(
+                {"episode_id": episodes[5], "file_paths": ["Show.S02E05.mkv"]}
+            ),
+        )
+        row = downloads_repo.get_download(session, download.id)
+        assert row is not None
+        await select.inspect_download(session, row, probe_fn=_probe)
+
+        # The same download row is reused for the next episode.
+        downloads_repo.update_download(
+            session,
+            download.id,
+            selected_files_json="[1]",
+            file_match_json=json.dumps(
+                {"episode_id": episodes[6], "file_paths": ["Show.S02E06.mkv"]}
+            ),
+        )
+        row = downloads_repo.get_download(session, download.id)
+        assert row is not None
+        await select.inspect_download(session, row, probe_fn=_probe)
+        files = media_repo.list_by_download(session, row.id)
+
+    assert [Path(item.src_path).name for item in files] == [
+        "Show.S02E05.mkv",
+        "Show.S02E06.mkv",
+    ]
+    assert [item.episode_id for item in files] == [episodes[5], episodes[6]]
+    assert sum(1 for item in files if item.is_primary) == 1
+
+
 async def test_engine_indices_are_used_when_paths_were_not_recorded(
     db: tuple[Any, sessionmaker[Session]], tmp_path: Path
 ) -> None:

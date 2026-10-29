@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+from pathlib import Path
 from typing import Annotated, Any
 
 import httpx
@@ -22,6 +23,7 @@ from daku.db import get_session
 from daku.errors import AppError
 from daku.models import Download
 from daku.repositories import downloads as downloads_repo
+from daku.repositories import media_files as media_files_repo
 from daku.repositories import releases as releases_repo
 from daku.services.downloads_view import download_payload
 from daku.services.engines.aria2 import is_torrent_url
@@ -35,6 +37,9 @@ router = APIRouter(prefix="/api", tags=["downloads"])
 SIZE_PROBE_TIMEOUT_SECONDS = 3.0
 TERMINAL_STATUSES = frozenset({"cancelled", "available", "organizing"})
 RETRYABLE_STATUSES = frozenset({"failed", "cancelled"})
+# A download that has finished transferring. The row is keyed by info-hash, so a
+# finished pack may be asked for another episode later without a new row.
+FINISHED_STATUSES = frozenset({"complete", "available"})
 
 DUPLICATE_CODE = "DOWNLOAD_ALREADY_TRACKED"
 
@@ -235,6 +240,64 @@ def _selection_size(match: dict[str, Any], selection: Selection) -> int | None:
     return total or None
 
 
+def _file_name(raw: str) -> str:
+    return Path(raw.replace("\\", "/")).name.casefold()
+
+
+def _requested_files_already_present(
+    session: Session,
+    release: Any,
+    selection: Selection,
+    episode_id: str | None,
+) -> bool:
+    """Is what this request asks for already sitting in the library?
+
+    Files are compared by name when the request names them, because a finished
+    season pack keeps its already-organised episodes on disk while the user asks
+    for the next one.
+    """
+
+    rows = media_files_repo.list_by_title(session, release.title_id)
+    if not rows:
+        return False
+    if selection.paths:
+        wanted = {_file_name(path) for path in selection.paths}
+        return any(_file_name(row.src_path) in wanted for row in rows)
+    if episode_id:
+        return any(row.episode_id == episode_id for row in rows)
+    return True
+
+
+def _restart_finished(
+    request: Request,
+    session: Session,
+    row: Download,
+    selection: Selection,
+) -> dict[str, Any]:
+    """Reuse a finished download row for another file from the same torrent.
+
+    The row is keyed by info-hash, so it cannot be recreated. Its existing
+    ``media_files`` rows stay attached: the row represents the torrent and keeps
+    every episode that torrent has produced (T-042). The engine entry is left in
+    place so the worker can adopt it instead of re-adding the magnet.
+    """
+
+    updated = downloads_repo.update_download(
+        session,
+        row.id,
+        status="queued",
+        progress=0.0,
+        downloaded_bytes=0,
+        speed_bps=None,
+        eta_seconds=None,
+        error=None,
+    )
+    payload = _payload(session, updated or row)
+    payload.update(selection.to_dict())
+    _publish(request, "download.updated", payload)
+    return payload
+
+
 @router.post("/downloads/preview")
 async def preview_selection(
     body: PreviewSelectionRequest,
@@ -366,6 +429,25 @@ async def start_download(
         )
 
     selection = await _resolve(request, session, release, body)
+    requested_episode_id = body.episode_id or release.episode_id
+    existing = downloads_repo.find_by_external_id(
+        session, engine="qbittorrent", external_id=(release.info_hash or "").lower()
+    )
+
+    # A finished download whose requested file is already in the library is a real
+    # duplicate. A finished pack asked for a different episode is not: that row is
+    # reused below with the new selection.
+    if (
+        existing is not None
+        and existing.status in FINISHED_STATUSES
+        and _requested_files_already_present(session, release, selection, requested_episode_id)
+    ):
+        response.status_code = 409
+        payload = _payload(session, existing)
+        payload.update(selection.to_dict())
+        payload["code"] = DUPLICATE_CODE
+        payload["message"] = _duplicate_message(existing.status)
+        return payload
 
     settings = request.app.state.settings
     previous_selection, previous_files_json, previous_match_json = _current_selection(
@@ -389,6 +471,13 @@ async def start_download(
         # The release was downloaded before and either failed or was cancelled.
         # Pressing Download again is a retry, not a duplicate.
         payload = await _requeue_existing(request, session, result.download, selection)
+        response.status_code = 202
+        return payload
+
+    if result.download.status in FINISHED_STATUSES:
+        # Same torrent, a different file/episode. Keep the completed media rows
+        # and let the worker re-apply the selection on the adopted torrent.
+        payload = _restart_finished(request, session, result.download, selection)
         response.status_code = 202
         return payload
 

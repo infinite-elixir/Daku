@@ -76,6 +76,42 @@ describe("DownloadRow selective downloads", () => {
     expect(screen.getByText("Whole pack")).toBeInTheDocument();
   });
 
+  it("lists every episode this torrent has already downloaded", () => {
+    render(
+      <DownloadRow
+        download={record({
+          status: "complete",
+          progress: 1,
+          downloaded_files: [
+            {
+              id: "m1",
+              episode_id: "e1",
+              episode_label: "S01E01",
+              file_name: "Cyberpunk.S01E01.mkv",
+              size_bytes: 900_000_000,
+              is_primary: false,
+            },
+            {
+              id: "m2",
+              episode_id: "e2",
+              episode_label: "S01E02",
+              file_name: "Cyberpunk.S01E02.mkv",
+              size_bytes: 1_100_000_000,
+              is_primary: true,
+            },
+          ],
+        })}
+        onAction={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Downloaded")).toBeInTheDocument();
+    expect(screen.getByText("S01E01")).toBeInTheDocument();
+    expect(screen.getByText("S01E02")).toBeInTheDocument();
+    expect(screen.getByText("S01E01").getAttribute("title")).toContain("Cyberpunk.S01E01.mkv");
+  });
+
   it("confirms before removing and defaults the file-delete checkbox off", () => {
     const onRemove = vi.fn();
     render(<DownloadRow download={record()} onAction={vi.fn()} onRemove={onRemove} />);

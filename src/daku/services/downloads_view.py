@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from daku.models import Download, Episode, Title
+from daku.models import Download, Episode, MediaFile, Title
+from daku.repositories import media_files as media_files_repo
 from daku.repositories import releases as releases_repo
 
 
@@ -44,6 +46,57 @@ def _selection_label(
     if isinstance(total, int) and total > 0:
         return f"File {first} of {total}"
     return f"{len(selected)} files"
+
+
+def _downloaded_files(
+    session: Session,
+    row: Download,
+    release: Any,
+) -> list[dict[str, Any]]:
+    """Every file this torrent has produced, including earlier selections.
+
+    A download row is keyed by info-hash and may be reused for another episode of
+    the same pack (T-042). Rows written before that change detached the previous
+    episode's media row instead of keeping it; those orphans are picked up again
+    when they share a folder with a file this download still owns.
+    """
+
+    attached = media_files_repo.list_by_download(session, row.id)
+    parents = {Path(item.src_path).parent for item in attached if item.src_path}
+    rows: list[MediaFile] = list(attached)
+    if release is not None and parents:
+        for candidate in media_files_repo.list_by_title(session, release.title_id):
+            if (
+                candidate.download_id is None
+                and candidate.src_path
+                and Path(candidate.src_path).parent in parents
+            ):
+                rows.append(candidate)
+
+    seen: set[str] = set()
+    payload: list[tuple[tuple[int, int, str], dict[str, Any]]] = []
+    for item in rows:
+        key = item.src_path.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        episode = session.get(Episode, item.episode_id) if item.episode_id else None
+        name = Path(item.src_path).name
+        entry = {
+            "id": item.id,
+            "episode_id": item.episode_id,
+            "episode_label": _label(episode) if episode is not None else None,
+            "file_name": name,
+            "size_bytes": item.size_bytes,
+            "is_primary": item.is_primary,
+        }
+        if episode is None:
+            order = (9999, 9999, name.casefold())
+        else:
+            order = (episode.season, episode.episode, name.casefold())
+        payload.append((order, entry))
+
+    return [entry for _order, entry in sorted(payload, key=lambda pair: pair[0])]
 
 
 def download_payload(session: Session, row: Download) -> dict[str, Any]:
@@ -97,4 +150,5 @@ def download_payload(session: Session, row: Download) -> dict[str, Any]:
         "file_match": match,
         "selection_label": _selection_label(selected, match, episode),
         "selection_size_bytes": selected_size,
+        "downloaded_files": _downloaded_files(session, row, release),
     }

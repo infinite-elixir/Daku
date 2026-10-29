@@ -167,6 +167,11 @@ Resolution order: environment → `~/.config/daku/config.json` → defaults.
 - `downloads.engine` is `qbittorrent`, `aria2`, or `local` (same-host Telegram file copy).
   `downloads.external_id` is the qBittorrent info-hash, the aria2 GID, or the Telegram
   `message_id` respectively. `UNIQUE(engine, external_id)` prevents double-tracking.
+  Because of that key, a finished season pack keeps **one** download row: asking for another
+  episode reuses the row, replaces the selection and lets the worker re-apply file priorities
+  on the adopted torrent. The row keeps every `media_files` file it has produced and exposes
+  them as `downloaded_files`; re-inspection replaces only the files being inspected. A request
+  is a duplicate only when the requested file/episode is already in `media_files` (T-042).
 - `telegram_messages` is keyed by `(channel_id, message_id)`; `file_unique_id` is the dedupe key.
 - T-005 adds `anime_mappings` and `anime_mapping_overrides` (migration v2).
   T-006 adds `titles.folder_name` and the partial unique indexes on `imdb_id`/`anilist_id`

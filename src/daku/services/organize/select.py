@@ -409,7 +409,13 @@ async def inspect_download(
         )
 
     primary = select_primary(valid)
-    media_repo.delete_by_download(session, download.id)
+    # Re-inspection is idempotent for the files being inspected now, but rows from
+    # earlier episodes fetched by the same torrent must survive: one download row
+    # accumulates every file it has produced (T-042).
+    current_paths = {str(candidate.path) for candidate in valid}
+    for existing in media_repo.list_by_download(session, download.id):
+        if existing.src_path in current_paths:
+            media_repo.delete_media_file(session, existing.id)
 
     rows: list[MediaFile] = []
     for candidate in valid:

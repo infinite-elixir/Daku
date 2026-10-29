@@ -58,7 +58,7 @@ function RowButton({
       type="button"
       onClick={() => onAction(id, action)}
       className={[
-        "min-h-8 rounded-control border px-3 text-small font-semibold transition-colors",
+        "min-h-control-sm rounded-control border px-3 text-small font-semibold transition-colors",
         primary
           ? "border-accent/50 bg-accent/15 text-accent hover:bg-accent/25"
           : "border-border-subtle text-fg-muted hover:bg-hover hover:text-fg",
@@ -106,6 +106,7 @@ export const DownloadRow = memo(function DownloadRow({
           download.episode_label ?? "the selected files"
         }. Nothing is downloading.`
       : download.error;
+  const downloadedFiles = download.downloaded_files ?? [];
 
   return (
     <article
@@ -145,6 +146,22 @@ export const DownloadRow = memo(function DownloadRow({
             {download.quality ? <span>{download.quality}</span> : null}
             <span>{download.engine === "aria2" ? "Direct" : "Torrent"}</span>
           </p>
+          {downloadedFiles.length > 0 ? (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1 text-micro">
+              <span className="text-fg-comment">Downloaded</span>
+              {downloadedFiles.map((file) => (
+                <span
+                  key={file.id}
+                  title={`${file.file_name}${
+                    file.size_bytes ? ` · ${formatBytes(file.size_bytes)}` : ""
+                  }`}
+                  className="max-w-[22ch] truncate rounded-full bg-hover px-2 py-0.5 font-medium text-fg-muted"
+                >
+                  {file.episode_label ?? file.file_name}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           {download.status === "active" ? (
@@ -164,7 +181,7 @@ export const DownloadRow = memo(function DownloadRow({
             onClick={() => setConfirmingRemove(true)}
             aria-label="Remove download"
             title="Remove download"
-            className="inline-flex min-h-8 items-center gap-1.5 rounded-control border border-border-subtle px-2.5 text-small font-semibold text-fg-muted hover:bg-hover hover:text-danger"
+            className="inline-flex min-h-control-sm items-center gap-1.5 rounded-control border border-border-subtle px-panel-compact text-small font-semibold text-fg-muted hover:bg-hover hover:text-danger"
           >
             <svg
               aria-hidden
