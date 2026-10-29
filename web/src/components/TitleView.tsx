@@ -52,24 +52,29 @@ const TAB_CLASS =
 const ROW_CLASS =
   "flex min-h-11 w-full items-center gap-3 px-4 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent";
 
-/** Direct banner artwork, with a gradient fallback when there is no wide art. */
+/** Direct banner artwork. The gradient sits underneath while the image loads. */
 function BannerArt({ url }: { url: string | null }) {
   const [failed, setFailed] = useState(false);
-
-  if (!url || failed) {
-    return <div data-testid="title-banner-gradient" className="banner-fallback h-full w-full" />;
-  }
+  // React 18 does not know the camelCase prop; spreading keeps it lowercase in the DOM.
+  const highPriority = { fetchpriority: "high" } as Record<string, string>;
 
   return (
-    <img
-      data-testid="title-banner-image"
-      src={url}
-      alt=""
-      draggable={false}
-      decoding="async"
-      onError={() => setFailed(true)}
-      className="h-full w-full object-cover object-center"
-    />
+    <div data-testid="title-banner-gradient" className="banner-fallback relative h-full w-full">
+      {url && !failed ? (
+        <img
+          data-testid="title-banner-image"
+          src={url}
+          alt=""
+          width={1280}
+          height={720}
+          draggable={false}
+          decoding="async"
+          {...highPriority}
+          onError={() => setFailed(true)}
+          className="absolute inset-0 h-full w-full object-cover object-center"
+        />
+      ) : null}
+    </div>
   );
 }
 

@@ -111,6 +111,11 @@ describe("TitlePage banner", () => {
       "src",
       "https://images.metahub.space/background/tt1234567/medium.jpg",
     );
+    expect(image).toHaveAttribute("fetchpriority", "high");
+    expect(image).toHaveAttribute("decoding", "async");
+    expect(image).toHaveAttribute("width", "1280");
+    // The gradient sits underneath while the remote image loads.
+    expect(screen.getByTestId("title-banner-gradient")).toHaveClass("banner-fallback");
     expect(screen.queryByTestId("title-banner-art")).not.toBeInTheDocument();
 
     const scrim = screen.getByTestId("title-banner-scrim");
