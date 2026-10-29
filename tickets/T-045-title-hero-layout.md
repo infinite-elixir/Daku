@@ -128,7 +128,9 @@ single inline `<dl>` row and `showCounters={false}` hides them in the preview. O
 `MetadataFacts` moved outside the hero into a `title-facts-scope`: from 900px container width
 the overview stays capped at `68ch` on the left and the facts stack vertically on the right;
 below 900px they stack with a `--spacing-section` gap, so the description is no longer flush
-against the facts. The skeleton mirrors both regions and the hero is a labelled `<section>`.
+against the facts. The wide banner art is a full-bleed backdrop that starts above the poster
+and fades into the canvas, so it no longer reads as a rounded card sharing the poster's
+margin. The skeleton mirrors both regions and the hero is a labelled `<section>`.
 
 Tests: `web/src/components/__tests__/title-view.test.tsx` (new),
 `web/src/pages/__tests__/title-page.test.tsx` (skeleton) and

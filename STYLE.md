@@ -305,6 +305,8 @@ content container, not the viewport.
   they stack in that order with a `--spacing-section` gap. Facts are never spread as a
   horizontal row of columns.
 - The 2px detail rule belongs to the hero, not the title block: one rule per page.
+- Wide banner art is a full-bleed backdrop, not a rounded card: it breaks past the content
+  gutters, begins above the poster, and fades into the canvas on the left, bottom and top.
 
 ### 4.2 App shell
 

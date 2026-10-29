@@ -117,7 +117,7 @@ describe("TitlePage banner", () => {
     const banner = screen.getByTestId("title-banner");
     expect(banner).toBeInTheDocument();
     expect(banner).toHaveAttribute("aria-hidden", "true");
-    expect(banner).toHaveClass("title-banner-strip", "h-[300px]");
+    expect(banner).toHaveClass("title-banner-strip", "title-banner-bleed", "h-[300px]");
 
     const image = screen.getByTestId("title-banner-image");
     expect(image).toHaveAttribute(

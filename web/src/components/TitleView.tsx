@@ -182,7 +182,7 @@ export function TitleView({
       <div className="relative">
         <div
           data-testid="title-banner"
-          className="title-banner-strip title-banner-art pointer-events-none absolute inset-x-0 top-0 h-[300px] overflow-hidden rounded-panel"
+          className="title-banner-strip title-banner-art title-banner-bleed pointer-events-none absolute h-[300px] overflow-hidden"
           aria-hidden
         >
           <BannerArt url={bannerUrl} />
