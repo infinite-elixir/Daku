@@ -30,8 +30,7 @@
   --color-rating-metacritic: var(--rating-metacritic);
 
   --font-sans:
-    "Caskaydia Cove NF", "CaskaydiaCove Nerd Font Mono", "JetBrainsMono Nerd Font",
-    ui-monospace, "SFMono-Regular", Menlo, monospace;
+    "Poppins", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: var(--font-sans);
 
   --radius-control: 6px;

@@ -20,10 +20,9 @@ This document is normative. If a component disagrees with it, the component is w
 3. **Density is a feature.** The library is for browsing, not for scrolling past whitespace.
    Use the 4px grid. Density comes from compact information per card, not from cramped cards:
    whitespace inside a card is what makes a dense page readable.
-4. **Monospace is the voice.** Caskaydia Cove carries every piece of text, headings and the
-   wordmark included. Hierarchy comes from size and weight, not a second family. Respect
-   Caskaydia's metrics: shorter line lengths, no faux letter-spacing, alignment over
-   indentation tricks.
+4. **One family, disciplined type.** Poppins carries every piece of text, headings and the
+   wordmark included. Hierarchy comes from size and weight, not a second family. Keep line
+   lengths readable and alignment deliberate; no faux letter-spacing on body copy.
 5. **States are visible.** Queued, active, failed, available must be distinguishable by
    text and icon, never colour alone.
 6. **No decorative animation.** Motion only explains a state change or a spatial
@@ -165,52 +164,29 @@ Focus ring: 2px `--accent`, 2px offset, visible on all interactive elements.
 
 ### 3.1 Family
 
-Body, UI and headings: **Caskaydia Cove Nerd Font** (Cascadia Code derivative, patched).
-There is **no display face**. Headings and the wordmark use the same family and separate
-themselves by size and weight only.
+Body, UI and headings: **Poppins** (geometric sans, Google Fonts). There is **no display
+face**. Headings and the wordmark use the same family and separate themselves by size and
+weight only.
 
-Caskaydia is monospaced. Treat every label as if it were code: alignment is free, awkward
-line-breaks are not.
+Poppins is proportional. Use the type scale for hierarchy; do not fake spacing with letter
+tracking, and do not switch to a second family for headings.
 
 ```css
-@font-face {
-  font-family: "Caskaydia Cove NF";
-  src:
-    local("CaskaydiaCove Nerd Font"),
-    local("Caskaydia Cove Nerd Font"),
-    url("/fonts/caskaydia-cove-nf.woff2") format("woff2");
-  font-weight: 300 700;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
-  --font-sans: "Caskaydia Cove NF", "CaskaydiaCove Nerd Font Mono",
-    "JetBrainsMono Nerd Font", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-sans: "Poppins", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  --font-mono: var(--font-sans);
 }
 ```
 
-- **Delivery (decided):** bundle a Latin subset at
-  `web/public/fonts/caskaydia-cove-nf.woff2`, with `local()` first so machines that
-  already have the Nerd Font installed pay nothing.
-
-- **Subset recipe:** Basic Latin, Latin-1 punctuation and the curated Nerd Font
-  codepoints listed in `web/src/styles/glyph-codepoints.txt` (the hybrid icon whitelist),
-  weight axis 300–700. Build once and commit the result:
-
-  ```bash
-  pyftsubset CaskaydiaCoveNerdFont-Regular.ttf \
-    --unicodes-file=web/src/styles/glyph-codepoints.txt \
-    --layout-features='kern,liga,calt' \
-    --flavor=woff2 \
-    --output-file=web/public/fonts/caskaydia-cove-nf.woff2
-  ```
-
-- If a Nerd Font glyph is missing from the subset, the component must fall back to an
-  inline SVG. A tofu box is a release blocker.
-- Disable ligatures for identifiers: hashes, paths, versions, IMDb ids, file sizes.
-  `font-variant-ligatures: none` on `.font-data`.
-- Fallback is always a monospace family. Never let the UI fall back to a sans-serif.
+- **Delivery:** self-hosted via the `@fontsource/poppins` package, imported from
+  `web/src/main.tsx` for weights 400, 500, 600 and 700 (Latin subset). No runtime request to
+  Google Fonts.
+- Numeric values keep `tabular-nums` where alignment matters; Poppins supplies the glyphs,
+  the utility supplies the spacing.
+- Identifiers (hashes, paths, versions, IMDb ids, file sizes) may still use
+  `font-variant-ligatures: none` on `.font-data`; they no longer rely on a monospace family.
+- Fallback is the system sans stack. Never let the UI fall back to a serif.
 
 ### 3.2 Scale
 
@@ -232,7 +208,7 @@ by roughly 1px in T-033; `text-display` and `text-mega` did not change.
 Rules:
 
 - Max two weights per view: 400 and 600. Reserve 700 for `h1` and the wordmark.
-- **Hierarchy is size and weight, not family.** Every heading is Caskaydia. `h1` is
+- **Hierarchy is size and weight, not family.** Every heading is Poppins. `h1` is
   `text-h1` 700, section `h2` and dialog titles are `text-h2` 600, card `h3` is `text-title`
   600. Do not shrink a heading into body size to save space; step the level down instead
   (`text-h2` → `text-title`). Large headings may use `tracking-tight`; never faux
@@ -249,7 +225,7 @@ Rules:
 
 ### 3.3 Wordmark
 
-`Daku` set in Caskaydia, `text-h2`, weight 700, sentence case, `tracking-tight`,
+`Daku` set in Poppins, `text-h2`, weight 700, sentence case, `tracking-tight`,
 `--text-primary`, with a single leading glyph (`󰐊`/`▸`) in `--accent` if an icon is wanted.
 No subtitle in the wordmark itself. The topbar keeps its 56px height: `text-h2` is the
 largest step that does not crowd it.
@@ -552,8 +528,8 @@ Tokens live in `web/src/styles/theme.css` and are imported once by `index.css`.
   --color-rating-rt: var(--rating-rt);
   --color-rating-metacritic: var(--rating-metacritic);
 
-  --font-sans: "Caskaydia Cove NF", "CaskaydiaCove Nerd Font Mono",
-    "JetBrainsMono Nerd Font", ui-monospace, monospace;
+  --font-sans: "Poppins", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
   --font-mono: var(--font-sans);
 
   --radius-control: 6px;
@@ -597,7 +573,7 @@ Tokens live in `web/src/styles/theme.css` and are imported once by `index.css`.
 A small, sanctioned borrow from Marathon's poster and broadcast identity: acid lime,
 oversized condensed lettering, registration crosses, hazard bands, ticker rails and
 technical microcopy. It is seasoning — **at most ~10% of any screen** — applied on top of
-Tokyo Night and Caskaydia. The app must still read as a media librarian, not a game menu.
+Tokyo Night and Poppins. The app must still read as a media librarian, not a game menu.
 
 ### 11.1 Borrow / don't borrow
 
@@ -646,12 +622,12 @@ labels separating them.
 
 ### 11.4 Wordmark
 
-The brand is set in Caskaydia (§3.3) or uses the condensed SVG asset
+The brand is set in Poppins (§3.3) or uses the condensed SVG asset
 at `web/src/assets/daku-wordmark.svg`. The SVG is built from condensed, bevel-cornered
 letterforms so it does not depend on a font. Either form may be set in `--volt`,
 `--text-primary` or knocked out of a volt block, and may bleed off the left or bottom
 edge on splash/404 only. It is never a clickable control and never appears inside tables
-or dialogs. The topbar wordmark uses Caskaydia at `text-h2`, weight 700.
+or dialogs. The topbar wordmark uses Poppins at `text-h2`, weight 700.
 
 ### 11.5 Glitch
 
@@ -708,16 +684,16 @@ If you want two, you are designing a poster, not an app.
 | # | Decision |
 |---|---|
 | 1 | **Palette:** Tokyo Night (`#1a1b26` surfaces, `#16161e` canvas). Not Storm/Moon. |
-| 2 | **Typography:** Caskaydia Cove Nerd Font carries every level — body, controls, metadata, IDs, headings and the wordmark. No display face, no sans anywhere. Hierarchy is size and weight only. Base body is 15/23. |
+| 2 | **Typography:** Poppins carries every level — body, controls, metadata, IDs, headings and the wordmark. No display face, no second family. Hierarchy is size and weight only. Base body is 15/23. |
 | 3 | **Density:** 15px / 23px body, 36/40px controls, 44px table rows (T-043). |
 | 4 | **Icons:** hybrid — inline SVG for UI, Nerd Font glyphs only for terminal-native concepts from the bundled whitelist. |
 | 5 | **Accent model:** blue is the sole action accent. Movie = orange, series = cyan, anime = purple, used only as small identity marks (badge, filter chip, detail rule, hover glow). |
-| 6 | **Font delivery:** bundled Latin subset (`web/public/fonts/caskaydia-cove-nf.woff2`) plus a curated Nerd Font glyph whitelist; `local()` tried first. |
+| 6 | **Font delivery:** self-hosted `@fontsource/poppins` weights 400/500/600/700, imported by the SPA; no runtime Google Fonts request. |
 | 7 | **Shell:** desktop sidebar (232px) that collapses to a drawer below 900px; mobile inherits the same navigation. |
 | 8 | **Panels:** flat `--bg-panel` with a 1px `--border-subtle`; no shadows except overlays and the poster-card hover glow (§14.3). |
 | 9 | **Marathon layer:** allowed as a ~10% broadcast accent on brand/empty/error/progress moments only; never in forms, tables, settings or dialogs. |
 | 10 | **Volt:** `#c8ff3c`, four placements only — wordmark/splash, empty/404 rule or numeral, active-download progress fill, optional library hero ticker. Never buttons or status. |
-| 11 | **Wordmark:** set in Caskaydia (`text-h2`, 700) or the condensed SVG asset; no display face. |
+| 11 | **Wordmark:** set in Poppins (`text-h2`, 700) or the condensed SVG asset; no display face. |
 | 12 | **Graphic devices:** one per section — registration crosses *or* hazard band *or* index numeral. Glitch is hover-only and reduced-motion aware. |
 
 ---
