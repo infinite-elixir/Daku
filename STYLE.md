@@ -281,6 +281,30 @@ largest step that does not crowd it.
 - See §4.1 for the named spacing scale. Components consume tokens (`p-panel`,
   `gap-section`, `py-row`, `min-h-control-sm`); arbitrary spacing values are banned.
 
+### 4.1.1 Title hero
+
+The title page has one hero: poster and identity are a single object, measured against the
+content container, not the viewport.
+
+| Container width | Layout | Poster |
+|---|---|---|
+| < 720px | single column: poster block, identity, actions | capped at 160px, never full-bleed |
+| 720–1023px | two columns, `180px minmax(0, 1fr)` | 180px |
+| ≥ 1024px | two columns, `220px minmax(0, 1fr)` | 220px |
+
+- The grid uses container queries (`@container`) with a viewport media-query fallback for
+  browsers without `container-type`. The breakpoint is **container** width: 720px is the
+  hero's own width, so the same component works in the preview and in a future split view.
+- The identity column is `flex flex-col`; its action row is the last child with `mt-auto`, so
+  the actions sit on the poster's bottom edge at any amount of metadata. One action bar only.
+  Below 720px that row spans the full width and its buttons share it equally.
+- Poster aspect is always 2:3 and never stretched. The identity order is badges, `h1`,
+  year/ids, ratings, counters (one inline `<dl>` row), actions.
+- Overview (capped at `68ch`) and facts are full width below the hero, never inside the
+  identity column. Facts are one column below 720px, two columns from 720px and auto-fill
+  (minimum 220px) from 1024px.
+- The 2px detail rule belongs to the hero, not the title block: one rule per page.
+
 ### 4.2 App shell
 
 ```
@@ -309,7 +333,8 @@ largest step that does not crowd it.
 | Pills, avatars | 999px |
 | Banners / media artwork | 8px |
 
-Borders are always `1px solid`; never 2px except focus rings and active tabs.
+Borders are always `1px solid`; never 2px except focus rings, active tabs and the
+detail-page identity rule (§2.4).
 
 ### 4.4 Elevation
 

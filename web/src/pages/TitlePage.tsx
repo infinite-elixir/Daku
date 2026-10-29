@@ -18,12 +18,38 @@ import {
 
 function TitleSkeleton() {
   return (
-    <div className="grid gap-gutter sm:grid-cols-[180px_minmax(0,1fr)]" aria-hidden>
-      <div className="aspect-[2/3] animate-pulse rounded-panel bg-hover" />
-      <div className="flex flex-col gap-3">
-        <div className="h-8 w-2/3 animate-pulse rounded bg-hover" />
-        <div className="h-4 w-1/3 animate-pulse rounded bg-hover" />
-        <div className="h-20 w-full animate-pulse rounded bg-hover" />
+    <div className="flex flex-col gap-section" data-testid="title-skeleton" aria-hidden>
+      <div className="title-hero-scope">
+        <div className="title-hero grid grid-cols-1 gap-gutter border-l-2 border-border-strong pl-3 @min-[720px]:grid-cols-[180px_minmax(0,1fr)] @min-[1024px]:grid-cols-[minmax(160px,220px)_minmax(0,1fr)]">
+          <div
+            data-testid="title-skeleton-poster"
+            className="title-hero-poster aspect-[2/3] animate-pulse rounded-panel bg-hover"
+          />
+          <div
+            data-testid="title-skeleton-identity"
+            className="flex min-w-0 flex-col gap-3"
+          >
+            <div className="h-5 w-40 animate-pulse rounded bg-hover" />
+            <div className="h-8 w-2/3 animate-pulse rounded bg-hover" />
+            <div className="h-4 w-1/3 animate-pulse rounded bg-hover" />
+            <div className="h-6 w-2/5 animate-pulse rounded bg-hover" />
+            <div className="h-4 w-1/2 animate-pulse rounded bg-hover" />
+            <div className="mt-auto flex flex-wrap gap-2 pt-1">
+              <div className="h-control w-28 animate-pulse rounded-control bg-hover" />
+              <div className="h-control w-28 animate-pulse rounded-control bg-hover" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="title-facts-scope">
+        <div
+          data-testid="title-skeleton-facts"
+          className="title-facts grid grid-cols-1 gap-panel @min-[720px]:grid-cols-2 @min-[1024px]:grid-cols-[repeat(auto-fill,minmax(220px,1fr))]"
+        >
+          <div className="h-16 animate-pulse rounded-panel bg-hover" />
+          <div className="h-16 animate-pulse rounded-panel bg-hover" />
+          <div className="h-16 animate-pulse rounded-panel bg-hover" />
+        </div>
       </div>
     </div>
   );

@@ -45,6 +45,8 @@ export interface TitleViewProps {
   renderEpisodeExpanded?: (episode: Episode) => ReactNode;
   emptyEpisodesAction?: ReactNode;
   notices?: ReactNode;
+  /** Library-only counters (saved releases, episodes, folder). Hidden in a preview. */
+  showCounters?: boolean;
 }
 
 const TAB_CLASS =
@@ -90,6 +92,7 @@ export function TitleView({
   renderEpisodeExpanded,
   emptyEpisodesAction,
   notices,
+  showCounters = true,
 }: TitleViewProps) {
   const seasons = useMemo(
     () =>
@@ -186,63 +189,88 @@ export function TitleView({
           <div data-testid="title-banner-scrim" className="title-banner-scrim absolute inset-0" />
         </div>
 
-        <div className="relative grid gap-gutter sm:grid-cols-[180px_minmax(0,1fr)] md:pt-6">
-          <div className="w-40 sm:w-full">
-            <PosterArt url={title.poster_url} title={title.title} />
-          </div>
-
-        <div className="flex min-w-0 flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <KindBadge kind={title.kind} />
-            <AvailabilityPill availability={title.availability} />
-            {title.wanted ? (
-              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-micro font-medium text-accent">
-                Wanted
-              </span>
-            ) : null}
-          </div>
-
-          <div className="border-l-2 border-border-strong pl-3">
-            <h1 className="line-clamp-2 break-words text-h1 font-bold text-fg">{title.title}</h1>
-            <p className="text-small text-fg-muted">
-              {title.year ?? "Year unknown"}
-              {title.imdb_id ? ` · ${title.imdb_id}` : ""}
-              {title.anilist_id ? ` · AniList ${title.anilist_id}` : ""}
-            </p>
-          </div>
-
-          {notices}
-
-          <RatingsRow ratings={metadata ?? {}} />
-
-          <ExpandableText text={title.overview} />
-
-          {metadata ? <MetadataFacts facts={metadata} /> : null}
-
-          <dl className="flex flex-wrap gap-x-6 gap-y-2 text-small">
-            <div>
-              <dt className="text-fg-comment">Saved releases</dt>
-              <dd className="font-semibold text-fg">{title.saved_release_count}</dd>
+        <div className="title-hero-scope relative">
+          <div className="relative mb-gutter empty:hidden">{notices}</div>
+          <section
+            data-testid="title-hero"
+            aria-labelledby="title-heading"
+            className="title-hero grid grid-cols-1 gap-gutter border-l-2 border-border-strong pl-3 @min-[720px]:grid-cols-[180px_minmax(0,1fr)] @min-[1024px]:grid-cols-[minmax(160px,220px)_minmax(0,1fr)]"
+          >
+            <div data-testid="title-poster" className="title-hero-poster">
+              <PosterArt url={title.poster_url} title={title.title} />
             </div>
-            {!isMovie ? (
-              <div>
-                <dt className="text-fg-comment">Episodes</dt>
-                <dd className="font-semibold text-fg">
-                  {title.available_episode_count}/{title.episode_count}
-                </dd>
-              </div>
-            ) : null}
-            {title.folder_name ? (
-              <div>
-                <dt className="text-fg-comment">Folder</dt>
-                <dd className="break-all font-semibold text-fg">{title.folder_name}</dd>
-              </div>
-            ) : null}
-          </dl>
 
-          {actions ? <div className="flex flex-wrap items-center gap-2 pt-1">{actions}</div> : null}
+            <div data-testid="title-identity" className="flex min-w-0 flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <KindBadge kind={title.kind} />
+                <AvailabilityPill availability={title.availability} />
+                {title.wanted ? (
+                  <span className="rounded-full bg-accent/15 px-2 py-0.5 text-micro font-medium text-accent">
+                    Wanted
+                  </span>
+                ) : null}
+              </div>
+
+              <div>
+                <h1
+                  id="title-heading"
+                  className="line-clamp-2 break-words text-h1 font-bold text-fg"
+                >
+                  {title.title}
+                </h1>
+                <p className="text-small text-fg-muted">
+                  {title.year ?? "Year unknown"}
+                  {title.imdb_id ? ` · ${title.imdb_id}` : ""}
+                  {title.anilist_id ? ` · AniList ${title.anilist_id}` : ""}
+                </p>
+              </div>
+
+              <RatingsRow ratings={metadata ?? {}} />
+
+              {showCounters ? (
+                <dl
+                  data-testid="title-counters"
+                  className="title-counters flex flex-wrap items-baseline gap-x-tight gap-y-1 text-small"
+                >
+                  <div className="flex items-baseline gap-1">
+                    <dt className="text-fg-comment">Saved releases</dt>
+                    <dd className="font-semibold text-fg">{title.saved_release_count}</dd>
+                  </div>
+                  {!isMovie ? (
+                    <div className="flex items-baseline gap-1">
+                      <dt className="text-fg-comment">Episodes</dt>
+                      <dd className="font-semibold text-fg">
+                        {title.available_episode_count}/{title.episode_count}
+                      </dd>
+                    </div>
+                  ) : null}
+                  {title.folder_name ? (
+                    <div className="flex min-w-0 items-baseline gap-1">
+                      <dt className="text-fg-comment">Folder</dt>
+                      <dd className="min-w-0 break-all font-semibold text-fg">
+                        {title.folder_name}
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
+              ) : null}
+
+              {actions ? (
+                <div
+                  data-testid="title-actions"
+                  className="title-hero-actions mt-auto flex flex-wrap items-center gap-2 pt-1"
+                >
+                  {actions}
+                </div>
+              ) : null}
+            </div>
+          </section>
         </div>
-        </div>
+      </div>
+
+      <div data-testid="title-facts-scope" className="title-facts-scope">
+        <ExpandableText text={title.overview} />
+        {metadata ? <MetadataFacts facts={metadata} /> : null}
       </div>
 
       {!isMovie ? (

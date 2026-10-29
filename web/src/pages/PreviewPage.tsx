@@ -203,6 +203,7 @@ export function PreviewPage() {
     <TitleView
       title={data}
       metadata={data}
+      showCounters={false}
       back={{ label: "← Search", onClick: () => navigate(-1) }}
       actions={
         <>

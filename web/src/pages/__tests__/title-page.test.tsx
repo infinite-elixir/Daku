@@ -97,6 +97,19 @@ describe("TitlePage banner", () => {
     vi.restoreAllMocks();
   });
 
+  it("reserves the hero and facts regions while loading", async () => {
+    renderTitle(makeTitle());
+
+    const skeleton = screen.getByTestId("title-skeleton");
+    expect(skeleton).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByTestId("title-skeleton-poster")).toHaveClass("title-hero-poster");
+    expect(screen.getByTestId("title-skeleton-identity")).toHaveClass("flex", "flex-col");
+    expect(screen.getByTestId("title-skeleton-facts")).toHaveClass("title-facts");
+
+    await screen.findByRole("heading", { level: 1, name: "Big Buck Bunny" });
+    expect(screen.queryByTestId("title-skeleton")).not.toBeInTheDocument();
+  });
+
   it("renders the wide banner image directly with a mandatory bottom-up scrim", async () => {
     renderTitle(makeTitle());
 

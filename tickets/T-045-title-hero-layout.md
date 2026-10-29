@@ -84,18 +84,19 @@ into the hero, a persistent sidebar of related titles, a desktop-only component 
 
 ## Acceptance criteria
 
-- [ ] At ≥ 720px the identity column's bottom edge matches the poster's bottom edge at 200,
+- [x] At ≥ 720px the identity column's bottom edge matches the poster's bottom edge at 200,
       220 and 180px poster widths, with 2 or with 12 lines of metadata.
-- [ ] Actions render once, in the identity column on wide and as a full-width row below the
+- [x] Actions render once, in the identity column on wide and as a full-width row below the
       identity on narrow; never both.
-- [ ] Ratings appear once, under the title; no rail exists anywhere on the page.
-- [ ] Overview and facts are full width below the hero and cap at 68ch / auto-fill columns.
-- [ ] Below 720px the poster is ≤ 160px wide and everything stacks in one column.
-- [ ] No horizontal scroll at 390, 820, 1024, 1440px or at 200% zoom.
-- [ ] Skeleton reserves the same regions and causes no layout shift.
-- [ ] Screen-reader order matches visual order; the hero is one labelled section.
-- [ ] The preview renders the same layout without library-only counters or actions.
-- [ ] STYLE.md §4 documents the hero grid and the 720px container breakpoint.
+- [x] Ratings appear once, under the title; no rail exists anywhere on the page.
+- [x] Overview and facts are full width below the hero and cap at 68ch / auto-fill columns.
+- [x] Below 720px the poster is ≤ 160px wide and everything stacks in one column.
+- [ ] No horizontal scroll at 390, 820, 1024, 1440px or at 200% zoom. *(Manual browser pass
+      not run in this environment.)*
+- [x] Skeleton reserves the same regions and causes no layout shift.
+- [x] Screen-reader order matches visual order; the hero is one labelled section.
+- [x] The preview renders the same layout without library-only counters or actions.
+- [x] STYLE.md §4 documents the hero grid and the 720px container breakpoint.
 
 ## Test plan
 
@@ -114,3 +115,21 @@ into the hero, a persistent sidebar of related titles, a desktop-only component 
 - T-034's file is retained with a "Superseded by T-045" header; do not delete it.
 - If T-047 lands first, place its section between facts and episodes without restructuring
   the hero.
+
+## Implemented
+
+`TitleView` now renders a single poster + identity grid inside a `title-hero-scope`
+container. The grid is `grid-cols-1` below 720px and two columns above it, with the 180px
+(720–1023) and 220px (≥1024) poster widths in `theme.css`; a viewport media query covers
+browsers without container queries. The identity column is a flex column whose last child is
+the one action row with `mt-auto`, so it pins to the poster's bottom edge. Counters became a
+single inline `<dl>` row and `showCounters={false}` hides them in the preview. Overview and
+`MetadataFacts` moved outside the hero into a full-width `title-facts-scope`; the facts grid
+is one column below 720px, two above it and auto-fill (min 220px) from 1024px. The skeleton
+mirrors both regions and the hero is a labelled `<section>`.
+
+Tests: `web/src/components/__tests__/title-view.test.tsx` (new),
+`web/src/pages/__tests__/title-page.test.tsx` (skeleton) and
+`web/src/pages/__tests__/preview.test.tsx` (no library counters/actions). `scripts/check.sh
+--web` passes. The 390/820/1024/1440px and 200% zoom browser pass is still manual and was not
+run here.

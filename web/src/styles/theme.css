@@ -168,6 +168,85 @@ body {
   background: linear-gradient(to top, rgba(12, 14, 20, 0.95), transparent);
 }
 
+/* Title hero (T-045). The poster and identity are one object: the identity column
+   stretches to the poster's height and pins its actions to the bottom edge. */
+.title-hero-scope,
+.title-facts-scope {
+  container-type: inline-size;
+}
+
+.title-hero-poster {
+  width: min(160px, 100%);
+  max-width: 220px;
+}
+
+.title-counters > div + div::before {
+  content: "·";
+  color: var(--color-fg-comment);
+}
+
+@container (min-width: 720px) {
+  .title-hero {
+    padding-top: var(--spacing-gutter);
+  }
+
+  .title-hero-poster {
+    width: 180px;
+  }
+}
+
+@container (min-width: 1024px) {
+  .title-hero-poster {
+    width: 220px;
+  }
+}
+
+@container (max-width: 719px) {
+  .title-hero-actions {
+    width: 100%;
+  }
+
+  .title-hero-actions > :is(button, a) {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+}
+
+/* Viewport fallback for browsers without container queries. */
+@supports not (container-type: inline-size) {
+  @media (min-width: 720px) {
+    .title-hero {
+      grid-template-columns: 180px minmax(0, 1fr);
+      padding-top: var(--spacing-gutter);
+    }
+
+    .title-hero-poster {
+      width: 180px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .title-hero {
+      grid-template-columns: minmax(160px, 220px) minmax(0, 1fr);
+    }
+
+    .title-hero-poster {
+      width: 220px;
+    }
+  }
+
+  @media (max-width: 719px) {
+    .title-hero-actions {
+      width: 100%;
+    }
+
+    .title-hero-actions > :is(button, a) {
+      flex: 1 1 0;
+      justify-content: center;
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

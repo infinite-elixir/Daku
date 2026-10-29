@@ -55,7 +55,7 @@ export function MetadataFacts({ facts }: { facts: MetadataFactsData }) {
   const extraCast = cast.length - shownCast.length;
 
   return (
-    <dl className="flex flex-col gap-tight text-small">
+    <dl className="title-facts grid grid-cols-1 gap-panel text-small @min-[720px]:grid-cols-2 @min-[1024px]:grid-cols-[repeat(auto-fill,minmax(220px,1fr))]">
       {genres.length > 0 ? (
         <div className="flex flex-wrap items-baseline gap-x-tight">
           <dt className="shrink-0 text-small text-fg-comment">Genres</dt>

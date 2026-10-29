@@ -155,8 +155,30 @@ describe("PreviewPage", () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/releases"))).toBe(false);
   });
 
-  it("shows Open when the title is already in the library", async () => {
+  it("uses the same hero without library counters or library actions", async () => {
     vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse(
+          makePreview({
+            saved_release_count: 4,
+            available_episode_count: 2,
+          }),
+        ),
+      ),
+    );
+
+    renderPreview("/preview/series/imdb/tt0944947");
+
+    expect(await screen.findByTestId("title-hero")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Game of Thrones" })).toBeInTheDocument();
+    expect(screen.queryByTestId("title-counters")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Mark wanted" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Fix metadata" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add to library" })).toBeInTheDocument();
+  });
+
+  it("shows Open when the title is already in the library", async () => {    vi.stubGlobal(
       "fetch",
       vi.fn(async () => jsonResponse(makePreview({ library_title_id: "lib-1", id: "lib-1" }))),
     );
