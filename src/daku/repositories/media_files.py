@@ -3,12 +3,56 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
+from pathlib import Path
+from stat import S_ISREG
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from daku.models import MediaFile
 from daku.utils import new_id, utc_now_iso
+
+
+def usable_path(row: MediaFile) -> Path | None:
+    """The path availability should inspect: library copy first, then download copy."""
+
+    raw = row.lib_path or row.src_path
+    return Path(raw) if raw else None
+
+
+def is_present(row: MediaFile) -> bool:
+    """Whether the recorded file is a regular file with the expected size."""
+
+    path = usable_path(row)
+    if path is None:
+        return False
+    try:
+        info = path.stat()
+    except (OSError, ValueError):
+        return False
+    if not S_ISREG(info.st_mode):
+        return False
+    return not (row.size_bytes is not None and info.st_size != row.size_bytes)
+
+
+def set_playback(
+    session: Session,
+    media_file_id: str,
+    position_s: float,
+    duration_s: float | None,
+) -> MediaFile | None:
+    """Record the host player's position for a media file. Idempotent per call."""
+
+    row = session.get(MediaFile, media_file_id)
+    if row is None:
+        return None
+    row.playback_position_s = max(0.0, float(position_s))
+    if duration_s is not None and duration_s > 0:
+        row.playback_duration_s = float(duration_s)
+    row.playback_updated_at = utc_now_iso()
+    session.commit()
+    return row
 
 
 def create_media_file(
@@ -66,6 +110,28 @@ def list_by_download(session: Session, download_id: str) -> list[MediaFile]:
 
 def list_by_title(session: Session, title_id: str) -> list[MediaFile]:
     return list(session.scalars(select(MediaFile).where(MediaFile.title_id == title_id)))
+
+
+def list_by_titles(session: Session, title_ids: Iterable[str]) -> list[MediaFile]:
+    ids = list(dict.fromkeys(title_ids))
+    if not ids:
+        return []
+    return list(session.scalars(select(MediaFile).where(MediaFile.title_id.in_(ids))))
+
+
+def list_all(session: Session) -> list[MediaFile]:
+    return list(session.scalars(select(MediaFile)))
+
+
+def reconcile_title(session: Session, title_id: str) -> tuple[int, int]:
+    """Delete only media rows whose file no longer exists; never touch disk."""
+
+    rows = list_by_title(session, title_id)
+    missing_ids = [row.id for row in rows if not is_present(row)]
+    if missing_ids:
+        session.execute(delete(MediaFile).where(MediaFile.id.in_(missing_ids)))
+        session.commit()
+    return len(missing_ids), len(rows) - len(missing_ids)
 
 
 def _clear_siblings(session: Session, row: MediaFile) -> None:

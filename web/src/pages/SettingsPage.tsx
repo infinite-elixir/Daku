@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { getSettings, patchSettings, type Kind, type ReleaseSettings } from "../lib/api";
+import { RELEASE_SOURCES } from "../lib/releaseSources";
 
 const KINDS: Array<{ key: Kind; label: string }> = [
   { key: "movie", label: "Movies" },
@@ -25,22 +26,33 @@ export function SettingsPage() {
   const [limit, setLimit] = useState<number | null>(null);
   const [animeSources, setAnimeSources] = useState<string[] | null>(null);
   const [custom, setCustom] = useState<Partial<Record<Kind, string>>>({});
+  const [mpvEnabled, setMpvEnabled] = useState<boolean | null>(null);
 
   const current = settings.data?.release;
+  const player = settings.data?.player;
   const selected = (kind: Kind) => providers[kind] ?? current?.providers[kind] ?? [];
   const changed = useMemo(
-    () => Object.keys(providers).length > 0 || minQuality !== null || sort !== null || limit !== null || animeSources !== null,
-    [providers, minQuality, sort, limit, animeSources],
+    () =>
+      Object.keys(providers).length > 0 ||
+      minQuality !== null ||
+      sort !== null ||
+      limit !== null ||
+      animeSources !== null ||
+      mpvEnabled !== null,
+    [providers, minQuality, sort, limit, animeSources, mpvEnabled],
   );
   const mutation = useMutation({
     mutationFn: () =>
-      patchSettings({
-        ...(Object.keys(providers).length ? { providers } : {}),
-        ...(minQuality !== null ? { min_quality: minQuality || null } : {}),
-        ...(sort !== null ? { sort } : {}),
-        ...(limit !== null ? { limit } : {}),
-        ...(animeSources !== null ? { anime_sources: animeSources } : {}),
-      }),
+      patchSettings(
+        {
+          ...(Object.keys(providers).length ? { providers } : {}),
+          ...(minQuality !== null ? { min_quality: minQuality || null } : {}),
+          ...(sort !== null ? { sort } : {}),
+          ...(limit !== null ? { limit } : {}),
+          ...(animeSources !== null ? { anime_sources: animeSources } : {}),
+        },
+        mpvEnabled !== null ? { mpv_enabled: mpvEnabled } : undefined,
+      ),
     onSuccess: (value) => {
       queryClient.setQueryData(["settings"], value);
       void queryClient.invalidateQueries({ queryKey: ["release-options"] });
@@ -49,6 +61,7 @@ export function SettingsPage() {
       setSort(null);
       setLimit(null);
       setAnimeSources(null);
+      setMpvEnabled(null);
     },
   });
 
@@ -62,7 +75,7 @@ export function SettingsPage() {
       : [...selected(kind), provider];
     setProviders((old) => ({ ...old, [kind]: next }));
   }
-  const selectedSources = animeSources ?? settings.data?.sources.anime_sources ?? ["torrentio", "nyaa"];
+  const selectedSources = animeSources ?? settings.data?.sources.anime_sources ?? ["torrentio", "animetosho"];
   function toggleSource(source: string) {
     const next = selectedSources.includes(source)
       ? selectedSources.filter((item) => item !== source)
@@ -111,12 +124,12 @@ export function SettingsPage() {
       </section>
       <section className="rounded-panel border border-border-subtle bg-panel p-panel">
         <h2 className="text-h2 font-semibold tracking-tight text-fg">Anime sources</h2>
-        <p className="mt-1 text-small text-fg-muted">Nyaa uses RSS and has stricter rate limits than Torrentio.</p>
-        <div className="mt-3 flex gap-2">
-          {["torrentio", "nyaa"].map((source) => (
-            <label key={source} className="inline-flex min-h-control-sm items-center rounded-control border border-border-strong px-panel-compact py-grid text-small text-fg">
-              <input type="checkbox" className="mr-1" checked={selectedSources.includes(source)} onChange={() => toggleSource(source)} />
-              {source === "nyaa" ? "Nyaa" : "Torrentio"}
+        <p className="mt-1 text-small text-fg-muted">AnimeTosho aggregates anime torrents and is rate-limited; Torrentio covers the rest. Search status shows these as numbered sources.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {RELEASE_SOURCES.map((source, index) => (
+            <label key={source.id} className="inline-flex min-h-control-sm items-center rounded-control border border-border-strong px-panel-compact py-grid text-small text-fg">
+              <input type="checkbox" className="mr-1" checked={selectedSources.includes(source.id)} onChange={() => toggleSource(source.id)} />
+              {index + 1} · {source.label}
             </label>
           ))}
         </div>
@@ -127,6 +140,31 @@ export function SettingsPage() {
           <label>Minimum quality <select value={minQuality ?? current.min_quality ?? ""} onChange={(e) => setMinQuality(e.target.value)} className="ml-2 min-h-control rounded-control border border-border-strong bg-canvas px-2 text-fg">{QUALITIES.map((value) => <option key={value} value={value}>{value || "Any"}</option>)}</select></label>
           <label>Sort <select value={sort ?? current.sort} onChange={(e) => setSort(e.target.value as ReleaseSettings["release"]["sort"])} className="ml-2 min-h-control rounded-control border border-border-strong bg-canvas px-2 text-fg">{SORTS.map((value) => <option key={value}>{value}</option>)}</select></label>
           <label>Page size <select value={limit ?? current.limit} onChange={(e) => setLimit(Number(e.target.value))} className="ml-2 min-h-control rounded-control border border-border-strong bg-canvas px-2 text-fg">{[20, 50, 100, 200].map((value) => <option key={value}>{value}</option>)}</select></label>
+        </div>
+      </section>
+      <section className="rounded-panel border border-border-subtle bg-panel p-panel">
+        <h2 className="text-h2 font-semibold tracking-tight text-fg">Player</h2>
+        <p className="mt-1 text-small text-fg-muted">
+          Launch a filed file in the host&apos;s own mpv. The toggle is saved for this
+          installation; the binary is read from <code>mpv_bin</code> in{" "}
+          <code>config.json</code> or <code>DAKU_MPV_BIN</code>.
+        </p>
+        <div className="mt-3 flex flex-col gap-3 text-small">
+          <label className="inline-flex items-center gap-2 text-fg">
+            <input
+              type="checkbox"
+              checked={mpvEnabled ?? player?.mpv_enabled ?? false}
+              onChange={(event) => setMpvEnabled(event.target.checked)}
+            />
+            Launch downloaded files in mpv
+          </label>
+          <div>
+            <span className="text-fg-muted">mpv binary</span>
+            <p className="mt-0.5 font-mono text-fg">{player?.mpv_bin ?? "mpv"}</p>
+            <p className="mt-0.5 text-micro text-fg-muted">
+              {player?.mpv_path ?? "Not found on PATH or as an absolute path"}
+            </p>
+          </div>
         </div>
       </section>
       <section className="rounded-panel border border-border-subtle bg-panel p-panel">

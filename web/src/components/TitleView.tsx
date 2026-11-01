@@ -3,8 +3,16 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { seasonLabel, episodesForSeason, seasonNumbers } from "../lib/episodes";
-import type { Availability, Episode, Kind, SeasonInfo, TitleMetadata } from "../lib/api";
+import type {
+  Availability,
+  Episode,
+  Kind,
+  SeasonInfo,
+  TitleFilesResponse,
+  TitleMetadata,
+} from "../lib/api";
 import { AvailabilityPill, EpisodeStatusPill, KindBadge } from "./Pills";
+import { DownloadedFiles } from "./DownloadedFiles";
 import { ExpandableText } from "./ExpandableText";
 import { MetadataFacts } from "./MetadataFacts";
 import { PosterArt } from "./PosterArt";
@@ -25,6 +33,7 @@ export interface TitleViewData {
   saved_release_count: number;
   episode_count: number;
   available_episode_count: number;
+  missing_file_count?: number;
   episodes: Episode[];
   seasons?: SeasonInfo[];
 }
@@ -37,6 +46,8 @@ export interface TitleViewProps {
   actions?: ReactNode;
   /** Release UI for a library title. `null` renders a metadata-only preview. */
   releases?: ReactNode;
+  /** Files already on disk. Omit on a metadata-only preview. */
+  files?: TitleFilesResponse | null;
   selected?: Episode | null;
   onSelectEpisode?: (episode: Episode) => void;
   /** Called when switching seasons should close the currently open card. */
@@ -47,6 +58,9 @@ export interface TitleViewProps {
   notices?: ReactNode;
   /** Library-only counters (saved releases, episodes, folder). Hidden in a preview. */
   showCounters?: boolean;
+  /** Explicit repair for media rows whose file was removed outside Daku. */
+  onCleanupMissing?: () => void;
+  cleanupPending?: boolean;
 }
 
 const TAB_CLASS =
@@ -86,6 +100,7 @@ export function TitleView({
   back,
   actions,
   releases,
+  files = null,
   selected = null,
   onSelectEpisode,
   onCollapse,
@@ -93,6 +108,8 @@ export function TitleView({
   emptyEpisodesAction,
   notices,
   showCounters = true,
+  onCleanupMissing,
+  cleanupPending = false,
 }: TitleViewProps) {
   const seasons = useMemo(
     () =>
@@ -111,6 +128,7 @@ export function TitleView({
   );
   const tabRefs = useRef(new Map<number, HTMLButtonElement>());
   const isMovie = title.kind === "movie";
+  const missingFiles = title.missing_file_count ?? 0;
   // Prefer real wide art so the banner is not a hard crop of a 2:3 poster.
   const bannerUrl = title.banner_url ?? metadata?.banner_url ?? title.poster_url;
 
@@ -204,6 +222,27 @@ export function TitleView({
               <div className="flex flex-wrap items-center gap-2">
                 <KindBadge kind={title.kind} />
                 <AvailabilityPill availability={title.availability} />
+                {missingFiles > 0 ? (
+                  <span
+                    data-testid="title-missing-files"
+                    className="inline-flex items-center gap-1 text-micro font-medium text-warning"
+                  >
+                    {missingFiles} {missingFiles === 1 ? "file" : "files"} missing
+                    {onCleanupMissing ? (
+                      <>
+                        <span aria-hidden>·</span>
+                        <button
+                          type="button"
+                          disabled={cleanupPending}
+                          onClick={onCleanupMissing}
+                          className="font-semibold underline underline-offset-2 hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {cleanupPending ? "Cleaning…" : "Clean up"}
+                        </button>
+                      </>
+                    ) : null}
+                  </span>
+                ) : null}
                 {title.wanted ? (
                   <span className="rounded-full bg-accent/15 px-2 py-0.5 text-micro font-medium text-accent">
                     Wanted
@@ -423,6 +462,15 @@ export function TitleView({
             </>
           )}
         </section>
+      ) : null}
+
+      {files !== null && files.file_count > 0 ? (
+        <DownloadedFiles
+          files={files}
+          titleKind={title.kind}
+          posterUrl={title.poster_url}
+          activeSeason={activeSeason}
+        />
       ) : null}
 
       {releases}

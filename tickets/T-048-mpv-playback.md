@@ -28,7 +28,7 @@ from Daku. Every click ends in a browser download prompt or nothing at all.
 
 ### Settings
 
-- `mpv_enabled: bool = false` (config file / env, exposed read-only to the UI).
+- `mpv_enabled: bool = true` (config file / env default; the Settings page persists an override).
 - `mpv_bin: str = "mpv"` — a bare command resolved with `shutil.which` or an absolute path.
 - Both appear on the Settings page: a toggle and a path field with the resolved binary
   shown underneath.
@@ -100,19 +100,19 @@ the *client* machine, Jellyfin playback links, a player in the browser.
 
 ## Acceptance criteria
 
-- [ ] With `mpv_enabled` on, clicking a file card launches mpv with the resolved library path
+- [x] With `mpv_enabled` on, clicking a file card launches mpv with the resolved library path
       and returns `202`.
-- [ ] With the flag off, the card navigates to the title page and no launch endpoint is called.
-- [ ] An id for a missing file returns `404`; a path outside the library roots returns `403`.
+- [x] With the flag off, the card navigates to the title page and no launch endpoint is called.
+- [x] An id for a missing file returns `404`; a path outside the library roots returns `403`.
       A hand-crafted request carrying a path or extra argv is ignored entirely.
-- [ ] Clicking a second file while mpv runs kills only Daku's own child and launches the new
+- [x] Clicking a second file while mpv runs kills only Daku's own child and launches the new
       file; a user-started mpv is untouched.
-- [ ] If mpv cannot open a window, the card shows a toast with the server's message within
+- [x] If mpv cannot open a window, the card shows a toast with the server's message within
       ~2 seconds instead of failing silently.
-- [ ] Dragging the carousel or scrolling the files page never launches a player.
-- [ ] Doctor reports `ok` / `missing` / `no-display` / `disabled` without spawning mpv.
-- [ ] AGENTS.md §1 records the amendment.
-- [ ] No file path, argv or magnet appears in logs.
+- [x] Dragging the carousel or scrolling the files page never launches a player.
+- [x] Doctor reports `ok` / `missing` / `no-display` / `disabled` without spawning mpv.
+- [x] AGENTS.md §1 records the amendment.
+- [x] No file path, argv or magnet appears in logs.
 
 ## Test plan
 
@@ -135,3 +135,18 @@ the *client* machine, Jellyfin playback links, a player in the browser.
   README rather than guessing a display in code.
 - Keep the whole feature behind one module (`services/player/mpv.py`) so replacing it with a
   socket-based player later does not touch the router.
+- **As implemented:** `mpv_enabled` / `mpv_bin` stay config-file/env values and the Settings
+  page toggles `mpv_enabled` (persisted in SQLite and applied to the running process) and
+  shows `mpv_bin` read-only with the `shutil.which` result underneath. Cards receive the flag
+  through a `PlayerProvider`; outside that provider the default is `disabled`, which keeps the
+  plain link behaviour in isolated component tests.
+- `MpvPlayer.play()` serialises launches with a lock. A second request for the same id that
+  arrived within two seconds returns success without spawning again; a different id terminates
+  only the tracked child, waits up to two seconds, then spawns. The child uses
+  `start_new_session=True` and its `communicate()` task stays alive after the two-second probe
+  to drain pipes and clear the tracked pid.
+- **Playback roots (amended):** the endpoint accepts a file under `movies_dir`, `tv_dir`,
+  `anime_dir` **or** `downloads_dir`. The organiser (T-013) is not implemented yet, so a
+  completed download only exists in `downloads_dir` with `lib_path = NULL`; rejecting it made
+  every downloaded file unplayable. Anything else still returns `403 PATH_OUTSIDE_LIBRARY`.
+- `packaging/daku.service` documents the optional `DISPLAY` / `WAYLAND_DISPLAY` environment.

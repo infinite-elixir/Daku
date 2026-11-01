@@ -57,7 +57,7 @@ filter that finds downloaded titles.
 `GET /api/media-files/{id}/thumbnail`
 
 - Resolves `lib_path` (falling back to `src_path`), requires the path to exist.
-- `ffmpeg -ss <0.25 × duration_s> -i <path> -frames:v 1 -vf scale=480:-2 -q:v 4`
+- `ffmpeg -ss <0.25 × duration_s> -i <path> -frames:v 1 -vf scale=960:-2 -q:v 4`
   via `asyncio.create_subprocess_exec`, no shell, fixed argv.
 - Cache: `data_dir/thumbnails/{media_file_id}.jpg`, served with `ETag` (`id:size:mtime`) and
   `Cache-Control: private, max-age=86400`.
@@ -90,13 +90,16 @@ One component used by the carousel and the files page.
 
 - Rendered on `TitleView` after the episodes section and before Releases (movies: after
   facts, before Releases).
-- Header: `Downloaded` + `N files · 20.0 GB` and a `View all files (N)` link to
-  `/title/{id}/files`.
+- Header: `Downloaded` with `N files · 20.0 GB` stacked under it, and a
+  `View all files (N)` link to `/title/{id}/files`. The link is hidden when the title has
+  exactly one file.
 - **Season pills** above the strip, only when more than one season has files. Default
   selection follows the open episode tab's season, else the newest season with files. Pills
   filter the strip only; the header count stays the title total.
-- Horizontal strip with scroll-snap, 6 cards at 1440px, 2.5 at 390px, arrow-key scrolling,
+- Horizontal strip with scroll-snap, 4 cards at 1440px, 1.4 at 390px, arrow-key scrolling,
   no autoplay, no drag inertia hacks.
+- Movies with a file render the primary file as one full-width 16:9 hero card (max 960px)
+  instead of a strip; samples and extras stay on the files page.
 - Extras are **hidden** here.
 - Empty (no files at all): the section is not rendered.
 - Above `--spacing-section` from the neighbouring sections.
@@ -135,22 +138,22 @@ first), Jellyfin artwork, trickplay, a poster proxy.
 
 ## Acceptance criteria
 
-- [ ] `GET /api/titles/{id}/files` returns every media file with size, episode label and
+- [x] `GET /api/titles/{id}/files` returns every media file with size, episode label and
       season, only files that exist, and per-season aggregates.
-- [ ] `GET /api/media-files/{id}/thumbnail` returns a JPEG for a real file, caches it on disk,
+- [x] `GET /api/media-files/{id}/thumbnail` returns a JPEG for a real file, caches it on disk,
       and sends an ETag that yields a 304 on the second request.
-- [ ] A missing file or a failing ffmpeg returns `404 THUMBNAIL_UNAVAILABLE` and the card
+- [x] A missing file or a failing ffmpeg returns `404 THUMBNAIL_UNAVAILABLE` and the card
       falls back to the poster.
-- [ ] The carousel appears only when files exist, shows season pills only when more than one
+- [x] The carousel appears only when files exist, shows season pills only when more than one
       season has files, and hides extras.
-- [ ] `View all files (N)` opens `/title/{id}/files`, which renders every file for the title
+- [x] `View all files (N)` opens `/title/{id}/files`, which renders every file for the title
       with season tabs and an Extras group.
-- [ ] Thumbnails are requested only for visible cards; scrolling a 100-file grid does not
+- [x] Thumbnails are requested only for visible cards; scrolling a 100-file grid does not
       fire 100 simultaneous extractions.
-- [ ] The `Downloaded` chip filters to titles with at least one file and clears `No file yet`.
-- [ ] A library card exposes a `N files` link without nesting it inside the card anchor.
-- [ ] No Jellyfin play URL is rendered anywhere.
-- [ ] Doctor reports ffmpeg as `ok` or `unavailable` without running an extraction.
+- [x] The `Downloaded` chip filters to titles with at least one file and clears `No file yet`.
+- [x] A library card exposes a `N files` link without nesting it inside the card anchor.
+- [x] No Jellyfin play URL is rendered anywhere.
+- [x] Doctor reports ffmpeg as `ok` or `unavailable` without running an extraction.
 
 ## Test plan
 
@@ -176,3 +179,12 @@ first), Jellyfin artwork, trickplay, a poster proxy.
   queue's job (T-039).
 - `MediaFileCard` must accept a `thumbnail_url` that 404s without breaking layout; reserve the
   16:9 box before the image loads.
+- **Review revision:** after the first implementation the strip was widened to 4/2/1.4 cards,
+  the header meta moved under the heading, `View all` was hidden for a single file, thumbnails
+  were raised to 960px wide, and a movie's primary file became a single wide hero card. A
+  follow-up review capped the hero at 640px and made the title-page carousel request real file
+  thumbnails (poster remains the fallback). The files page keeps the normal grid.
+- **Deferred dependency:** T-044 (`downloads-page-redesign`) is not present in this checkout.
+  The Downloads group header needed for the `Files (N)` link was implemented as a minimal
+  grouping of rows by title/`title_id` in `DownloadsPage`, rather than rewriting
+  `DownloadRow`. When T-044 lands, fold that header into its richer group component.

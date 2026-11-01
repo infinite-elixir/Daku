@@ -94,6 +94,7 @@ def _file_payload(row: MediaFile) -> dict[str, Any]:
         "height": row.height,
         "duration_s": row.duration_s,
         "is_primary": row.is_primary,
+        "present": media_repo.is_present(row),
         "sidecars": media_repo.sidecars(row),
     }
 

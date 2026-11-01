@@ -416,8 +416,10 @@ describe("TitlePage episodes", () => {
 
     expect(await screen.findByText("No episodes recorded yet")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Refresh metadata" }),
-    ).toBeDisabled();
+      screen
+        .getAllByRole("button", { name: "Refresh metadata" })
+        .some((button) => button.hasAttribute("disabled")),
+    ).toBe(true);
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(
       fetchMock.mock.calls.some(([url]) => String(url).includes("/releases?season=")),

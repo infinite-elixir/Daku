@@ -150,3 +150,68 @@ def test_doctor_cli_json_and_strict_exit_code(
     payload = json.loads(capsys.readouterr().out)
     names = {check["name"] for check in payload["checks"]}
     assert "qbittorrent" in names
+
+
+def test_doctor_reports_ffmpeg_ok_without_extracting(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+
+    def fake_which(name: str) -> str | None:
+        calls.append(name)
+        return "/usr/bin/ffmpeg" if name == "ffmpeg" else None
+
+    monkeypatch.setattr("daku.services.doctor.shutil.which", fake_which)
+
+    check = next(check for check in run_doctor(settings) if check.name == "ffmpeg")
+    assert check.status == STATUS_OK
+    assert check.detail == "/usr/bin/ffmpeg"
+    assert "ffmpeg" in calls
+
+
+def test_doctor_reports_ffmpeg_unavailable(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("daku.services.doctor.shutil.which", lambda _name: None)
+
+    check = next(check for check in run_doctor(settings) if check.name == "ffmpeg")
+    assert check.status == "unavailable"
+    assert "media thumbnails are unavailable" in check.detail
+
+
+def test_doctor_reports_mpv_disabled_when_turned_off(settings: Settings) -> None:
+    disabled = settings.model_copy(update={"mpv_enabled": False})
+
+    check = next(check for check in run_doctor(disabled) if check.name == "mpv")
+    assert check.status == "disabled"
+    assert "Settings" in check.detail
+
+
+def test_doctor_reports_mpv_missing(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    enabled = settings.model_copy(update={"mpv_enabled": True})
+    monkeypatch.setattr("daku.services.doctor.shutil.which", lambda _name: None)
+
+    check = next(check for check in run_doctor(enabled) if check.name == "mpv")
+    assert check.status == "missing"
+
+
+def test_doctor_reports_mpv_no_display(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    enabled = settings.model_copy(update={"mpv_enabled": True})
+    monkeypatch.setattr("daku.services.doctor.shutil.which", lambda _name: "/usr/bin/mpv")
+    monkeypatch.delenv("DISPLAY", raising=False)
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+
+    check = next(check for check in run_doctor(enabled) if check.name == "mpv")
+    assert check.status == "no-display"
+
+
+def test_doctor_reports_mpv_ok_without_launching(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    enabled = settings.model_copy(update={"mpv_enabled": True})
+    monkeypatch.setattr("daku.services.doctor.shutil.which", lambda _name: "/usr/bin/mpv")
+    monkeypatch.setenv("DISPLAY", ":0")
+
+    check = next(check for check in run_doctor(enabled) if check.name == "mpv")
+    assert check.status == STATUS_OK
+    assert check.detail == "/usr/bin/mpv"

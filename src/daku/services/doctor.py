@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import shutil
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
@@ -11,6 +12,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from daku.config import Settings
+from daku.repositories import media_files as media_files_repo
 from daku.repositories import settings as settings_repo
 from daku.services.engines.base import DownloadEngine, Health
 from daku.services.metadata.mapping import mapping_status
@@ -26,6 +28,9 @@ STATUS_DEGRADED = "degraded"
 STATUS_NOT_CONFIGURED = "not_configured"
 STATUS_NOT_FOUND = "not_found"
 STATUS_ERROR = "error"
+STATUS_WARN = "warn"
+
+MISSING_MEDIA_CAP = 50
 
 PROBE_TIMEOUT_SECONDS = 5.0
 
@@ -151,16 +156,16 @@ def run_doctor(
         ),
     ]
     anime_sources = (
-        settings_repo.get_setting(session, "anime_sources", ["torrentio", "nyaa"])
+        settings_repo.get_anime_sources(session)
         if session is not None
-        else ["torrentio", "nyaa"]
+        else list(settings_repo.ANIME_SOURCES)
     )
     checks.append(
         Check(
-            name="nyaa",
-            status=STATUS_OK if "nyaa" in anime_sources else STATUS_NOT_CONFIGURED,
-            detail="enabled for anime RSS searches"
-            if "nyaa" in anime_sources
+            name="animetosho",
+            status=STATUS_OK if "animetosho" in anime_sources else STATUS_NOT_CONFIGURED,
+            detail="enabled for anime feed searches"
+            if "animetosho" in anime_sources
             else "disabled in anime source settings",
         )
     )
@@ -173,6 +178,17 @@ def run_doctor(
             detail=ffprobe or "ffprobe not found on PATH; install ffmpeg (sudo apt install ffmpeg)",
         )
     )
+
+    ffmpeg = shutil.which("ffmpeg")
+    checks.append(
+        Check(
+            name="ffmpeg",
+            status=STATUS_OK if ffmpeg else "unavailable",
+            detail=ffmpeg or "ffmpeg not found on PATH; media thumbnails are unavailable",
+        )
+    )
+
+    checks.append(_mpv_check(settings))
 
     try:
         settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -207,7 +223,65 @@ def run_doctor(
     checks.append(_omdb_check(settings, omdb))
     checks.append(_mapping_check(session))
     checks.append(_magnet_probe_check(settings, probe_status))
+    if session is not None:
+        checks.append(_library_check(session))
     return checks
+
+
+def _mpv_check(settings: Settings) -> Check:
+    """Report mpv without ever launching it."""
+
+    if not settings.mpv_enabled:
+        return Check(
+            name="mpv",
+            status="disabled",
+            detail="mpv playback is disabled (turn it on in Settings or set DAKU_MPV_ENABLED)",
+        )
+    binary = shutil.which(settings.mpv_bin)
+    if binary is None:
+        return Check(
+            name="mpv",
+            status="missing",
+            detail=f"{settings.mpv_bin} not found on PATH or as an absolute path",
+        )
+    if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        return Check(
+            name="mpv",
+            status="no-display",
+            detail="neither DISPLAY nor WAYLAND_DISPLAY is set; launch would fail without one",
+        )
+    return Check(name="mpv", status=STATUS_OK, detail=binary)
+
+
+def _library_check(session: Session) -> Check:
+    """Report media rows whose recorded file is no longer on disk.
+
+    Read-only: nothing is deleted, and a missing count is only ever a warning.
+    """
+
+    present_checked = 0
+    missing = 0
+    for row in media_files_repo.list_all(session):
+        present_checked += 1
+        if not media_files_repo.is_present(row):
+            missing += 1
+            if missing >= MISSING_MEDIA_CAP:
+                break
+    if missing == 0:
+        return Check(
+            name="library",
+            status=STATUS_OK,
+            detail=f"{present_checked} media file(s) present on disk",
+        )
+    suffix = "+" if missing >= MISSING_MEDIA_CAP else ""
+    return Check(
+        name="library",
+        status=STATUS_WARN,
+        detail=(
+            f"{missing}{suffix} media file(s) missing on disk; "
+            "use Clean up on the title page to forget them"
+        ),
+    )
 
 
 def _magnet_probe_check(settings: Settings, probe_status: Mapping[str, object] | None) -> Check:

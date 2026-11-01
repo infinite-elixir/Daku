@@ -9,10 +9,14 @@ import { selectionFromParams } from "../lib/episodes";
 import {
   deleteTitle,
   getTitle,
+  getTitleFiles,
   getTitleMetadata,
   patchTitle,
+  reconcileTitleMedia,
+  refreshTitleMetadata,
   type Episode,
   type TitleDetail,
+  type TitleFilesResponse,
   type TitleMetadata,
 } from "../lib/api";
 
@@ -85,6 +89,14 @@ export function TitlePage() {
     retry: false,
   });
 
+  const { data: files } = useQuery<TitleFilesResponse>({
+    queryKey: ["title-files", id],
+    queryFn: ({ signal }) => getTitleFiles(id, signal),
+    enabled: id.length > 0,
+    staleTime: 30_000,
+    retry: false,
+  });
+
   const wantedMutation = useMutation({
     mutationFn: (wanted: boolean) => patchTitle(id, { wanted }),
     onSuccess: (updated) => {
@@ -98,6 +110,25 @@ export function TitlePage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["library"] });
       navigate("/library");
+    },
+  });
+
+  const cleanupMutation = useMutation({
+    mutationFn: () => reconcileTitleMedia(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["title", id] });
+      void queryClient.invalidateQueries({ queryKey: ["title-files", id] });
+      void queryClient.invalidateQueries({ queryKey: ["library"] });
+    },
+  });
+
+  const refreshMetadataMutation = useMutation({
+    mutationFn: () => refreshTitleMetadata(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["title", id] });
+      void queryClient.invalidateQueries({ queryKey: ["title-files", id] });
+      void queryClient.invalidateQueries({ queryKey: ["title-metadata", id] });
+      void queryClient.invalidateQueries({ queryKey: ["library"] });
     },
   });
 
@@ -224,6 +255,32 @@ export function TitlePage() {
           </button>
         </p>
       ) : null}
+      {!title.poster_url ? (
+        <p
+          role="status"
+          className="rounded-panel border-l-2 border-warning bg-panel px-3 py-2 text-small text-warning"
+        >
+          Artwork unavailable.{" "}
+          <button
+            type="button"
+            disabled={refreshMetadataMutation.isPending}
+            onClick={() => refreshMetadataMutation.mutate()}
+            className="font-semibold underline disabled:opacity-50"
+          >
+            {refreshMetadataMutation.isPending ? "Refreshing…" : "Refresh metadata"}
+          </button>
+          {refreshMetadataMutation.data?.refresh_error ? (
+            <span className="block text-fg-muted">
+              {refreshMetadataMutation.data.refresh_error.message}
+            </span>
+          ) : null}
+        </p>
+      ) : null}
+      {refreshMetadataMutation.error ? (
+        <p role="alert" className="text-small text-danger">
+          {refreshMetadataMutation.error.message}
+        </p>
+      ) : null}
       {wantedMutation.error ? (
         <p role="alert" className="text-small text-danger">
           {wantedMutation.error.message}
@@ -234,6 +291,11 @@ export function TitlePage() {
           {deleteMutation.error.message}
         </p>
       ) : null}
+      {cleanupMutation.error ? (
+        <p role="alert" className="text-small text-danger">
+          {cleanupMutation.error.message}
+        </p>
+      ) : null}
     </>
   );
 
@@ -242,12 +304,27 @@ export function TitlePage() {
       <TitleView
       title={title}
       metadata={metadata ?? null}
+      files={files ?? null}
       back={{ to: "/library", label: "← Library" }}
       actions={actions}
       notices={notices}
+      emptyEpisodesAction={
+        title.poster_url ? (
+          <button
+            type="button"
+            disabled={refreshMetadataMutation.isPending}
+            onClick={() => refreshMetadataMutation.mutate()}
+            className="min-h-control rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {refreshMetadataMutation.isPending ? "Refreshing…" : "Refresh metadata"}
+          </button>
+        ) : undefined
+      }
       selected={selected}
       onSelectEpisode={toggleEpisode}
       onCollapse={clearSelection}
+      onCleanupMissing={() => cleanupMutation.mutate()}
+      cleanupPending={cleanupMutation.isPending}
       renderEpisodeExpanded={
         title.kind === "movie"
           ? undefined

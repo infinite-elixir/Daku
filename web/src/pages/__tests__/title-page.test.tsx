@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -63,10 +63,22 @@ function jsonResponse(payload: unknown, status = 200): Response {
   } as Response;
 }
 
-function renderTitle(title: TitleDetail) {
+function renderTitle(title: TitleDetail, refreshResult?: unknown) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
+      if (url.endsWith("/metadata/refresh")) {
+        return jsonResponse(
+          refreshResult ?? {
+            title_id: title.id,
+            source: "anilist",
+            partial: false,
+            refresh_error: null,
+            report: { added: 0, updated: 0, skipped: 0, stale: false },
+            overridden_fields: [],
+          },
+        );
+      }
       if (url.includes("/metadata")) {
         return jsonResponse({ stale: false });
       }
@@ -108,6 +120,23 @@ describe("TitlePage banner", () => {
 
     await screen.findByRole("heading", { level: 1, name: "Big Buck Bunny" });
     expect(screen.queryByTestId("title-skeleton")).not.toBeInTheDocument();
+  });
+
+  it("shows an artwork notice and can refresh metadata", async () => {
+    renderTitle(makeTitle({ poster_url: null }), {
+      title_id: "title-1",
+      source: "anilist",
+      partial: true,
+      refresh_error: { code: "ARTWORK_UNAVAILABLE", message: "No usable poster artwork was found" },
+      report: { added: 0, updated: 0, skipped: 0, stale: false },
+      overridden_fields: [],
+    });
+
+    expect(await screen.findByText("Artwork unavailable.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh metadata" }));
+    expect(
+      await screen.findByText("No usable poster artwork was found"),
+    ).toBeInTheDocument();
   });
 
   it("renders the wide banner image directly with a mandatory bottom-up scrim", async () => {
@@ -158,5 +187,20 @@ describe("TitlePage banner", () => {
     const heading = await screen.findByRole("heading", { level: 1, name: "Big Buck Bunny" });
     expect(heading).toBeVisible();
     expect(screen.getByRole("button", { name: "Mark wanted" })).toBeVisible();
+  });
+
+  it("shows missing files and reconciles them on demand", async () => {
+    renderTitle(makeTitle({ missing_file_count: 3 }));
+
+    const missing = await screen.findByTestId("title-missing-files");
+    expect(missing).toHaveTextContent("3 files missing");
+    fireEvent.click(screen.getByRole("button", { name: "Clean up" }));
+
+    await waitFor(() =>
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        "/api/titles/title-1/media/reconcile",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
   });
 });

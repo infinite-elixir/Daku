@@ -19,11 +19,14 @@ from daku.db import init_db
 from daku.errors import AppError
 from daku.events import EventBus
 from daku.logging_setup import configure_logging
+from daku.repositories import media_files as media_files_repo
+from daku.repositories import settings as settings_repo
 from daku.routers import (
     downloads,
     events,
     health,
     magnets,
+    media_files,
     releases,
     search,
     system,
@@ -37,7 +40,9 @@ from daku.services.metadata.cache import TTLCache
 from daku.services.metadata.client import make_client
 from daku.services.metadata.mapping import ensure_mapping_settings
 from daku.services.metadata.ratings import OmdbEnricher
+from daku.services.player.mpv import MpvPlayer
 from daku.services.releases.refresh import RefreshThrottle
+from daku.services.thumbnails import ThumbnailService
 from daku.services.torrents.cache import PayloadCache
 from daku.services.torrents.probe import ProbeService
 from daku.worker import Worker
@@ -84,6 +89,10 @@ def create_app(settings: Settings | None = None, *, configure_logs: bool = True)
         engine, session_factory = init_db(resolved)
         with session_factory() as session:
             ensure_mapping_settings(session)
+            stored_mpv = settings_repo.get_setting(session, "mpv_enabled", None)
+        # A Settings-page toggle is persisted and wins over the config default at startup.
+        if isinstance(stored_mpv, bool):
+            resolved.mpv_enabled = stored_mpv
         app.state.settings = resolved
         app.state.started_at = time.monotonic()
         app.state.engine = engine
@@ -93,6 +102,13 @@ def create_app(settings: Settings | None = None, *, configure_logs: bool = True)
         app.state.releases_cache = PayloadCache(ttl_seconds=3600)
         app.state.release_refresh = RefreshThrottle()
         app.state.probe = ProbeService(resolved)
+        app.state.thumbnails = ThumbnailService(resolved)
+
+        def save_playback(media_file_id: str, position_s: float, duration_s: float | None) -> None:
+            with session_factory() as session:
+                media_files_repo.set_playback(session, media_file_id, position_s, duration_s)
+
+        app.state.mpv_player = MpvPlayer(resolved, progress_sink=save_playback)
         app.state.http_client = make_client()
         app.state.event_bus = EventBus()
 
@@ -134,6 +150,7 @@ def create_app(settings: Settings | None = None, *, configure_logs: bool = True)
             probe = getattr(app.state, "probe", None)
             if probe is not None:
                 await probe.aclose()
+            await app.state.mpv_player.aclose()
             await qbt_engine.aclose()
             await aria2_engine.aclose()
             await app.state.http_client.aclose()
@@ -154,6 +171,7 @@ def create_app(settings: Settings | None = None, *, configure_logs: bool = True)
     app.include_router(events.router)
     app.include_router(search.router)
     app.include_router(titles.router)
+    app.include_router(media_files.router)
     app.include_router(releases.router)
     app.include_router(magnets.router)
     app.include_router(settings_router.router)

@@ -100,6 +100,11 @@ class Settings(BaseModel):
     jellyfin_url: str = "http://127.0.0.1:8096"
     tvdb_api_key: str = ""
 
+    # Playback. On by default; the Settings page persists a per-install override and the
+    # UI only shows the launch affordance when enabled.
+    mpv_enabled: bool = True
+    mpv_bin: str = "mpv"
+
     # Worker loop. Disable in tests so a TestClient does not poll localhost.
     worker_enabled: bool = True
     worker_poll_seconds: float = Field(default=2.0, gt=0)

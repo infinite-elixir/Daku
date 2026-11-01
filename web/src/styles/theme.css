@@ -218,6 +218,44 @@ body {
   }
 }
 
+/* Downloaded-files carousel (T-047). Six cards at desktop, 2.5 at phone width. */
+.downloaded-strip {
+  display: flex;
+  gap: var(--spacing-panel);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.downloaded-strip-card {
+  flex: 0 0 calc((100% - 3 * var(--spacing-panel)) / 4);
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+@media (max-width: 900px) {
+  .downloaded-strip-card {
+    flex-basis: calc((100% - var(--spacing-panel)) / 2);
+  }
+}
+
+@media (max-width: 480px) {
+  .downloaded-strip-card {
+    flex-basis: calc((100% - 0.4 * var(--spacing-panel)) / 1.4);
+  }
+}
+
+/* Movie files are featured as one wide card instead of a strip. */
+.media-hero-scrim {
+  background: linear-gradient(
+    to top,
+    rgb(0 0 0 / 0.82) 0%,
+    rgb(0 0 0 / 0.5) 38%,
+    transparent 78%
+  );
+}
+
 /* Viewport fallback for browsers without container queries. */
 @supports not (container-type: inline-size) {
   @media (min-width: 720px) {
