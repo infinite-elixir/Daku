@@ -1,6 +1,6 @@
 [project]
 name = "daku"
-version = "0.1.0"
+version = "0.1.0a1"
 description = "Self-hosted, LAN-only media librarian"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"

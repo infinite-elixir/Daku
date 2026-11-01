@@ -10,6 +10,9 @@ Type=simple
 # T-019 points this at the uv-managed virtualenv created by install.sh.
 ExecStart=%h/.local/bin/daku
 Environment=PYTHONUNBUFFERED=1
+# Uncomment so mpv can open a window on your session (T-048).
+# Environment=DISPLAY=:0
+# Environment=WAYLAND_DISPLAY=wayland-0
 Restart=on-failure
 RestartSec=5
 

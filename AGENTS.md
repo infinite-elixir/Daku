@@ -1,11 +1,12 @@
 # AGENTS.md — Daku
 
 Daku is a **single-user, LAN-only, self-hosted media library manager** for Linux.
-It searches metadata (IMDb/Cinemeta, AniList), finds releases on Torrentio and nyaa.si (anime),
+It searches metadata (IMDb/Cinemeta, AniList), finds releases on Torrentio and AnimeTosho (anime),
 downloads them with qBittorrent (torrents) or aria2c (direct URLs), files them into a Jellyfin
 library, and mirrors library entries into a Telegram archive channel via a bot.
 
-Daku **does not play video itself**. Jellyfin owns playback, remuxing and transcoding.
+Daku **does not decode or play video itself**. Jellyfin owns scanning, metadata and library
+management; on explicit request Daku launches the host's own mpv on a file it filed.
 
 ---
 
@@ -18,7 +19,7 @@ These are decisions, not preferences. Do not re-litigate them in a ticket.
 | Deployment | One background service + responsive web UI on `0.0.0.0:8420` |
 | Host | Linux with systemd, XDG paths. Windows/macOS are later ports, not v1. |
 | Auth | None. LAN only. Never add internet-facing auth without a new decision record |
-| Playback | Deep-link to Jellyfin. No in-app transcode, no HLS packaging, no `<video>` for non-MP4 |
+| Playback | Launch the host's mpv with a library path on explicit request. Until the organiser (T-013) exists, a file still in Daku's own `downloads_dir` is also accepted. No in-app decode/transcode, no HLS packaging, no `<video>`, no Jellyfin play URL |
 | Torrent engine | qBittorrent via Web API v2. **Never** use aria2c as the torrent client |
 | Torrent metadata | libtorrent may inspect a magnet read-only (metadata only, no payload, no download row) to list files. qBittorrent remains the only download engine |
 | Magnet probe | Optional `daku[probe]` extra. One lazy, serialised session; no listener; DHT only; probe dirs under `data_dir/probes` are always deleted. Never a download engine |
@@ -43,7 +44,7 @@ no content. Keep the disclaimer in the README and settings page.
 Browser / PWA ──HTTP+SSE──> FastAPI (daku) ──> SQLite (daku.db)
                                   │
                                   ├─ Metadata: IMDb suggestions → Cinemeta → AniList/Jikan
-                                  ├─ Releases: Torrentio adapter
+                                  ├─ Releases: Torrentio + AnimeTosho adapters
                                   ├─ Engines: qBittorrent Web API | aria2c JSON-RPC
                                   ├─ Organiser: ffprobe + hardlink/copy → Jellyfin dirs
                                   ├─ Jellyfin: POST /Library/Refresh, GET /Items
@@ -72,7 +73,7 @@ src/daku/
   routers/             # search, titles, releases, downloads, telegram, jellyfin, system
   services/
     metadata/          # imdb.py, cinemeta.py, anilist.py, jikan.py, mapping.py
-    torrents/          # base.py, torrentio.py
+    torrents/          # base.py, torrentio.py, animetosho.py, sources.py
     engines/           # base.py, qbittorrent.py, aria2.py
     organize/          # ffprobe.py, naming.py, organizer.py
     telegram/          # bot.py, attach.py, archive.py
@@ -127,6 +128,7 @@ Resolution order: environment → `~/.config/daku/config.json` → defaults.
 | `qbt_url` / `qbt_user` / `qbt_pass` | `http://127.0.0.1:8080` | password in secrets |
 | `aria2_rpc` / `aria2_secret` | `http://127.0.0.1:6800/jsonrpc` | |
 | `jellyfin_url` / `jellyfin_api_key` | `http://127.0.0.1:8096` | key in secrets |
+| `mpv_enabled` / `mpv_bin` | `true` / `mpv` | host mpv launch; the Settings page toggles `mpv_enabled` (persisted in SQLite), `mpv_bin` stays config/env |
 | `omdb_api_key` | empty | optional; enables Rotten Tomatoes/Metacritic ratings (secrets) |
 | `telegram_bot_token` | empty | in secrets |
 | `telegram_api_base` | `https://api.telegram.org` | set to local server to lift the 20 MB cap |
@@ -186,6 +188,10 @@ Resolution order: environment → `~/.config/daku/config.json` → defaults.
   means the engine default/all) and `downloads.file_match_json` (matcher result plus the
   selected paths and, when a selection is still pending, `selection_pending`), migration v9.
   These are metadata only: they never introduce a download state.
+- T-054 adds `media_files.playback_position_s`, `playback_duration_s` and
+  `playback_updated_at` (migration v13). The host player's JSON IPC socket is read-only;
+  progress is metadata, never a download or episode state. Positions older than the file
+  itself are display-only: Daku never seeks on the user's behalf.
 - Deleting a title cascades to episodes/releases/files but **never** deletes files on disk
   unless the caller passes `keep_files=false` explicitly.
 
@@ -222,14 +228,17 @@ The raw-payload cache key is the URL, so a different provider set is a different
 `providers=` is rewritten with `with_providers`; empty means the configured default.
 `GET /api/releases/options` exposes the provider/label/sort choices and limit steps.
 
-### Nyaa RSS
-Anime-only release discovery may also use `https://nyaa.si/?page=rss&q=...&c=1_2&f=0&s=seeders&o=desc`.
+### AnimeTosho JSON feed
+Anime-only release discovery may also use `https://feed.animetosho.xyz/json?q=...`.
 The query is URL-encoded, control characters are removed, and it is capped at 120 characters.
 Daku sends a descriptive `User-Agent`, throttles requests to one per second per process, parses
-only RSS items, and builds magnets locally from a verified 40-hex or 32-base32 info hash.
-The torrent link is never downloaded. Default category `1_2` is Anime — English-translated;
-`1_1` and `1_3` are also supported. Raw RSS is cached for one hour by full URL, and stale
-payloads are served on upstream failure. Nyaa is never queried for movies or non-anime TV.
+only the JSON array, and builds magnets locally from a verified 40-hex or 32-base32 info hash
+(`info_hash`). The torrent file (`torrent_url`) is never downloaded and `magnet_uri` is not
+trusted blindly. Fields are optional: `title`/`torrent_name`, `total_size`, `seeders`,
+`leechers`, `timestamp`, `link`, `article_url`, `status`, `num_files`. Raw JSON is cached for
+one hour by full URL, and stale payloads are served on upstream failure. AnimeTosho is never
+queried for movies or non-anime TV. A stored legacy `nyaa` source or origin maps to
+`animetosho` on read.
 
 ### Magnet probe (optional libtorrent)
 - `POST /api/magnets/inspect` `{magnet}` and `GET /api/releases/{id}/files` return torrent

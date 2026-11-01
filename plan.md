@@ -70,7 +70,7 @@ LAN, with no *arr stack and no config files.** The zero-tap alternative matters 
 | 13 | Watch state | `wanted` stays acquire intent; watch status is `planning/watching/completed/dropped/on_hold` plus per-episode progress | T-032 replaces the boolean watched plan; no Jellyfin watched sync in v1 |
 | 14 | Metadata source priority | IMDb id is identity; Cinemeta → TheTVDB → AniList for detail, with a per-title override | T-022 adds the switcher; no IMDb scraping |
 | 15 | Ratings | IMDb from Cinemeta; Rotten Tomatoes/Metacritic optional via an OMDb key | T-024; without a key the UI is IMDb-only, never an error |
-| 16 | Anime releases | Nyaa.si as a second source (RSS only), merged with Torrentio | T-027; nyaa is never treated as a Torrentio provider |
+| 16 | Anime releases | AnimeTosho as a second source (JSON feed only), merged with Torrentio | T-049 replaces T-027; AnimeTosho is never treated as a Torrentio provider |
 | 17 | Torrent metadata | Standalone libtorrent session, metadata-only, no payload and no download row | T-030; qBittorrent remains the only torrent engine |
 | 18 | Season packs | Match the episode and download only the matching file; ask when ambiguous | T-031; qBittorrent file priorities, never a silent full pack |
 | 19 | Watch state | Local statuses `planning/watching/completed/dropped/on_hold` + per-episode progress | T-032 replaces the boolean watched plan in T-025; no sync in v1 |
@@ -80,6 +80,8 @@ LAN, with no *arr stack and no config files.** The zero-tap alternative matters 
 | 23 | Density | One named spacing scale, one step looser app-wide; components consume tokens, never arbitrary values | T-043; replaces the "tighter rhythm" rule in STYLE §1.3 |
 | 24 | Title layout | Poster and identity are one object; actions sit on the poster's bottom edge; overview and facts run full width below | T-045 supersedes T-034 and rejects the facts rail |
 | 25 | Playback | Daku still decodes nothing; on explicit request it launches the host's mpv with a library path it resolved itself | T-048; amends AGENTS.md §1, no Jellyfin play links in the UI |
+| 26 | Anime identity | An `anilist_id` must resolve to `type: ANIME`; split cours map to explicit season/episode ranges | T-052; a manga id is rejected before it is saved, `title_cours` records the ranges |
+| 27 | Release search | Every known alias is searched in several notations, then episodes are matched from the parsed filename and provider season | T-053; bounded query budget, 1 req/s AnimeTosho throttle unchanged |
 
 ---
 
@@ -364,7 +366,7 @@ Tickets live in `tickets/`. Each is independently shippable and lists acceptance
 | Ticket | Deliverable |
 |---|---|
 | T-026 | Settings menu, persisted per-kind provider defaults |
-| T-027 | Nyaa.si as a second anime release source |
+| T-027 | Nyaa.si as a second anime release source (superseded by T-049) |
 | T-028 | Conservative anime classification from the AniBridge mapping |
 | T-029 | Manual metadata fixer: kind, identity and episode mapping |
 
@@ -419,6 +421,34 @@ Phase 12 is presentation plus one new capability. T-043 lands first because ever
 ticket describes tokens rather than pixels. T-048 is gated on T-047: it needs file cards to
 attach a launch to.
 
+### Phase 13 — Source replacement
+
+| Ticket | Deliverable |
+|---|---|
+| T-049 | AnimeTosho replaces Nyaa as the anime release source |
+
+### Phase 14 — Library integrity
+
+| Ticket | Deliverable |
+|---|---|
+| T-050 | Destructive queue removal refuses to delete the only copy of a library file |
+| T-051 | Availability reads the filesystem and stale media rows can be reconciled |
+
+T-013 is still the prerequisite for "the library is separate from the download folder".
+Until it ships, `src_path` is the only copy: T-050 blocks the destructive removal path and
+T-051 stops the UI from claiming a deleted file is available.
+
+### Phase 15 — Anime identity and discovery
+
+| Ticket | Deliverable |
+|---|---|
+| T-052 | AniList identity validation, split-cour ranges, artwork fallback |
+| T-053 | All-alias, multi-notation release search with provider-season episode matching |
+
+T-052 comes first: T-053 needs the provider season (`S06`) and absolute offsets that a
+correct split-cour identity produces. Without T-052, `Steel Ball Run` searches can never
+match the `S06E07` releases AnimeTosho publishes.
+
 T-021 and T-023 are the two halves of "search → pick → watch"; T-022 is the repair path for
 entries added while metadata was offline. Phase 7 makes classification and provider selection
 honest; Phase 8 makes the acquisition side understand what a release actually contains; Phase 9
@@ -453,6 +483,10 @@ T-009 → T-040 → T-041 (T-041 also needs T-031)
 
 T-018 → T-043 → T-044, T-045, T-046, T-047
 T-039, T-042 → T-044
+T-013, T-039 → T-050
+T-050, T-013 → T-051
+T-037 → T-052 (also needs T-004, T-022, T-028, T-029)
+T-052 → T-053 (also needs T-037, T-049)
 T-030, T-031 → T-046 (also needs T-043, T-045)
 T-014 → T-047 (also needs T-043, T-044, T-045)
 T-047 → T-048 (also needs T-043)

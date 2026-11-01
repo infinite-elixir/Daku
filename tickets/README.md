@@ -54,11 +54,17 @@ contracts. If a ticket contradicts `AGENTS.md`, `AGENTS.md` wins and the ticket 
 | [T-046](T-046-release-panel.md) | 12 | T-030, T-031, T-043, T-045 | Taller release panel, single action row |
 | [T-047](T-047-downloaded-files.md) | 12 | T-014, T-043, T-044, T-045 | Downloaded-files carousel, files page, thumbnails, library filter |
 | [T-048](T-048-mpv-playback.md) | 12 | T-043, T-044, T-047 | Launch a downloaded file in the host's mpv |
+| [T-049](T-049-animetosho-source.md) | 13 | T-023, T-026, T-027 | AnimeTosho replaces Nyaa as the anime release source |
+| [T-050](T-050-safe-file-deletion.md) | 14 | T-013, T-039 | Destructive queue removal refuses to delete the only copy |
+| [T-051](T-051-honest-availability.md) | 14 | T-013, T-050 | Availability reads the filesystem; stale media rows reconcile |
+| [T-052](T-052-anime-identity-and-artwork.md) | 15 | T-004, T-022, T-028, T-029, T-037 | AniList identity must be an anime; split cours and artwork repair |
+| [T-053](T-053-release-search-expansion.md) | 15 | T-037, T-049, T-052 | Search every alias in several notations and match provider seasons |
+| [T-054](T-054-playback-progress.md) | 13 | T-048 | Read mpv's position and draw a seek bar on downloaded-file cards |
 
 ## Rules
 
 - Do not start a ticket whose dependency is not green.
-- Network tests use `respx`; never hit IMDb, Torrentio, nyaa.si, Jellyfin or Telegram in CI.
+- Network tests use `respx`; never hit IMDb, Torrentio, AnimeTosho, Jellyfin or Telegram in CI.
   libtorrent probes are faked in tests, never run against a real swarm.
 - Tick acceptance boxes in the ticket when done and note anything deferred.
 - New work discovered mid-ticket becomes a new ticket, not an unreported TODO.

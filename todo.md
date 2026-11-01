@@ -2,12 +2,12 @@
 
 1. Add Nyassi torrenst as a source
 2. Make anime classifying better
-3. Add a manual metdata fixer, such as misclassified stuff manually can be classified and stored.
+3. Add a manual metdata fixer, such as misclassified stuff manually classified and stored.
 4. There should be a copy magnet link option somewhere
 5. There should be a magnet metadata resolver (For example, some torrents are bundled versions of a tv show it might have different files in one torrent, so there should be a collpsible window that shows the files under a torrent by fetching its metdata )
 6. also adding to 5, Daku should inherently try to match the episode and download that. 
 7. There should be a settings menu, with a setting, default providers for movies, tv shows and anime.
-8. Need a tracker for watched episodes, locally, we can look into a anilist or other integrations later. This could take inspiration from those websites, states like planning, watching, completed and stuff.
+8. Could use genre tags, could be cool. 
 
 
 
@@ -18,6 +18,4 @@
 4. Daku typography needs to be bigger, and can use some different font, a cyberpunk esque font.
 5. Remove the colored bars at the top from the cards, does not look good
 6. Related to 5, intsead do the colors behind the cards as glow, when hovering on it.
-7. The UI on PC is too compact to the left and right side is very much, in the area where it shows details and metdata, needs to flow and fill the right side as well. and can use this layout for vertical viewports. Like for PC and such viewports we can take genres and casts section and put it in the right. 
-8. Change the color of the IMDB rating pill to be yellow, rottentomatoes red, and metacritic green.
 
