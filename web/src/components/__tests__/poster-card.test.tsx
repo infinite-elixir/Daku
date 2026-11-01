@@ -63,6 +63,7 @@ describe("poster cards", () => {
     const card = screen.getByRole("link", { name: /Big Buck Bunny/i });
 
     expect(card).toHaveClass("poster-glow", glow);
+    expect(card.parentElement).not.toHaveClass("overflow-hidden");
     expect(container.querySelector(".h-0\\.5")).toBeNull();
   });
 

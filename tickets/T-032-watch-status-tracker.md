@@ -92,22 +92,22 @@ watched" statistics, and automatic status changes based on downloads.
 
 ## Acceptance criteria
 
-- [ ] Migration adds the three columns safely; existing titles read as untracked and unwatched.
-- [ ] A movie can be set to each status and the change survives a restart.
-- [ ] Marking one episode of a planning series moves it to watching; marking the last
+- [x] Migration adds the three columns safely; existing titles read as untracked and unwatched.
+- [x] A movie can be set to each status and the change survives a restart.
+- [x] Marking one episode of a planning series moves it to watching; marking the last
       non-special episode moves it to completed.
-- [ ] Marking a series completed sets every non-special episode watched; specials stay
+- [x] Marking a series completed sets every non-special episode watched; specials stay
       untouched.
-- [ ] Moving away from completed keeps progress unless `clear_progress=true`, and the UI asks
+- [x] Moving away from completed keeps progress unless `clear_progress=true`, and the UI asks
       first.
-- [ ] `dropped` and `on_hold` are not changed by episode toggles.
-- [ ] An explicit status change is never immediately overwritten by an automatic transition.
-- [ ] `next_episode` is the first unwatched non-special episode in season/episode order.
-- [ ] Library status filters compose with kind, wanted and availability filters.
-- [ ] `watched=true` returns completed titles consistently; it does not change `wanted`.
-- [ ] The episode checkbox does not steal the row's release-search click.
-- [ ] Preview has no status controls.
-- [ ] The control is keyboard operable and readable at 390 px.
+- [x] `dropped` and `on_hold` are not changed by episode toggles.
+- [x] An explicit status change is never immediately overwritten by an automatic transition.
+- [x] `next_episode` is the first unwatched non-special episode in season/episode order.
+- [x] Library status filters compose with kind, wanted and availability filters.
+- [x] `watched=true` returns completed titles consistently; it does not change `wanted`.
+- [x] The episode checkbox does not steal the row's release-search click.
+- [x] Preview has no status controls.
+- [x] The control is keyboard operable and readable at 390 px.
 
 ## Test plan
 
@@ -132,3 +132,5 @@ watched" statistics, and automatic status changes based on downloads.
   the fixer ticket owns that warning.
 - Update `AGENTS.md` §5 (episodes/titles), §7 (status is not a download state) and plan.md
   decision #13.
+- The header control is a native `<select>` at every breakpoint. On mobile the OS picker
+  stands in for a custom bottom sheet; it stays keyboard operable and needs no extra state.

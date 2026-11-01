@@ -3,17 +3,17 @@ import type { Availability, Kind } from "../lib/api";
 const KIND_STYLE: Record<Kind, { label: string; badge: string; glow: string }> = {
   movie: {
     label: "MOVIE",
-    badge: "bg-kind-movie/15 text-kind-movie",
+    badge: "text-kind-movie",
     glow: "poster-glow kind-glow-movie",
   },
   series: {
     label: "TV",
-    badge: "bg-kind-series/15 text-kind-series",
+    badge: "text-kind-series",
     glow: "poster-glow kind-glow-series",
   },
   anime: {
     label: "ANIME",
-    badge: "bg-kind-anime/15 text-kind-anime",
+    badge: "text-kind-anime",
     glow: "poster-glow kind-glow-anime",
   },
 };
@@ -39,7 +39,11 @@ const PILL = "inline-flex items-center px-2 py-0.5 text-micro font-medium";
 
 export function KindBadge({ kind }: { kind: Kind }) {
   const style = KIND_STYLE[kind];
-  return <span className={`${PILL} rounded ${style.badge}`}>{style.label}</span>;
+  return (
+    <span className={`text-micro font-semibold uppercase tracking-wide ${style.badge}`}>
+      {style.label}
+    </span>
+  );
 }
 
 export function kindGlowClass(kind: Kind): string {

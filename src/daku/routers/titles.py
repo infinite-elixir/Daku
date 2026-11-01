@@ -68,7 +68,10 @@ router = APIRouter(prefix="/api", tags=["library"])
 MetaKind = Literal["movie", "series"]
 LibraryKind = Literal["movie", "series", "anime"]
 AvailabilityFilter = Literal["none", "partial", "complete"]
-SortOrder = Literal["added", "title", "year", "kind", "availability"]
+WatchStatus = Literal["planning", "watching", "completed", "dropped", "on_hold"]
+WatchStatusFilter = Literal["planning", "watching", "completed", "dropped", "on_hold", "untracked"]
+SortOrder = Literal["added", "title", "year", "kind", "availability", "status_changed_at"]
+WATCH_STATUS_FILTERS = {"planning", "watching", "completed", "dropped", "on_hold", "untracked"}
 TargetProvider = Literal["anilist", "imdb_show", "tvdb_show", "mal"]
 MetadataSource = Literal["cinemeta", "tvdb", "anilist"]
 
@@ -94,6 +97,8 @@ class TitlePatchRequest(BaseModel):
     wanted: bool | None = None
     folder_name: str | None = Field(default=None, max_length=255)
     kind: LibraryKind | None = None
+    watch_status: WatchStatus | None = None
+    clear_progress: bool = False
 
     @field_validator("folder_name")
     @classmethod
@@ -109,9 +114,13 @@ class TitlePatchRequest(BaseModel):
 
     @model_validator(mode="after")
     def _require_at_least_one_field(self) -> TitlePatchRequest:
-        if not self.model_fields_set:
-            raise ValueError("provide at least one of wanted, folder_name or kind")
+        if not self.model_fields_set - {"clear_progress"}:
+            raise ValueError("provide at least one of wanted, folder_name, kind or watch_status")
         return self
+
+
+class EpisodeWatchRequest(BaseModel):
+    watched: bool
 
 
 class EpisodeFixRequest(BaseModel):
@@ -204,6 +213,8 @@ def _episode_payload(row: Any, available_ids: set[str]) -> dict[str, Any]:
         "air_date": row.air_date,
         "status": status,
         "present": present,
+        "watched": bool(row.watched),
+        "watched_at": row.watched_at,
     }
 
 
@@ -214,6 +225,7 @@ def _title_payload(
     availability: str | None = None,
     saved_release_count: int | None = None,
     file_count: int | None = None,
+    progress: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if availability is None:
         availability = titles_repo.availability_for(session, title)
@@ -221,6 +233,8 @@ def _title_payload(
         saved_release_count = titles_repo.saved_release_counts(session, [title.id]).get(title.id, 0)
     if file_count is None:
         file_count = len(media_files_repo.list_by_title(session, title.id))
+    if progress is None:
+        progress = episodes_repo.progress_for(session, title.id)
     return {
         "id": title.id,
         "kind": title.kind,
@@ -239,6 +253,11 @@ def _title_payload(
         "added_at": title.added_at,
         "wanted": title.wanted,
         "wanted_at": title.wanted_at,
+        "watch_status": title.watch_status,
+        "status_changed_at": title.status_changed_at,
+        "watched_episode_count": progress["watched_episode_count"],
+        "watchable_episode_count": progress["watchable_episode_count"],
+        "next_episode": progress["next_episode"],
         "availability": availability,
         "saved_release_count": saved_release_count,
         "file_count": file_count,
@@ -627,6 +646,26 @@ async def add_title(
     return _detail_payload(session, title)
 
 
+def _parse_status_filters(values: list[str] | None) -> list[str] | None:
+    if not values:
+        return None
+    parsed: list[str] = []
+    for value in values:
+        for token in value.split(","):
+            status = token.strip()
+            if not status:
+                continue
+            if status not in WATCH_STATUS_FILTERS:
+                raise AppError(
+                    code="INVALID_WATCH_STATUS",
+                    message=f"Unknown watch status filter: {status}",
+                    status_code=422,
+                )
+            if status not in parsed:
+                parsed.append(status)
+    return parsed or None
+
+
 @router.get("/titles")
 def list_titles(
     session: Annotated[Session, Depends(get_session)],
@@ -634,6 +673,8 @@ def list_titles(
     availability: Annotated[AvailabilityFilter | None, Query()] = None,
     wanted: Annotated[bool | None, Query()] = None,
     has_files: Annotated[bool | None, Query()] = None,
+    status: Annotated[list[str] | None, Query()] = None,
+    watched: Annotated[bool | None, Query()] = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
     sort: Annotated[SortOrder, Query()] = "added",
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
@@ -645,6 +686,8 @@ def list_titles(
         wanted=wanted,
         availability=availability,
         has_files=has_files,
+        statuses=_parse_status_filters(status),
+        watched=watched,
         q=q,
         sort=sort,
         limit=limit,
@@ -654,6 +697,7 @@ def list_titles(
     availability_by_id = titles_repo.availability_map(session, title_ids)
     saved_by_id = titles_repo.saved_release_counts(session, title_ids)
     files_by_id = titles_repo.file_counts(session, title_ids)
+    progress_by_id = episodes_repo.progress_map(session, title_ids)
     items = [
         _title_payload(
             session,
@@ -661,6 +705,7 @@ def list_titles(
             availability=availability_by_id.get(row.id, "none"),
             saved_release_count=saved_by_id.get(row.id, 0),
             file_count=files_by_id.get(row.id, 0),
+            progress=progress_by_id.get(row.id),
         )
         for row in rows
     ]
@@ -924,6 +969,7 @@ async def get_title_metadata(
 def patch_title(
     title_id: str,
     body: TitlePatchRequest,
+    request: Request,
     session: Annotated[Session, Depends(get_session)],
 ) -> dict[str, Any]:
     title = _require_title(session, title_id)
@@ -943,6 +989,62 @@ def patch_title(
         if updated is not None:
             title = updated
 
+    if "watch_status" in body.model_fields_set:
+        title = episodes_repo.set_title_watch_status(
+            session,
+            title=title,
+            status=body.watch_status,
+            clear_progress=body.clear_progress,
+        )
+        _publish(
+            request,
+            "watch.updated",
+            {
+                "title_id": title.id,
+                "watch_status": title.watch_status,
+                "status_changed_at": title.status_changed_at,
+                "source": "title",
+            },
+        )
+
+    return _detail_payload(session, title)
+
+
+@router.patch("/titles/{title_id}/episodes/{episode_id}")
+def patch_episode_watch(
+    title_id: str,
+    episode_id: str,
+    body: EpisodeWatchRequest,
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+) -> dict[str, Any]:
+    title = _require_title(session, title_id)
+    episode = episodes_repo.get_episode(session, episode_id)
+    if episode is None or episode.title_id != title.id:
+        raise AppError(
+            code="EPISODE_NOT_FOUND",
+            message=f"Episode {episode_id} is not part of title {title_id}",
+            status_code=404,
+        )
+
+    episode = episodes_repo.set_episode_watched(
+        session,
+        title=title,
+        episode=episode,
+        watched=body.watched,
+    )
+    _publish(
+        request,
+        "watch.updated",
+        {
+            "title_id": title.id,
+            "episode_id": episode.id,
+            "watched": episode.watched,
+            "watch_status": title.watch_status,
+            "status_changed_at": title.status_changed_at,
+            "source": "episode",
+        },
+    )
     return _detail_payload(session, title)
 
 
@@ -1420,6 +1522,8 @@ async def metadata_preview(
         "added_at": existing.added_at if existing is not None else None,
         "wanted": existing.wanted if existing is not None else False,
         "wanted_at": existing.wanted_at if existing is not None else None,
+        "watch_status": existing.watch_status if existing is not None else None,
+        "status_changed_at": existing.status_changed_at if existing is not None else None,
         "availability": (
             titles_repo.availability_for(session, existing) if existing is not None else "none"
         ),

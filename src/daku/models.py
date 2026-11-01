@@ -65,6 +65,9 @@ class Title(Base):
         Boolean, nullable=False, default=False, server_default=text("0")
     )
     wanted_at: Mapped[str | None] = mapped_column(String(40))
+    # T-032: local watch intent. NULL means untracked; availability never depends on it.
+    watch_status: Mapped[str | None] = mapped_column(String(16))
+    status_changed_at: Mapped[str | None] = mapped_column(String(40))
 
     episodes: Mapped[list[Episode]] = relationship(
         back_populates="title", cascade="all, delete-orphan", passive_deletes=True
@@ -96,6 +99,11 @@ class Episode(Base):
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default="missing", server_default=text("'missing'")
     )
+    # T-032: progress source of truth for series/anime. Specials never count.
+    watched: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("0")
+    )
+    watched_at: Mapped[str | None] = mapped_column(String(40))
 
     title: Mapped[Title] = relationship(back_populates="episodes")
     releases: Mapped[list[Release]] = relationship(

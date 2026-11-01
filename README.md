@@ -16,14 +16,6 @@ streaming while downloading.
 
 ---
 
-## Screenshots
-
-| Library | Title page |
-|---|---|
-| ![Library grid](example_screenshots/library.png) | ![Title detail with downloaded file](example_screenshots/title-page.png) |
-
----
-
 ## Features
 
 ### Library and metadata
@@ -37,7 +29,10 @@ streaming while downloading.
   are persisted separately so a metadata refresh cannot overwrite your decision.
 - AniList identity validation: a manga id is rejected instead of silently saved, and a
   failed refresh can repair dead artwork.
-- Wanted / downloaded / "no file yet" filters, watch-status labels and toasts.
+- Local watch-status tracking per title (`planning`, `watching`, `completed`, `dropped`,
+  `on_hold`) with per-episode progress, next-up display and sticky manual statuses.
+- Library filters for kind, downloads, watch status and unwatched titles, with a compact
+  expandable filter bar. Cards use icon-based availability and progress indicators.
 
 ### Release discovery
 - **Torrentio** for movies and TV, with per-kind provider lists, quality filters, dedupe,
@@ -89,7 +84,7 @@ This is an alpha; some planned pieces are still missing:
 - **Jellyfin (T-014):** no library scan or item lookup.
 - **Telegram (T-015–T-017):** no bot, archive channel or file pull-back.
 - **PWA install (T-018)** and the real installer/systemd setup (T-019).
-- **Hardening (T-020)** and remaining watch-status / metadata-recovery tickets.
+- **Hardening (T-020)** and remaining metadata-recovery tickets.
 - A real installer, wider platform support (macOS/Windows) and multi-user auth are out of
   scope for v1.
 

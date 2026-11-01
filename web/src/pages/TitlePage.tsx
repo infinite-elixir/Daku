@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
+import { DeleteTitleDialog } from "../components/DeleteTitleDialog";
+import { PlayIcon, PencilIcon, TrashIcon } from "../components/icons";
 import { ReleasesSection } from "../components/ReleasesSection";
 import { MetadataFixerDialog } from "../components/MetadataFixerDialog";
 import { TitleView } from "../components/TitleView";
@@ -11,14 +13,42 @@ import {
   getTitle,
   getTitleFiles,
   getTitleMetadata,
+  patchEpisode,
   patchTitle,
+  playMediaFile,
   reconcileTitleMedia,
   refreshTitleMetadata,
   type Episode,
+  type MediaFileItem,
   type TitleDetail,
   type TitleFilesResponse,
   type TitleMetadata,
+  type WatchStatus,
 } from "../lib/api";
+import { WATCH_STATUS_OPTIONS } from "../lib/watch";
+
+function choosePlayableFile(
+  files: TitleFilesResponse | null | undefined,
+  title: TitleDetail,
+): MediaFileItem | null {
+  const items = files?.items ?? [];
+  if (items.length === 0) {
+    return null;
+  }
+  if (title.kind !== "movie" && title.next_episode) {
+    const next = title.next_episode;
+    const episode = title.episodes.find(
+      (row) => row.season === next.season && row.episode === next.episode,
+    );
+    if (episode) {
+      const match = items.find((file) => file.episode_id === episode.id);
+      if (match) {
+        return match;
+      }
+    }
+  }
+  return items.find((file) => file.is_primary) ?? items[0] ?? null;
+}
 
 function TitleSkeleton() {
   return (
@@ -71,7 +101,7 @@ export function TitlePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [fixerOpen, setFixerOpen] = useState(searchParams.get("fix") === "classification");
 
   const { data: title, error, isLoading, refetch } = useQuery<TitleDetail>({
@@ -97,16 +127,99 @@ export function TitlePage() {
     retry: false,
   });
 
-  const wantedMutation = useMutation({
-    mutationFn: (wanted: boolean) => patchTitle(id, { wanted }),
+  const watchStatusMutation = useMutation({
+    mutationFn: ({
+      status,
+      clearProgress,
+    }: {
+      status: WatchStatus | null;
+      clearProgress: boolean;
+    }) => patchTitle(id, { watch_status: status, clear_progress: clearProgress }),
+    onMutate: async ({ status }) => {
+      await queryClient.cancelQueries({ queryKey: ["title", id] });
+      const previous = queryClient.getQueryData<TitleDetail>(["title", id]);
+      if (previous) {
+        queryClient.setQueryData(["title", id], { ...previous, watch_status: status });
+      }
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["title", id], context.previous);
+      }
+    },
     onSuccess: (updated) => {
       queryClient.setQueryData(["title", id], updated);
       void queryClient.invalidateQueries({ queryKey: ["library"] });
     },
   });
 
+  const episodeMutation = useMutation({
+    mutationFn: ({ episodeId, watched }: { episodeId: string; watched: boolean }) =>
+      patchEpisode(id, episodeId, watched),
+    onMutate: async ({ episodeId, watched }) => {
+      await queryClient.cancelQueries({ queryKey: ["title", id] });
+      const previous = queryClient.getQueryData<TitleDetail>(["title", id]);
+      if (previous) {
+        queryClient.setQueryData(["title", id], {
+          ...previous,
+          episodes: previous.episodes.map((episode) =>
+            episode.id === episodeId ? { ...episode, watched } : episode,
+          ),
+        });
+      }
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["title", id], context.previous);
+      }
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["title", id], updated);
+      void queryClient.invalidateQueries({ queryKey: ["library"] });
+    },
+  });
+
+  const bulkWatchMutation = useMutation({
+    mutationFn: async (episodes: Episode[]) => {
+      let updated: TitleDetail | null = null;
+      for (const episode of episodes) {
+        updated = await patchEpisode(id, episode.id, true);
+      }
+      return updated;
+    },
+    onSuccess: (updated) => {
+      if (updated) {
+        queryClient.setQueryData(["title", id], updated);
+      }
+      void queryClient.invalidateQueries({ queryKey: ["library"] });
+    },
+  });
+
+  function changeWatchStatus(status: WatchStatus | null) {
+    const leavingCompleted = title?.watch_status === "completed" && status !== "completed";
+    const clearProgress =
+      leavingCompleted &&
+      window.confirm("Clear watch progress for every episode? Cancel keeps your progress.");
+    watchStatusMutation.mutate({ status, clearProgress });
+  }
+
+  const playMutation = useMutation({
+    mutationFn: () => {
+      if (!title) {
+        throw new Error("Title is not loaded");
+      }
+      const file = choosePlayableFile(files, title);
+      if (!file) {
+        throw new Error("No downloaded file to play");
+      }
+      return playMediaFile(file.id);
+    },
+  });
+
   const deleteMutation = useMutation({
-    mutationFn: () => deleteTitle(id, true),
+    mutationFn: (deleteFiles: boolean) => deleteTitle(id, !deleteFiles),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["library"] });
       navigate("/library");
@@ -182,59 +295,61 @@ export function TitlePage() {
     }, 0);
   }
 
+  const playable = choosePlayableFile(files, title);
+
   const actions = (
     <>
       <button
         type="button"
-        aria-pressed={title.wanted}
-        disabled={wantedMutation.isPending}
-        onClick={() => wantedMutation.mutate(!title.wanted)}
-        className={[
-          "min-h-control rounded-control border px-3 text-small font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-          title.wanted
-            ? "border-accent/50 bg-accent/15 text-accent hover:bg-accent/20"
-            : "border-border-strong text-fg hover:bg-hover",
-        ].join(" ")}
+        aria-label="Play"
+        title={playable ? "Play in mpv" : "Nothing downloaded yet"}
+        disabled={!playable || playMutation.isPending}
+        onClick={() => playMutation.mutate()}
+        className="inline-flex min-h-control items-center gap-2 rounded-control border border-border-strong px-3 text-small font-semibold text-fg transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:border-border-subtle disabled:text-fg-comment disabled:opacity-50"
       >
-        {title.wanted ? "Wanted" : "Mark wanted"}
+        <PlayIcon className="h-3.5 w-3.5" />
+        <span>{playMutation.isPending ? "Playing…" : "Play"}</span>
+      </button>
+
+      <label className="inline-flex items-center">
+        <select
+          aria-label="Watch status"
+          value={title.watch_status ?? ""}
+          disabled={watchStatusMutation.isPending}
+          onChange={(event) =>
+            changeWatchStatus(
+              event.target.value === "" ? null : (event.target.value as WatchStatus),
+            )
+          }
+          className="min-h-control rounded-control border border-border-strong bg-panel px-2 text-small font-semibold text-fg disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          {WATCH_STATUS_OPTIONS.map((option) => (
+            <option key={option.value || "untracked"} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <button
+        type="button"
+        aria-label="Fix metadata"
+        title="Fix metadata"
+        onClick={() => setFixerOpen(true)}
+        className="inline-flex min-h-control w-control items-center justify-center rounded-control border border-border-strong text-fg hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        <PencilIcon />
       </button>
 
       <button
         type="button"
-        onClick={() => setFixerOpen(true)}
-        className="min-h-control rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
+        aria-label="Delete title"
+        title="Delete title"
+        onClick={() => setDeleteOpen(true)}
+        className="inline-flex min-h-control w-control items-center justify-center rounded-control border border-danger/60 text-danger hover:bg-danger/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
-        Fix metadata
+        <TrashIcon />
       </button>
-
-      {confirmingDelete ? (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={deleteMutation.isPending}
-            onClick={() => deleteMutation.mutate()}
-            className="min-h-control rounded-control border border-danger bg-danger px-3 text-small font-semibold text-canvas disabled:opacity-40"
-          >
-            {deleteMutation.isPending ? "Removing…" : "Confirm remove"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirmingDelete(false)}
-            className="min-h-control rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover"
-          >
-            Cancel
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setConfirmingDelete(true)}
-          className="min-h-control rounded-control border border-danger px-3 text-small font-semibold text-danger hover:bg-danger/10"
-        >
-          Remove
-        </button>
-      )}
-      <span className="text-small text-fg-comment">Removing keeps files on disk.</span>
     </>
   );
 
@@ -281,9 +396,24 @@ export function TitlePage() {
           {refreshMetadataMutation.error.message}
         </p>
       ) : null}
-      {wantedMutation.error ? (
+      {playMutation.error ? (
         <p role="alert" className="text-small text-danger">
-          {wantedMutation.error.message}
+          {playMutation.error.message}
+        </p>
+      ) : null}
+      {watchStatusMutation.error ? (
+        <p role="alert" className="text-small text-danger">
+          {watchStatusMutation.error.message}
+        </p>
+      ) : null}
+      {episodeMutation.error ? (
+        <p role="alert" className="text-small text-danger">
+          {episodeMutation.error.message}
+        </p>
+      ) : null}
+      {bulkWatchMutation.error ? (
+        <p role="alert" className="text-small text-danger">
+          {bulkWatchMutation.error.message}
         </p>
       ) : null}
       {deleteMutation.error ? (
@@ -322,6 +452,11 @@ export function TitlePage() {
       }
       selected={selected}
       onSelectEpisode={toggleEpisode}
+      onToggleWatched={(episode, watched) =>
+        episodeMutation.mutate({ episodeId: episode.id, watched })
+      }
+      onBulkWatched={(episodes) => bulkWatchMutation.mutate(episodes)}
+      bulkWatchPending={bulkWatchMutation.isPending}
       onCollapse={clearSelection}
       onCleanupMissing={() => cleanupMutation.mutate()}
       cleanupPending={cleanupMutation.isPending}
@@ -352,6 +487,15 @@ export function TitlePage() {
         </div>
       }
     />
+      {deleteOpen ? (
+        <DeleteTitleDialog
+          titleName={title.title}
+          pending={deleteMutation.isPending}
+          error={deleteMutation.error?.message ?? null}
+          onCancel={() => setDeleteOpen(false)}
+          onConfirm={(deleteFiles) => deleteMutation.mutate(deleteFiles)}
+        />
+      ) : null}
       {fixerOpen ? (
         <MetadataFixerDialog
           title={title}

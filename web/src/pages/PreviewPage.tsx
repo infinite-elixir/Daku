@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { TitleView } from "../components/TitleView";
+import { watchStatusLabel } from "../lib/watch";
 import {
   addTitle,
   ApiError,
@@ -208,6 +209,11 @@ export function PreviewPage() {
       actions={
         <>
           {actions}
+          {libraryId !== null && data.watch_status ? (
+            <span className="text-small text-fg-muted">
+              In library: {watchStatusLabel(data.watch_status)}
+            </span>
+          ) : null}
           <span className="text-small text-fg-comment">
             Preview is metadata only. Nothing is downloaded.
           </span>

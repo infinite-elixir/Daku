@@ -7,10 +7,13 @@ import type {
   Availability,
   Episode,
   Kind,
+  NextEpisode,
   SeasonInfo,
   TitleFilesResponse,
   TitleMetadata,
+  WatchStatus,
 } from "../lib/api";
+import { EyeIcon } from "./icons";
 import { AvailabilityPill, EpisodeStatusPill, KindBadge } from "./Pills";
 import { DownloadedFiles } from "./DownloadedFiles";
 import { ExpandableText } from "./ExpandableText";
@@ -30,6 +33,11 @@ export interface TitleViewData {
   folder_name: string | null;
   availability: Availability;
   wanted: boolean;
+  watch_status?: WatchStatus | null;
+  status_changed_at?: string | null;
+  watched_episode_count?: number;
+  watchable_episode_count?: number;
+  next_episode?: NextEpisode | null;
   saved_release_count: number;
   episode_count: number;
   available_episode_count: number;
@@ -50,6 +58,9 @@ export interface TitleViewProps {
   files?: TitleFilesResponse | null;
   selected?: Episode | null;
   onSelectEpisode?: (episode: Episode) => void;
+  onToggleWatched?: (episode: Episode, watched: boolean) => void;
+  onBulkWatched?: (episodes: Episode[]) => void;
+  bulkWatchPending?: boolean;
   /** Called when switching seasons should close the currently open card. */
   onCollapse?: () => void;
   /** Rendered inside the expanded episode card. Omit for a read-only preview. */
@@ -103,6 +114,9 @@ export function TitleView({
   files = null,
   selected = null,
   onSelectEpisode,
+  onToggleWatched,
+  onBulkWatched,
+  bulkWatchPending = false,
   onCollapse,
   renderEpisodeExpanded,
   emptyEpisodesAction,
@@ -122,13 +136,33 @@ export function TitleView({
   const [activeSeason, setActiveSeason] = useState<number | null>(
     () => selected?.season ?? seasons[0] ?? null,
   );
+  const [seasonMenuOpen, setSeasonMenuOpen] = useState(false);
   const visibleEpisodes = useMemo(
     () => episodesForSeason(title.episodes, activeSeason),
     [title.episodes, activeSeason],
   );
+  const seasonEpisodesToMark = visibleEpisodes.filter(
+    (episode) => episode.season !== 0 && !episode.watched,
+  );
+  const previousEpisodesToMark =
+    activeSeason !== null && activeSeason !== 0
+      ? title.episodes.filter(
+          (episode) =>
+            episode.season !== 0 && episode.season < activeSeason && !episode.watched,
+        )
+      : [];
   const tabRefs = useRef(new Map<number, HTMLButtonElement>());
   const isMovie = title.kind === "movie";
   const missingFiles = title.missing_file_count ?? 0;
+  const watchedCount = title.watched_episode_count ?? 0;
+  const watchableCount = title.watchable_episode_count ?? 0;
+  const watchPercent =
+    watchableCount > 0 ? Math.min(100, Math.round((watchedCount / watchableCount) * 100)) : 0;
+  const nextEpisode = title.next_episode
+    ? `S${String(title.next_episode.season).padStart(2, "0")}E${String(
+        title.next_episode.episode,
+      ).padStart(2, "0")}`
+    : null;
   // Prefer real wide art so the banner is not a hard crop of a 2:3 poster.
   const bannerUrl = title.banner_url ?? metadata?.banner_url ?? title.poster_url;
 
@@ -148,6 +182,7 @@ export function TitleView({
 
   function changeSeason(season: number) {
     setActiveSeason(season);
+    setSeasonMenuOpen(false);
     if (selected !== null && selected.season !== season) {
       onCollapse?.();
     }
@@ -243,11 +278,6 @@ export function TitleView({
                     ) : null}
                   </span>
                 ) : null}
-                {title.wanted ? (
-                  <span className="rounded-full bg-accent/15 px-2 py-0.5 text-micro font-medium text-accent">
-                    Wanted
-                  </span>
-                ) : null}
               </div>
 
               <div>
@@ -292,6 +322,32 @@ export function TitleView({
                     </div>
                   ) : null}
                 </dl>
+              ) : null}
+
+              {!isMovie && watchableCount > 0 ? (
+                <div data-testid="watch-progress" className="flex max-w-[320px] flex-col gap-1">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2 text-small">
+                    <span className="font-semibold text-fg">
+                      {watchedCount} / {watchableCount} watched
+                    </span>
+                    {title.watch_status === "watching" && nextEpisode ? (
+                      <span className="text-fg-muted">Next up: {nextEpisode}</span>
+                    ) : null}
+                  </div>
+                  <div
+                    role="progressbar"
+                    aria-label="Episode watch progress"
+                    aria-valuemin={0}
+                    aria-valuemax={watchableCount}
+                    aria-valuenow={watchedCount}
+                    className="h-1.5 overflow-hidden rounded-full bg-hover"
+                  >
+                    <div
+                      className="h-full rounded-full bg-success transition-[width]"
+                      style={{ width: `${watchPercent}%` }}
+                    />
+                  </div>
+                </div>
               ) : null}
 
               {actions ? (
@@ -394,6 +450,52 @@ export function TitleView({
                 id={`season-panel-${activeSeason ?? 0}`}
                 aria-labelledby={`season-tab-${activeSeason ?? 0}`}
               >
+                {onBulkWatched ? (
+                  <div className="relative mb-2 flex justify-end">
+                    <button
+                      type="button"
+                      aria-haspopup="menu"
+                      aria-expanded={seasonMenuOpen}
+                      aria-label={`Season ${activeSeason ?? 0} actions`}
+                      disabled={bulkWatchPending}
+                      onClick={() => setSeasonMenuOpen((open) => !open)}
+                      className="min-h-control-sm rounded-control border border-border-subtle px-3 text-small font-semibold text-fg-muted hover:bg-hover hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Season actions
+                    </button>
+                    {seasonMenuOpen ? (
+                      <div
+                        role="menu"
+                        className="absolute right-0 top-full z-20 mt-1 flex min-w-[190px] flex-col rounded-panel border border-border-strong bg-panel p-1 shadow-lg"
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={bulkWatchPending || seasonEpisodesToMark.length === 0}
+                          onClick={() => {
+                            setSeasonMenuOpen(false);
+                            onBulkWatched(seasonEpisodesToMark);
+                          }}
+                          className="min-h-control-sm rounded-control px-3 text-left text-small text-fg hover:bg-hover disabled:opacity-40"
+                        >
+                          Mark season watched
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={bulkWatchPending || previousEpisodesToMark.length === 0}
+                          onClick={() => {
+                            setSeasonMenuOpen(false);
+                            onBulkWatched(previousEpisodesToMark);
+                          }}
+                          className="min-h-control-sm rounded-control px-3 text-left text-small text-fg hover:bg-hover disabled:opacity-40"
+                        >
+                          Mark previous watched
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 <ul className="flex flex-col gap-2">
                   {visibleEpisodes.map((episode) => {
                     const expanded = selected?.id === episode.id;
@@ -403,7 +505,7 @@ export function TitleView({
                         key={episode.id}
                         id={`episode-card-${episode.season}-${episode.episode}`}
                         className={[
-                          "overflow-hidden rounded-panel border bg-panel",
+                          "relative overflow-hidden rounded-panel border bg-panel",
                           expanded ? "border-accent/60" : "border-border-subtle",
                         ].join(" ")}
                       >
@@ -416,6 +518,7 @@ export function TitleView({
                           onClick={() => onSelectEpisode?.(episode)}
                           className={[
                             ROW_CLASS,
+                            onToggleWatched ? "pr-12" : "",
                             expanded ? "bg-accent/10 text-fg" : "hover:bg-hover",
                           ].join(" ")}
                         >
@@ -446,6 +549,32 @@ export function TitleView({
                           ) : null}
                           <EpisodeStatusPill status={episode.status} />
                         </button>
+                        {onToggleWatched ? (
+                          <span
+                            className="absolute right-3 top-0 z-10 flex h-row-lg items-center"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <label className="inline-flex cursor-pointer items-center justify-center rounded-control p-1 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
+                              <input
+                                type="checkbox"
+                                aria-label={`Mark ${episode.label} watched`}
+                                checked={Boolean(episode.watched)}
+                                onChange={(event) =>
+                                  onToggleWatched(episode, event.target.checked)
+                                }
+                                className="sr-only"
+                              />
+                              <EyeIcon
+                                className={[
+                                  "h-4 w-4 transition-colors",
+                                  episode.watched
+                                    ? "text-success"
+                                    : "text-fg-comment hover:text-fg",
+                                ].join(" ")}
+                              />
+                            </label>
+                          </span>
+                        ) : null}
                         {expandable && expanded ? (
                           <div
                             id={`episode-panel-${episode.season}-${episode.episode}`}

@@ -116,6 +116,8 @@ def query_library(
     wanted: bool | None = None,
     availability: str | None = None,
     has_files: bool | None = None,
+    statuses: Sequence[str] | None = None,
+    watched: bool | None = None,
     q: str | None = None,
     sort: str = "added",
     limit: int = 50,
@@ -128,6 +130,22 @@ def query_library(
         statement = statement.where(Title.kind == kind)
     if wanted is not None:
         statement = statement.where(Title.wanted.is_(wanted))
+    if statuses:
+        concrete = [status for status in statuses if status != "untracked"]
+        clauses = []
+        if concrete:
+            clauses.append(Title.watch_status.in_(concrete))
+        if "untracked" in statuses:
+            clauses.append(Title.watch_status.is_(None))
+        if clauses:
+            statement = statement.where(or_(*clauses))
+    if watched is not None:
+        # Convenience only: ``watched`` means "completed", not a separate flag.
+        statement = statement.where(
+            Title.watch_status == "completed"
+            if watched
+            else or_(Title.watch_status.is_(None), Title.watch_status != "completed")
+        )
     if has_files is not None:
         with_files = select(MediaFile.title_id)
         statement = statement.where(
@@ -147,10 +165,11 @@ def query_library(
     if availability is not None:
         rows = [row for row in rows if availability_by_id[row.id] == availability]
 
-    if sort == "added":
+    if sort in {"added", "status_changed_at"}:
         # Two stable passes: newest first, then title/id for deterministic ties.
         rows.sort(key=lambda row: (row.title.casefold(), row.id))
-        rows.sort(key=lambda row: row.added_at, reverse=True)
+        field = "added_at" if sort == "added" else "status_changed_at"
+        rows.sort(key=lambda row: getattr(row, field) or "", reverse=True)
     else:
         rows.sort(key=lambda row: _sort_key(row, sort, availability_by_id))
     total = len(rows)

@@ -3,8 +3,35 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ReleasesResponse, TitleDetail } from "../../lib/api";
+import type { MediaFileItem, ReleasesResponse, TitleDetail, TitleFilesResponse } from "../../lib/api";
 import { TitlePage } from "../TitlePage";
+
+function emptyFiles(titleId = "title-1", items: MediaFileItem[] = []): TitleFilesResponse {
+  return {
+    title_id: titleId,
+    file_count: items.length,
+    total_size_bytes: 1024,
+    seasons: [],
+    items,
+  };
+}
+
+function mediaFile(overrides: Partial<MediaFileItem> = {}): MediaFileItem {
+  return {
+    id: "file-1",
+    download_id: null,
+    episode_id: null,
+    episode_label: null,
+    episode_name: null,
+    season: null,
+    episode: null,
+    file_name: "Big Buck Bunny.mkv",
+    size_bytes: 1024,
+    is_primary: true,
+    has_episode: false,
+    ...overrides,
+  };
+}
 
 function makeTitle(overrides: Partial<TitleDetail> = {}): TitleDetail {
   return {
@@ -63,7 +90,11 @@ function jsonResponse(payload: unknown, status = 200): Response {
   } as Response;
 }
 
-function renderTitle(title: TitleDetail, refreshResult?: unknown) {
+function renderTitle(
+  title: TitleDetail,
+  refreshResult?: unknown,
+  files: TitleFilesResponse = emptyFiles(title.id),
+) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
@@ -84,6 +115,9 @@ function renderTitle(title: TitleDetail, refreshResult?: unknown) {
       }
       if (url.includes("/releases")) {
         return jsonResponse(emptyReleases());
+      }
+      if (url.endsWith(`/api/titles/${title.id}/files`)) {
+        return jsonResponse(files);
       }
       if (url.startsWith("/api/titles/title-1")) {
         return jsonResponse(title);
@@ -186,7 +220,60 @@ describe("TitlePage banner", () => {
 
     const heading = await screen.findByRole("heading", { level: 1, name: "Big Buck Bunny" });
     expect(heading).toBeVisible();
-    expect(screen.getByRole("button", { name: "Mark wanted" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Play" })).toBeDisabled();
+  });
+
+  it("plays the primary downloaded file", async () => {
+    renderTitle(makeTitle(), undefined, emptyFiles("title-1", [mediaFile()]));
+
+    const play = await screen.findByRole("button", { name: "Play" });
+    expect(play).toBeEnabled();
+    fireEvent.click(play);
+
+    await waitFor(() => {
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        "/api/media-files/file-1/play",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+  });
+
+  it("opens a delete dialog that keeps files by default", async () => {
+    renderTitle(makeTitle());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Delete title" }));
+    expect(screen.getByRole("dialog", { name: "Delete title?" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        expect.stringContaining("keep_files=true"),
+        expect.objectContaining({ method: "DELETE" }),
+      );
+    });
+  });
+
+  it("can delete the files from the same dialog", async () => {
+    renderTitle(makeTitle());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Delete title" }));
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        expect.stringContaining("keep_files=false"),
+        expect.objectContaining({ method: "DELETE" }),
+      );
+    });
+  });
+
+  it("shows icon buttons for metadata editing and deletion", async () => {
+    renderTitle(makeTitle());
+
+    expect(await screen.findByRole("button", { name: "Fix metadata" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete title" })).toBeInTheDocument();
   });
 
   it("shows missing files and reconciles them on demand", async () => {

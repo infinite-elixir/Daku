@@ -381,6 +381,20 @@ def _migration_013(engine: Engine) -> None:
         conn.exec_driver_sql("ALTER TABLE media_files ADD COLUMN playback_updated_at TEXT")
 
 
+def _migration_014(engine: Engine) -> None:
+    """T-032: local watch status on titles plus per-episode progress."""
+
+    statements = [
+        "ALTER TABLE titles ADD COLUMN watch_status TEXT",
+        "ALTER TABLE titles ADD COLUMN status_changed_at TEXT",
+        "ALTER TABLE episodes ADD COLUMN watched INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE episodes ADD COLUMN watched_at TEXT",
+    ]
+    with engine.begin() as conn:
+        for statement in statements:
+            conn.exec_driver_sql(statement)
+
+
 class Migration:
     __slots__ = ("name", "upgrade", "version")
 
@@ -404,6 +418,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(11, "split-cour anime identities", _migration_011),
     Migration(12, "release-search aliases", _migration_012),
     Migration(13, "media file playback progress", _migration_013),
+    Migration(14, "local watch status and episode progress", _migration_014),
 )
 SCHEMA_VERSION = MIGRATIONS[-1].version
 

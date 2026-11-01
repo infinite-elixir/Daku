@@ -2,11 +2,20 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
-import { KindTabs, type KindFilter } from "../components/KindTabs";
 import { LibraryCard } from "../components/LibraryCard";
-import { listTitles, type LibraryResponse } from "../lib/api";
+import { ChevronDownIcon } from "../components/icons";
+import { listTitles, type LibraryResponse, type WatchStatusFilter } from "../lib/api";
+import { LIBRARY_STATUS_FILTERS, WATCH_STATUS_LABELS } from "../lib/watch";
 
 const GRID = "grid grid-cols-2 gap-card sm:grid-cols-4 lg:grid-cols-6";
+const PRIMARY_STATUSES: WatchStatusFilter[] = ["watching"];
+const KIND_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "movie", label: "Movies" },
+  { value: "series", label: "TV" },
+  { value: "anime", label: "Anime" },
+] as const;
+type KindFilter = (typeof KIND_OPTIONS)[number]["value"];
 
 function SkeletonGrid() {
   return (
@@ -50,19 +59,26 @@ function FilterChip({
 
 export function LibraryPage() {
   const [kind, setKind] = useState<KindFilter>("all");
-  const [wantedOnly, setWantedOnly] = useState(false);
-  const [noFileOnly, setNoFileOnly] = useState(false);
   const [downloadedOnly, setDownloadedOnly] = useState(false);
+  const [notWatchedOnly, setNotWatchedOnly] = useState(false);
+  const [statuses, setStatuses] = useState<WatchStatusFilter[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const { data, error, isLoading, refetch } = useQuery<LibraryResponse>({
-    queryKey: ["library", kind, wantedOnly, noFileOnly, downloadedOnly],
+    queryKey: [
+      "library",
+      kind,
+      downloadedOnly,
+      notWatchedOnly,
+      statuses.join(","),
+    ],
     queryFn: ({ signal }) =>
       listTitles(
         {
           kind: kind === "all" ? null : kind,
-          wanted: wantedOnly ? true : null,
-          availability: noFileOnly ? "none" : null,
           has_files: downloadedOnly ? true : null,
+          watched: notWatchedOnly ? false : null,
+          status: statuses,
           sort: "added",
           limit: 100,
         },
@@ -71,23 +87,26 @@ export function LibraryPage() {
     staleTime: 30_000,
   });
 
-  const filtered = kind !== "all" || wantedOnly || noFileOnly || downloadedOnly;
+  const filtered =
+    kind !== "all" || downloadedOnly || notWatchedOnly || statuses.length > 0;
+  const visibleStatuses = LIBRARY_STATUS_FILTERS.filter(
+    (status) => filtersOpen || statuses.includes(status) || PRIMARY_STATUSES.includes(status),
+  );
 
-  function toggleNoFile() {
-    setNoFileOnly((value) => {
-      const next = !value;
-      if (next) {
-        setDownloadedOnly(false);
-      }
-      return next;
-    });
+  function toggleStatus(status: WatchStatusFilter) {
+    setNotWatchedOnly(false);
+    setStatuses((current) =>
+      current.includes(status)
+        ? current.filter((value) => value !== status)
+        : [...current, status],
+    );
   }
 
-  function toggleDownloaded() {
-    setDownloadedOnly((value) => {
+  function toggleNotWatched() {
+    setNotWatchedOnly((value) => {
       const next = !value;
       if (next) {
-        setNoFileOnly(false);
+        setStatuses([]);
       }
       return next;
     });
@@ -110,13 +129,52 @@ export function LibraryPage() {
         </Link>
       </header>
 
-      <div className="relative flex flex-col gap-2">
-        <KindTabs value={kind} onChange={setKind} label="Filter library by kind" />
-        <div className="flex gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none]">
-          <FilterChip label="Wanted" active={wantedOnly} onClick={() => setWantedOnly((value) => !value)} />
-          <FilterChip label="Downloaded" active={downloadedOnly} onClick={toggleDownloaded} />
-          <FilterChip label="No file yet" active={noFileOnly} onClick={toggleNoFile} />
+      <div className="flex items-center gap-2">
+        <div
+          id="library-filter-bar"
+          role="group"
+          aria-label="Library filters"
+          className="flex min-w-0 flex-1 gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none]"
+        >
+          {KIND_OPTIONS.map((option) => (
+            <FilterChip
+              key={option.value}
+              label={option.label}
+              active={kind === option.value}
+              onClick={() => setKind(option.value)}
+            />
+          ))}
+          <FilterChip
+            label="Downloaded"
+            active={downloadedOnly}
+            onClick={() => setDownloadedOnly((value) => !value)}
+          />
+          {visibleStatuses.map((status) => (
+            <FilterChip
+              key={status}
+              label={WATCH_STATUS_LABELS[status]}
+              active={statuses.includes(status)}
+              onClick={() => toggleStatus(status)}
+            />
+          ))}
+          <FilterChip
+            label="Not watched"
+            active={notWatchedOnly}
+            onClick={toggleNotWatched}
+          />
         </div>
+        <button
+          type="button"
+          aria-expanded={filtersOpen}
+          aria-controls="library-filter-bar"
+          onClick={() => setFiltersOpen((value) => !value)}
+          className="inline-flex min-h-control-sm shrink-0 items-center gap-1 rounded-control border border-border-subtle px-2 text-small font-semibold text-fg-muted hover:bg-hover hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          {filtersOpen ? "Less" : "More"}
+          <ChevronDownIcon
+            className={`h-3.5 w-3.5 transition-transform ${filtersOpen ? "rotate-180" : ""}`}
+          />
+        </button>
       </div>
 
       {error ? (
@@ -138,12 +196,22 @@ export function LibraryPage() {
             01
           </p>
           <p className="mt-4 text-h2 font-semibold tracking-tight text-fg">
-            {filtered ? "No titles match these filters" : "Library is empty"}
+            {notWatchedOnly
+              ? "Nothing left unwatched"
+              : statuses.length > 0
+                ? "No titles with these watch statuses"
+                : filtered
+                  ? "No titles match these filters"
+                  : "Library is empty"}
           </p>
           <p className="mx-auto mt-1 max-w-[48ch] text-small text-fg-muted">
-            {filtered
-              ? "Clear a filter or search for something new."
-              : "Search for a title to add it. Saved entries stay here even with no file."}
+            {notWatchedOnly
+              ? "Every title matching the other filters is marked completed. Clear the filter or change a title's status."
+              : statuses.length > 0
+                ? "Watch status is your own local progress, separate from whether a file is available. Clear a status chip or set a status from a title page."
+                : filtered
+                  ? "Clear a filter or search for something new."
+                  : "Search for a title to add it. Saved entries stay here even with no file."}
           </p>
           <Link
             to="/search"

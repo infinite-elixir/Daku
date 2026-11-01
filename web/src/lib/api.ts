@@ -1,6 +1,14 @@
 export type Kind = "movie" | "series" | "anime";
 export type Availability = "none" | "partial" | "complete";
-export type SortOrder = "added" | "title" | "year" | "kind" | "availability";
+export type WatchStatus = "planning" | "watching" | "completed" | "dropped" | "on_hold";
+export type WatchStatusFilter = WatchStatus | "untracked";
+export type SortOrder =
+  | "added"
+  | "title"
+  | "year"
+  | "kind"
+  | "availability"
+  | "status_changed_at";
 
 export interface SearchResult {
   source: string;
@@ -42,10 +50,21 @@ export interface TitleSummary {
   added_at: string;
   wanted: boolean;
   wanted_at: string | null;
+  watch_status?: WatchStatus | null;
+  status_changed_at?: string | null;
+  watched_episode_count?: number;
+  watchable_episode_count?: number;
+  next_episode?: NextEpisode | null;
   availability: Availability;
   saved_release_count: number;
   file_count?: number;
   has_files?: boolean;
+}
+
+export interface NextEpisode {
+  season: number;
+  episode: number;
+  name: string | null;
 }
 
 export interface MediaFileItem {
@@ -107,6 +126,8 @@ export interface Episode {
   air_date: string | null;
   status: string;
   present?: boolean;
+  watched?: boolean;
+  watched_at?: string | null;
 }
 
 export interface SeasonInfo {
@@ -204,6 +225,8 @@ export interface PreviewTitle {
   banner_url: string | null;
   folder_name: string | null;
   wanted: boolean;
+  watch_status?: WatchStatus | null;
+  status_changed_at?: string | null;
   availability: Availability;
   saved_release_count: number;
   episode_count: number;
@@ -243,6 +266,8 @@ export interface LibraryFilters {
   availability?: Availability | null;
   wanted?: boolean | null;
   has_files?: boolean | null;
+  status?: WatchStatusFilter[] | null;
+  watched?: boolean | null;
   q?: string | null;
   sort?: SortOrder;
   limit?: number;
@@ -267,6 +292,8 @@ export interface PatchTitleBody {
   wanted?: boolean;
   folder_name?: string | null;
   kind?: Kind;
+  watch_status?: WatchStatus | null;
+  clear_progress?: boolean;
 }
 
 export type EditableField =
@@ -409,6 +436,9 @@ export function listTitles(filters: LibraryFilters = {}, signal?: AbortSignal): 
       availability: filters.availability ?? null,
       wanted: filters.wanted ?? null,
       has_files: filters.has_files ?? null,
+      status:
+        filters.status && filters.status.length > 0 ? filters.status.join(",") : null,
+      watched: filters.watched ?? null,
       q: filters.q ?? null,
       sort: filters.sort ?? "added",
       limit: filters.limit ?? 100,
@@ -502,6 +532,21 @@ export function patchTitle(id: string, body: PatchTitleBody): Promise<TitleDetai
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+export function patchEpisode(
+  id: string,
+  episodeId: string,
+  watched: boolean,
+): Promise<TitleDetail> {
+  return request<TitleDetail>(
+    `/api/titles/${encodeURIComponent(id)}/episodes/${encodeURIComponent(episodeId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ watched }),
+    },
+  );
 }
 
 export function deleteTitle(id: string, keepFiles = true): Promise<{ id: string; deleted: boolean }> {

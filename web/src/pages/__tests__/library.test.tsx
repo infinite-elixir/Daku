@@ -112,20 +112,27 @@ describe("LibraryPage", () => {
     expect(screen.getByRole("button", { name: "Movies" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("filters to entries with no file yet", async () => {
-    const fetchMock = stubLibrary([makeTitle()]);
+  it("expands the filter bar to reveal every watch status", async () => {
+    stubLibrary([makeTitle()]);
 
     renderPage();
 
     await screen.findByText("Big Buck Bunny");
-    fireEvent.click(screen.getByRole("button", { name: "No file yet" }));
+    expect(screen.queryByRole("button", { name: "Completed" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(screen.getByRole("button", { name: "Completed" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dropped" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Untracked" })).toBeInTheDocument();
+  });
 
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining("availability=none"),
-        expect.anything(),
-      );
-    });
+  it("removes the no-file and wanted filter chips", async () => {
+    stubLibrary([makeTitle()]);
+
+    renderPage();
+
+    await screen.findByText("Big Buck Bunny");
+    expect(screen.queryByRole("button", { name: "No file yet" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Wanted" })).not.toBeInTheDocument();
   });
 });
 
@@ -134,55 +141,38 @@ describe("LibraryPage downloaded filter", () => {
     vi.unstubAllGlobals();
   });
 
-  it("filters by has_files and clears the no-file filter", async () => {
+  it("filters by has_files", async () => {
     const fetchMock = stubLibrary([makeTitle()]);
 
     renderPage();
 
     await screen.findByText("Big Buck Bunny");
-    fireEvent.click(screen.getByRole("button", { name: "No file yet" }));
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "No file yet" })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      );
-    });
-
     fireEvent.click(screen.getByRole("button", { name: "Downloaded" }));
 
     expect(screen.getByRole("button", { name: "Downloaded" })).toHaveAttribute(
       "aria-pressed",
       "true",
-    );
-    expect(screen.getByRole("button", { name: "No file yet" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
     );
     await waitFor(() => {
       const calls = fetchMock.mock.calls.map(([url]) => String(url));
       const last = calls.at(-1) ?? "";
       expect(last).toContain("has_files=true");
-      expect(last).not.toContain("availability=none");
     });
   });
 
-  it("clears the downloaded filter when No file yet is toggled", async () => {
-    stubLibrary([makeTitle()]);
+  it("adds a derived Not watched filter", async () => {
+    const fetchMock = stubLibrary([makeTitle()]);
 
     renderPage();
 
     await screen.findByText("Big Buck Bunny");
-    fireEvent.click(screen.getByRole("button", { name: "Downloaded" }));
-    fireEvent.click(screen.getByRole("button", { name: "No file yet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Not watched" }));
 
-    expect(screen.getByRole("button", { name: "Downloaded" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
-    expect(screen.getByRole("button", { name: "No file yet" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map(([url]) => String(url));
+      const last = calls.at(-1) ?? "";
+      expect(last).toContain("watched=false");
+    });
   });
 
   it("exposes the files link outside the poster anchor", async () => {

@@ -75,7 +75,7 @@ def _count(session: Session, model: type[object]) -> int:
 def test_fresh_database_has_full_schema(db: tuple[Engine, sessionmaker[Session]]) -> None:
     engine, _factory = db
 
-    assert current_version(engine) == SCHEMA_VERSION == 13
+    assert current_version(engine) == SCHEMA_VERSION == 14
     assert set(table_names(engine)) == ALL_TABLES
 
 

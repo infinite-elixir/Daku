@@ -192,6 +192,14 @@ Resolution order: environment → `~/.config/daku/config.json` → defaults.
   `playback_updated_at` (migration v13). The host player's JSON IPC socket is read-only;
   progress is metadata, never a download or episode state. Positions older than the file
   itself are display-only: Daku never seeks on the user's behalf.
+- T-032 adds `titles.watch_status`, `titles.status_changed_at`, `episodes.watched` and
+  `episodes.watched_at` (migration v14). `watch_status` is one of `planning`, `watching`,
+  `completed`, `dropped`, `on_hold` or `NULL` (untracked); it never gates downloads,
+  availability or Jellyfin scans, and `wanted` stays the orthogonal acquire intent.
+  Series/anime progress is derived from `episodes.watched` (non-special episodes only) and
+  never stored twice. Only episode writes may auto-advance `NULL`/`planning` → `watching`
+  and all-watched → `completed`; `dropped` and `on_hold` are sticky, and an explicit status
+  change is never overwritten by those transitions.
 - Deleting a title cascades to episodes/releases/files but **never** deletes files on disk
   unless the caller passes `keep_files=false` explicitly.
 
@@ -346,6 +354,13 @@ torrent stays `paused`; the worker retries the selection with backoff. Nothing r
 whole pack and the organiser only sees the selected files. The magnet necessarily adds the
 whole torrent: "download only one file" means file priorities, never a partial torrent.
 Selection is metadata, not a state; a failed selection is an ordinary `failed` row.
+
+Watch status (T-032) is user-facing intent and progress, not a download state. `watch_status`
+and `episodes.watched` live outside the state machine above: the worker never reads or writes
+them, availability stays derived from `media_files`, and episode toggles only auto-advance
+`watching`/`completed` inside the same transaction as the episode write. `dropped`/`on_hold`
+and any explicit title status change are never overwritten by that path. Every change emits
+`watch.updated`; it is a UI/library event, not a queue transition.
 
 ---
 

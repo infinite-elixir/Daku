@@ -11,11 +11,25 @@ function initials(title: string): string {
     .join("");
 }
 
-export function PosterArt({ url, title }: { url: string | null; title: string }) {
+export function PosterArt({
+  url,
+  title,
+  bleed = false,
+}: {
+  url: string | null;
+  title: string;
+  /** Fill the card's outer frame; the fixed aspect keeps every poster the same height. */
+  bleed?: boolean;
+}) {
   const [failed, setFailed] = useState(false);
 
   return (
-    <div className="relative aspect-[2/3] overflow-hidden rounded-panel border border-border-subtle bg-panel-alt">
+    <div
+      className={[
+        "pointer-events-none relative aspect-[2/3] overflow-hidden bg-panel-alt",
+        bleed ? "rounded-t-panel" : "rounded-panel border border-border-subtle",
+      ].join(" ")}
+    >
       {url && !failed ? (
         <img
           src={url}
