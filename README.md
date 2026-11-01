@@ -103,7 +103,7 @@ The full ticket list and dependency graph live in [`plan.md`](plan.md) and
 | Component | Notes |
 |---|---|
 | Linux | systemd user services, XDG paths. v1 target. |
-| Windows | Via **WSL2** (recommended). Native Windows is experimental; see [Windows](#windows). |
+| Windows | Native (recommended, experimental); WSL2 optional for full parity. See [Windows](#windows). |
 | Python 3.12 + [uv](https://docs.astral.sh/uv/) | Backend and CLI |
 | Node 20+ + [pnpm](https://pnpm.io/) | Builds the web UI |
 | qBittorrent (`qbittorrent-nox`) | Torrent engine; enable the Web UI |
@@ -223,88 +223,25 @@ starting a probe, launching mpv or downloading anything.
 
 ## Windows
 
-Windows is **not a v1 target**. The supported way to run Daku on Windows is **WSL2**, which
-gives you the same Linux environment the project is built and tested for. Native Windows
-works for the core app, but some features are experimental — see the caveats below.
+You do **not** need WSL2 to run Daku. The backend is plain Python + FastAPI + SQLAlchemy and
+`uv` supports Windows, so the core app runs natively. WSL2 is only worth it if you want the
+one feature that needs Unix-domain sockets (mpv playback progress) or if you prefer the
+Linux tooling/systemd.
 
-### Option A — WSL2 (recommended)
+### What works on native Windows
 
-This runs Daku, qBittorrent and aria2 inside an Ubuntu environment while you use it from a
-normal Windows browser.
+| Feature | Native Windows |
+|---|---|
+| Library, metadata, release search (Torrentio + AnimeTosho) | Yes |
+| qBittorrent and aria2 downloads, live progress | Yes (same Web API / JSON-RPC) |
+| Downloaded files, ffmpeg thumbnails | Yes |
+| Launching files in mpv | Yes (needs `mpv.exe` on `PATH`) |
+| mpv playback progress / seek bar | **No** — Daku reads mpv over a Unix-domain socket |
+| `systemd` user unit | No — use Task Scheduler or NSSM |
+| `libtorrent` probe extra | Untested; wheels may not exist for Windows |
+| `secrets.json` mode `0600` | Mode bits are ignored; rely on NTFS folder permissions |
 
-1. Install WSL2 and Ubuntu from PowerShell (run as Administrator), then reboot:
-
-   ```powershell
-   wsl --install -d Ubuntu-24.04
-   ```
-
-2. Open the Ubuntu terminal and install the runtime dependencies:
-
-   ```bash
-   sudo apt update
-   sudo apt install -y python3.12 python3.12-venv git aria2 ffmpeg mpv qbittorrent-nox
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-   sudo apt install -y nodejs
-   corepack enable pnpm
-   ```
-
-   Restart the shell so `uv` is on `PATH`.
-
-3. Clone and build exactly as in the Linux instructions:
-
-   ```bash
-   git clone <your-fork-url> daku
-   cd daku
-   uv sync
-   pnpm -C web install
-   pnpm -C web build
-   ```
-
-4. Configure qBittorrent and Daku using the Linux paths from
-   [step 4](#4-configure-daku). Files stay inside the WSL filesystem (for example
-   `~/Downloads/Daku` and `~/Media`); avoid `/mnt/c/...` for the library because hardlinks
-   and permissions do not behave the same across the Windows drive mount.
-
-5. Run it:
-
-   ```bash
-   uv run daku doctor
-   uv run daku
-   ```
-
-   Open `http://localhost:8420` in your Windows browser. WSL2 forwards `localhost`
-   automatically.
-
-6. **Optional: systemd as a user service.** Add this to `/etc/wsl.conf`:
-
-   ```ini
-   [boot]
-   systemd=true
-   ```
-
-   Then run `wsl --shutdown` from PowerShell, reopen Ubuntu, and follow
-   [step 6](#6-run-it-as-a-user-service-optional-placeholder). You may also need
-   `sudo loginctl enable-linger "$USER"` so the user service starts without a login.
-
-7. **Optional: access from other LAN devices.** `localhost` works on the Windows host, but
-   other devices cannot reach the WSL2 VM directly. In an Administrator PowerShell:
-
-   ```powershell
-   $wsl = (wsl hostname -I).Trim().Split()[0]
-   netsh interface portproxy add v4tov4 listenport=8420 listenaddress=0.0.0.0 `
-     connectport=8420 connectaddress=$wsl
-   New-NetFirewallRule -DisplayName "Daku" -Direction Inbound `
-     -LocalPort 8420 -Protocol TCP -Action Allow
-   ```
-
-   The WSL2 IP changes when the VM restarts, so re-run the `portproxy` command if access
-   stops working. Only do this on a trusted private network.
-
-### Option B — native Windows (experimental)
-
-Everything runs directly on Windows. The core app, library, release search, downloads and
-thumbnails work, but this path has **no CI coverage** and is not a supported target yet.
+### Option A — native Windows (recommended)
 
 1. Install the dependencies with `winget` (or the upstream installers):
 
@@ -357,25 +294,109 @@ thumbnails work, but this path has **no CI coverage** and is not a supported tar
    Daku's database, logs and thumbnails live under `%USERPROFILE%\.local\share\daku` by
    default. Set `DAKU_CONFIG_DIR` and `DAKU_DATA_DIR` if you want them elsewhere.
 
-4. Run it from PowerShell:
+4. Start aria2c with RPC enabled if you use direct downloads:
+
+   ```powershell
+   aria2c --enable-rpc --rpc-listen-all=false --rpc-listen-port=6800
+   ```
+
+5. Run Daku from PowerShell:
 
    ```powershell
    uv run daku doctor
    uv run daku
    ```
 
-   Open `http://localhost:8420`.
+   Open `http://localhost:8420`. To reach it from other devices, allow TCP 8420 through
+   Windows Firewall and use `http://<pc-ip>:8420`.
 
-**Native Windows caveats**
+6. **Optional: start at login.** There is no Windows service installer yet. Either create a
+   Task Scheduler task that runs `uv run daku` in the repository folder, or use NSSM. Keep
+   `DAKU_PORT`, `DAKU_DOWNLOADS_DIR` and the rest in the user environment if the task does
+   not inherit your shell.
 
-- There is no systemd or Windows service installer. Keep a terminal open, or wrap
-  `uv run daku` in Task Scheduler or NSSM yourself.
-- The mpv seek bar needs a Unix-domain IPC socket, which is not available to Daku on native
-  Windows. Launching mpv works; live/stored playback progress does not.
-- Library paths are Linux-first. Hardlink mode is unverified on NTFS; use `"organize_mode":
-  "copy"` when the organiser lands.
-- Run `uv run daku doctor` and check the `mpv`, `ffmpeg` and `library` rows before trusting
-  playback or thumbnails.
+**Caveats**
+
+- No CI runs on Windows yet; treat this path as experimental.
+- Launching mpv works, but the seek bar stays empty because `asyncio.open_unix_connection`
+  is Unix-only. WSL2 is the only way to get playback progress today.
+- Library paths are Linux-first. Hardlink mode is unverified on NTFS; use
+  `"organize_mode": "copy"` when the organiser lands.
+- `uv sync --extra probe` may fail on Windows if no libtorrent wheel matches your Python.
+  Everything except torrent file listing works without it.
+
+### Option B — WSL2 (optional, for full parity)
+
+Use this if you want mpv playback progress, the systemd unit, or a Linux-identical setup.
+
+1. Install WSL2 and Ubuntu from PowerShell (run as Administrator), then reboot:
+
+   ```powershell
+   wsl --install -d Ubuntu-24.04
+   ```
+
+2. Open the Ubuntu terminal and install the runtime dependencies:
+
+   ```bash
+   sudo apt update
+   sudo apt install -y python3.12 python3.12-venv git aria2 ffmpeg mpv qbittorrent-nox
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+   sudo apt install -y nodejs
+   corepack enable pnpm
+   ```
+
+   Restart the shell so `uv` is on `PATH`.
+
+3. Clone and build exactly as in the Linux instructions:
+
+   ```bash
+   git clone <your-fork-url> daku
+   cd daku
+   uv sync
+   pnpm -C web install
+   pnpm -C web build
+   ```
+
+4. Configure qBittorrent and Daku using the Linux paths from
+   [step 4](#4-configure-daku). Files stay inside the WSL filesystem (for example
+   `~/Downloads/Daku` and `~/Media`); avoid `/mnt/c/...` for the library because hardlinks
+   and permissions do not behave the same across the Windows drive mount.
+
+5. Run it:
+
+   ```bash
+   uv run daku doctor
+   uv run daku
+   ```
+
+   Open `http://localhost:8420` in your Windows browser. WSL2 forwards `localhost`
+   automatically, and mpv windows/audio appear through WSLg.
+
+6. **Optional: systemd as a user service.** Add this to `/etc/wsl.conf`:
+
+   ```ini
+   [boot]
+   systemd=true
+   ```
+
+   Then run `wsl --shutdown` from PowerShell, reopen Ubuntu, and follow
+   [step 6](#6-run-it-as-a-user-service-optional-placeholder). You may also need
+   `sudo loginctl enable-linger "$USER"` so the user service starts without a login.
+
+7. **Optional: access from other LAN devices.** `localhost` works on the Windows host, but
+   other devices cannot reach the WSL2 VM directly. In an Administrator PowerShell:
+
+   ```powershell
+   $wsl = (wsl hostname -I).Trim().Split()[0]
+   netsh interface portproxy add v4tov4 listenport=8420 listenaddress=0.0.0.0 `
+     connectport=8420 connectaddress=$wsl
+   New-NetFirewallRule -DisplayName "Daku" -Direction Inbound `
+     -LocalPort 8420 -Protocol TCP -Action Allow
+   ```
+
+   The WSL2 IP changes when the VM restarts, so re-run the `portproxy` command if access
+   stops working. Only do this on a trusted private network.
 
 ---
 
