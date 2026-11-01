@@ -103,6 +103,7 @@ The full ticket list and dependency graph live in [`plan.md`](plan.md) and
 | Component | Notes |
 |---|---|
 | Linux | systemd user services, XDG paths. v1 target. |
+| Windows | Via **WSL2** (recommended). Native Windows is experimental; see [Windows](#windows). |
 | Python 3.12 + [uv](https://docs.astral.sh/uv/) | Backend and CLI |
 | Node 20+ + [pnpm](https://pnpm.io/) | Builds the web UI |
 | qBittorrent (`qbittorrent-nox`) | Torrent engine; enable the Web UI |
@@ -113,7 +114,7 @@ The full ticket list and dependency graph live in [`plan.md`](plan.md) and
 
 ---
 
-## Install
+## Install on Linux
 
 ### 1. Install the runtime dependencies
 
@@ -217,6 +218,164 @@ uv run daku doctor
 
 The doctor reports each integration as `ok`, `warn`, `unavailable` or `disabled` without
 starting a probe, launching mpv or downloading anything.
+
+---
+
+## Windows
+
+Windows is **not a v1 target**. The supported way to run Daku on Windows is **WSL2**, which
+gives you the same Linux environment the project is built and tested for. Native Windows
+works for the core app, but some features are experimental — see the caveats below.
+
+### Option A — WSL2 (recommended)
+
+This runs Daku, qBittorrent and aria2 inside an Ubuntu environment while you use it from a
+normal Windows browser.
+
+1. Install WSL2 and Ubuntu from PowerShell (run as Administrator), then reboot:
+
+   ```powershell
+   wsl --install -d Ubuntu-24.04
+   ```
+
+2. Open the Ubuntu terminal and install the runtime dependencies:
+
+   ```bash
+   sudo apt update
+   sudo apt install -y python3.12 python3.12-venv git aria2 ffmpeg mpv qbittorrent-nox
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+   sudo apt install -y nodejs
+   corepack enable pnpm
+   ```
+
+   Restart the shell so `uv` is on `PATH`.
+
+3. Clone and build exactly as in the Linux instructions:
+
+   ```bash
+   git clone <your-fork-url> daku
+   cd daku
+   uv sync
+   pnpm -C web install
+   pnpm -C web build
+   ```
+
+4. Configure qBittorrent and Daku using the Linux paths from
+   [step 4](#4-configure-daku). Files stay inside the WSL filesystem (for example
+   `~/Downloads/Daku` and `~/Media`); avoid `/mnt/c/...` for the library because hardlinks
+   and permissions do not behave the same across the Windows drive mount.
+
+5. Run it:
+
+   ```bash
+   uv run daku doctor
+   uv run daku
+   ```
+
+   Open `http://localhost:8420` in your Windows browser. WSL2 forwards `localhost`
+   automatically.
+
+6. **Optional: systemd as a user service.** Add this to `/etc/wsl.conf`:
+
+   ```ini
+   [boot]
+   systemd=true
+   ```
+
+   Then run `wsl --shutdown` from PowerShell, reopen Ubuntu, and follow
+   [step 6](#6-run-it-as-a-user-service-optional-placeholder). You may also need
+   `sudo loginctl enable-linger "$USER"` so the user service starts without a login.
+
+7. **Optional: access from other LAN devices.** `localhost` works on the Windows host, but
+   other devices cannot reach the WSL2 VM directly. In an Administrator PowerShell:
+
+   ```powershell
+   $wsl = (wsl hostname -I).Trim().Split()[0]
+   netsh interface portproxy add v4tov4 listenport=8420 listenaddress=0.0.0.0 `
+     connectport=8420 connectaddress=$wsl
+   New-NetFirewallRule -DisplayName "Daku" -Direction Inbound `
+     -LocalPort 8420 -Protocol TCP -Action Allow
+   ```
+
+   The WSL2 IP changes when the VM restarts, so re-run the `portproxy` command if access
+   stops working. Only do this on a trusted private network.
+
+### Option B — native Windows (experimental)
+
+Everything runs directly on Windows. The core app, library, release search, downloads and
+thumbnails work, but this path has **no CI coverage** and is not a supported target yet.
+
+1. Install the dependencies with `winget` (or the upstream installers):
+
+   ```powershell
+   winget install astral-sh.uv
+   winget install OpenJS.NodeJS.LTS
+   winget install pnpm.pnpm
+   winget install qBittorrent.qBittorrent
+   winget install aria2.aria2
+   winget install Gyan.FFmpeg
+   ```
+
+   Install [mpv](https://mpv.io/installation/) separately and make sure `mpv.exe` is on
+   `PATH` if you want to launch files.
+
+2. Clone and build:
+
+   ```powershell
+   git clone <your-fork-url> daku
+   cd daku
+   uv sync
+   pnpm -C web install
+   pnpm -C web build
+   ```
+
+3. Enable the qBittorrent Web UI on `127.0.0.1:8080`, then create
+   `%USERPROFILE%\.config\daku\config.json`:
+
+   ```json
+   {
+     "host": "0.0.0.0",
+     "port": 8420,
+     "downloads_dir": "C:/Users/<you>/Downloads/Daku",
+     "movies_dir": "C:/Users/<you>/Media/Movies",
+     "tv_dir": "C:/Users/<you>/Media/TV",
+     "anime_dir": "C:/Users/<you>/Media/Anime",
+     "qbt_url": "http://127.0.0.1:8080",
+     "qbt_user": "admin",
+     "aria2_rpc": "http://127.0.0.1:6800/jsonrpc",
+     "mpv_enabled": true
+   }
+   ```
+
+   Put the qBittorrent password in `%USERPROFILE%\.config\daku\secrets.json`:
+
+   ```json
+   { "qbt_pass": "your-qbittorrent-password" }
+   ```
+
+   Daku's database, logs and thumbnails live under `%USERPROFILE%\.local\share\daku` by
+   default. Set `DAKU_CONFIG_DIR` and `DAKU_DATA_DIR` if you want them elsewhere.
+
+4. Run it from PowerShell:
+
+   ```powershell
+   uv run daku doctor
+   uv run daku
+   ```
+
+   Open `http://localhost:8420`.
+
+**Native Windows caveats**
+
+- There is no systemd or Windows service installer. Keep a terminal open, or wrap
+  `uv run daku` in Task Scheduler or NSSM yourself.
+- The mpv seek bar needs a Unix-domain IPC socket, which is not available to Daku on native
+  Windows. Launching mpv works; live/stored playback progress does not.
+- Library paths are Linux-first. Hardlink mode is unverified on NTFS; use `"organize_mode":
+  "copy"` when the organiser lands.
+- Run `uv run daku doctor` and check the `mpv`, `ffmpeg` and `library` rows before trusting
+  playback or thumbnails.
 
 ---
 
