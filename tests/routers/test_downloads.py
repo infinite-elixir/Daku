@@ -8,10 +8,11 @@ from fastapi.testclient import TestClient
 from daku.config import Settings
 from daku.repositories import downloads as downloads_repo
 from daku.repositories import episodes as episodes_repo
+from daku.repositories import events as events_repo
 from daku.repositories import media_files as media_repo
 from daku.repositories import releases as releases_repo
 from daku.repositories import titles as titles_repo
-from daku.services.engines.base import EngineError
+from daku.services.engines.base import EngineError, EngineFile
 from daku.services.torrents.probe import TorrentFile, TorrentMetadata
 
 HASH = "a" * 40
@@ -395,6 +396,54 @@ def test_downloading_an_episode_that_is_already_available_is_a_duplicate(
     client, settings = app_client
     _install(client, FakeProbe())
     release_id, episode_id = _seed(client)
+    media_path = settings.downloads_dir / "Show.S02E05.1080p.mkv"
+    media_path.parent.mkdir(parents=True, exist_ok=True)
+    media_path.write_bytes(b"video")
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        release = releases_repo.get_release(session, release_id)
+        assert release is not None
+        row = downloads_repo.create_download(
+            session,
+            source="torrent",
+            engine="qbittorrent",
+            external_id=HASH,
+            release_id=release_id,
+            status="complete",
+            save_path=str(settings.downloads_dir),
+            selected_files_json="[4]",
+            file_match_json='{"file_paths": ["Show.S02E05.1080p.mkv"]}',
+        )
+        media_repo.create_media_file(
+            session,
+            title_id=release.title_id,
+            episode_id=episode_id,
+            download_id=row.id,
+            src_path=str(media_path),
+        )
+        download_id = row.id
+
+    response = client.post(
+        "/api/downloads",
+        json={"release_id": release_id, "episode_id": episode_id},
+    )
+
+    assert response.status_code == 409, response.text
+    body = response.json()
+    assert body["code"] == "DOWNLOAD_ALREADY_TRACKED"
+    assert "already in your library" in body["message"]
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        row = downloads_repo.get_download(session, download_id)
+    assert row is not None
+    assert row.status == "complete"
+    assert row.selected_files_json == "[4]"
+
+
+def test_downloading_an_episode_whose_file_is_gone_is_not_a_duplicate(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, settings = app_client
+    _install(client, FakeProbe())
+    release_id, episode_id = _seed(client)
     with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
         release = releases_repo.get_release(session, release_id)
         assert release is not None
@@ -423,15 +472,15 @@ def test_downloading_an_episode_that_is_already_available_is_a_duplicate(
         json={"release_id": release_id, "episode_id": episode_id},
     )
 
-    assert response.status_code == 409, response.text
+    assert response.status_code == 202, response.text
     body = response.json()
-    assert body["code"] == "DOWNLOAD_ALREADY_TRACKED"
-    assert "already in your library" in body["message"]
+    assert body["id"] == download_id
+    assert body["status"] == "queued"
+    assert "code" not in body
     with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
         row = downloads_repo.get_download(session, download_id)
     assert row is not None
-    assert row.status == "complete"
-    assert row.selected_files_json == "[4]"
+    assert row.status == "queued"
 
 
 def test_downloads_payload_lists_every_episode_the_torrent_downloaded(
@@ -532,14 +581,29 @@ def test_downloads_payload_recovers_episodes_detached_before_t042(
 
 
 class FakeRemoveEngine:
-    def __init__(self, error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        error: Exception | None = None,
+        *,
+        file_list: list[EngineFile] | None = None,
+        files_error: Exception | None = None,
+    ) -> None:
         self.error = error
+        self.file_list = file_list if file_list is not None else []
+        self.files_error = files_error
         self.calls: list[tuple[str, bool]] = []
+        self.file_calls: list[str] = []
 
     async def remove(self, external_id: str, *, delete_files: bool = False) -> None:
         self.calls.append((external_id, delete_files))
         if self.error is not None:
             raise self.error
+
+    async def files(self, external_id: str) -> list[EngineFile]:
+        self.file_calls.append(external_id)
+        if self.files_error is not None:
+            raise self.files_error
+        return list(self.file_list)
 
 
 @pytest.mark.parametrize(
@@ -640,6 +704,211 @@ def test_removing_an_available_download_keeps_the_library_file(
     assert kept is not None
     assert kept.download_id is None
     assert kept.lib_path == str(lib_path)
+
+
+def _download_with_media(
+    client: TestClient,
+    settings: Settings,
+    release_id: str,
+    *,
+    src_name: str = "Show.S02E05.1080p.mkv",
+    lib_path: str | None = None,
+    size_bytes: int | None = None,
+) -> tuple[str, str]:
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        release = releases_repo.get_release(session, release_id)
+        assert release is not None
+        row = downloads_repo.create_download(
+            session,
+            source="torrent",
+            engine="qbittorrent",
+            external_id=HASH,
+            release_id=release_id,
+            status="complete",
+            save_path=str(settings.downloads_dir),
+        )
+        media = media_repo.create_media_file(
+            session,
+            title_id=release.title_id,
+            download_id=row.id,
+            src_path=str(settings.downloads_dir / src_name),
+            lib_path=lib_path,
+            size_bytes=size_bytes,
+            is_primary=True,
+        )
+        return row.id, media.id
+
+
+def test_delete_files_refuses_when_the_only_copy_is_in_downloads(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, settings = app_client
+    release_id, _episode_id = _seed(client)
+    download_id, media_id = _download_with_media(client, settings, release_id)
+    engine = FakeRemoveEngine(
+        file_list=[EngineFile(index=0, path="Show.S02E05.1080p.mkv", size_bytes=5)]
+    )
+    client.app.state.qbt_engine = engine  # type: ignore[attr-defined]
+
+    response = client.delete(f"/api/downloads/{download_id}?delete_files=true")
+
+    assert response.status_code == 409, response.text
+    assert response.json()["code"] == "DOWNLOAD_DELETE_FILES_UNSAFE"
+    assert engine.calls == []
+    assert engine.file_calls == [HASH]
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        assert downloads_repo.get_download(session, download_id) is not None
+        assert media_repo.get_media_file(session, media_id) is not None
+        payload = downloads_repo.get_download(session, download_id)
+    assert payload is not None
+
+
+def test_delete_files_succeeds_when_every_file_has_a_library_copy(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, settings = app_client
+    release_id, _episode_id = _seed(client)
+    lib_path = settings.movies_dir / "Show" / "Show.S02E05.1080p.mkv"
+    lib_path.parent.mkdir(parents=True)
+    lib_path.write_bytes(b"hello")
+    download_id, media_id = _download_with_media(
+        client,
+        settings,
+        release_id,
+        lib_path=str(lib_path),
+        size_bytes=5,
+    )
+    engine = FakeRemoveEngine(
+        file_list=[EngineFile(index=0, path="Show.S02E05.1080p.mkv", size_bytes=5)]
+    )
+    client.app.state.qbt_engine = engine  # type: ignore[attr-defined]
+
+    response = client.delete(f"/api/downloads/{download_id}?delete_files=true")
+
+    assert response.status_code == 204, response.text
+    assert engine.calls == [(HASH, True)]
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        assert downloads_repo.get_download(session, download_id) is None
+        media = media_repo.get_media_file(session, media_id)
+        assert media is not None
+        assert media.download_id is None
+        assert media.lib_path == str(lib_path)
+        event = events_repo.list_events(session, limit=1)[0]
+    assert event.kind == "download.files_deleted"
+    payload = event.payload()
+    assert payload == {
+        "download_id": download_id,
+        "engine": "qbittorrent",
+        "info_hash_prefix": HASH[:12],
+        "file_count": 1,
+        "reason": "library_copy_verified",
+    }
+    assert "path" not in payload
+    assert "magnet" not in payload
+    assert "tracker" not in payload
+
+
+def test_delete_files_refuses_a_missing_library_file(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, settings = app_client
+    release_id, _episode_id = _seed(client)
+    lib_path = settings.movies_dir / "Show" / "Missing.mkv"
+    download_id, _media_id = _download_with_media(
+        client, settings, release_id, lib_path=str(lib_path)
+    )
+    engine = FakeRemoveEngine(
+        file_list=[EngineFile(index=0, path="Show.S02E05.1080p.mkv", size_bytes=5)]
+    )
+    client.app.state.qbt_engine = engine  # type: ignore[attr-defined]
+
+    response = client.delete(f"/api/downloads/{download_id}?delete_files=true")
+
+    assert response.status_code == 409, response.text
+    assert response.json()["code"] == "DOWNLOAD_DELETE_FILES_UNSAFE"
+    assert engine.calls == []
+
+
+def test_delete_files_refuses_a_library_path_inside_downloads(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, settings = app_client
+    release_id, _episode_id = _seed(client)
+    lib_path = settings.downloads_dir / "library" / "Show.S02E05.1080p.mkv"
+    lib_path.parent.mkdir(parents=True)
+    lib_path.write_bytes(b"hello")
+    download_id, _media_id = _download_with_media(
+        client,
+        settings,
+        release_id,
+        lib_path=str(lib_path),
+        size_bytes=5,
+    )
+    engine = FakeRemoveEngine(
+        file_list=[EngineFile(index=0, path="Show.S02E05.1080p.mkv", size_bytes=5)]
+    )
+    client.app.state.qbt_engine = engine  # type: ignore[attr-defined]
+
+    response = client.delete(f"/api/downloads/{download_id}?delete_files=true")
+
+    assert response.status_code == 409, response.text
+    assert response.json()["code"] == "DOWNLOAD_DELETE_FILES_UNSAFE"
+    assert engine.calls == []
+
+
+def test_delete_files_refuses_when_the_engine_file_list_is_unavailable(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, settings = app_client
+    release_id, _episode_id = _seed(client)
+    download_id, _media_id = _download_with_media(client, settings, release_id)
+    engine = FakeRemoveEngine(files_error=EngineError("QBT_UNREACHABLE", "offline"))
+    client.app.state.qbt_engine = engine  # type: ignore[attr-defined]
+
+    response = client.delete(f"/api/downloads/{download_id}?delete_files=true")
+
+    assert response.status_code == 409, response.text
+    assert response.json()["code"] == "DOWNLOAD_DELETE_FILES_UNSAFE"
+    assert response.json()["detail"]["reason"] == "engine_files_unavailable"
+    assert engine.calls == []
+
+
+def test_delete_files_false_detaches_media_without_a_preflight(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, settings = app_client
+    release_id, _episode_id = _seed(client)
+    download_id, media_id = _download_with_media(client, settings, release_id)
+    engine = FakeRemoveEngine(
+        file_list=[EngineFile(index=0, path="Show.S02E05.1080p.mkv", size_bytes=5)]
+    )
+    client.app.state.qbt_engine = engine  # type: ignore[attr-defined]
+
+    response = client.delete(f"/api/downloads/{download_id}?delete_files=false")
+
+    assert response.status_code == 204, response.text
+    assert engine.calls == [(HASH, False)]
+    assert engine.file_calls == []
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        assert downloads_repo.get_download(session, download_id) is None
+        media = media_repo.get_media_file(session, media_id)
+        assert media is not None
+        assert media.download_id is None
+
+
+def test_download_payload_reports_whether_source_files_can_be_deleted(
+    app_client: tuple[TestClient, Settings],
+) -> None:
+    client, settings = app_client
+    release_id, _episode_id = _seed(client)
+    download_id, _media_id = _download_with_media(client, settings, release_id)
+
+    response = client.get("/api/downloads")
+
+    assert response.status_code == 200
+    item = next(row for row in response.json()["items"] if row["id"] == download_id)
+    assert item["can_delete_source_files"] is False
+    assert item["delete_files_reason"] == "no_library_copy"
 
 
 def test_remove_download_returns_404_for_a_missing_row(

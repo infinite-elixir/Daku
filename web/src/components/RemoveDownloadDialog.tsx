@@ -75,7 +75,8 @@ export function RemoveDownloadDialog({
           Remove download?
         </h2>
         <p id={bodyId} className="mt-2 break-words text-small text-fg-muted">
-          This removes the queue entry. Files already in your library stay where they are.
+          This removes the queue entry. Files Daku has already organised into your library stay
+          where they are.
         </p>
         <p className="mt-2 break-all text-small text-fg-muted">{name}</p>
 
@@ -95,7 +96,12 @@ export function RemoveDownloadDialog({
               </span>
             </span>
           </label>
-        ) : null}
+        ) : (
+          <p className="mt-4 rounded-control border border-border-subtle bg-canvas px-3 py-3 text-small text-fg-muted">
+            These files are still your only copy — Daku has not organised them into the library
+            yet. Removing the queue entry will keep them.
+          </p>
+        )}
 
         <div className="mt-5 flex flex-wrap justify-end gap-2">
           <button

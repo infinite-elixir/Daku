@@ -28,6 +28,8 @@ function record(overrides: Partial<DownloadRecord> = {}): DownloadRecord {
     filename: "Cyberpunk.S02.1080p.mkv",
     selection_label: "S02E04 only",
     selection_size_bytes: 1_500_000_000,
+    can_delete_source_files: false,
+    delete_files_reason: "no_library_copy",
     ...overrides,
   };
 }
@@ -114,7 +116,13 @@ describe("DownloadRow selective downloads", () => {
 
   it("confirms before removing and defaults the file-delete checkbox off", () => {
     const onRemove = vi.fn();
-    render(<DownloadRow download={record()} onAction={vi.fn()} onRemove={onRemove} />);
+    render(
+      <DownloadRow
+        download={record({ can_delete_source_files: true })}
+        onAction={vi.fn()}
+        onRemove={onRemove}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Remove download" }));
 
@@ -122,7 +130,7 @@ describe("DownloadRow selective downloads", () => {
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(
       screen.getByText(
-        "This removes the queue entry. Files already in your library stay where they are.",
+        "This removes the queue entry. Files Daku has already organised into your library stay where they are.",
       ),
     ).toBeInTheDocument();
     const checkbox = screen.getByRole("checkbox", {
@@ -138,7 +146,13 @@ describe("DownloadRow selective downloads", () => {
 
   it("passes delete_files when the checkbox is selected", () => {
     const onRemove = vi.fn();
-    render(<DownloadRow download={record()} onAction={vi.fn()} onRemove={onRemove} />);
+    render(
+      <DownloadRow
+        download={record({ can_delete_source_files: true })}
+        onAction={vi.fn()}
+        onRemove={onRemove}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Remove download" }));
     fireEvent.click(
@@ -147,6 +161,24 @@ describe("DownloadRow selective downloads", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
     expect(onRemove).toHaveBeenCalledWith("d1", true);
+  });
+
+  it("explains why files cannot be deleted and keeps them by default", () => {
+    const onRemove = vi.fn();
+    render(<DownloadRow download={record()} onAction={vi.fn()} onRemove={onRemove} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove download" }));
+
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "These files are still your only copy — Daku has not organised them into the library yet. Removing the queue entry will keep them.",
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect(onRemove).toHaveBeenCalledWith("d1", false);
   });
 
   it("closes the remove dialog with Escape or Cancel", () => {

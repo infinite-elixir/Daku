@@ -23,6 +23,7 @@ from daku.db import get_session
 from daku.errors import AppError
 from daku.models import Download
 from daku.repositories import downloads as downloads_repo
+from daku.repositories import events as events_repo
 from daku.repositories import media_files as media_files_repo
 from daku.repositories import releases as releases_repo
 from daku.services.downloads_view import download_payload
@@ -30,6 +31,7 @@ from daku.services.engines.aria2 import is_torrent_url
 from daku.services.engines.base import AddRequest, DownloadEngine, EngineError
 from daku.services.queue import check_disk_space, queue_direct, queue_release
 from daku.services.releases.selection import ResolveRequest, Selection, resolve_selection
+from daku.services.safety import assess_delete_files
 from daku.services.torrents.probe import ProbeService
 
 router = APIRouter(prefix="/api", tags=["downloads"])
@@ -74,8 +76,8 @@ class PreviewSelectionRequest(BaseModel):
     allow_pack: bool = False
 
 
-def _payload(session: Session, row: Download) -> dict[str, Any]:
-    return download_payload(session, row)
+def _payload(request: Request, session: Session, row: Download) -> dict[str, Any]:
+    return download_payload(session, row, settings=request.app.state.settings)
 
 
 def _publish(request: Request, event_type: str, payload: dict[str, Any]) -> None:
@@ -148,7 +150,7 @@ async def _requeue_existing(
         eta_seconds=None,
         error=None,
     )
-    payload = _payload(session, updated or row)
+    payload = _payload(request, session, updated or row)
     payload.update(selection.to_dict())
     _publish(request, "download.updated", payload)
     return payload
@@ -257,7 +259,11 @@ def _requested_files_already_present(
     for the next one.
     """
 
-    rows = media_files_repo.list_by_title(session, release.title_id)
+    rows = [
+        row
+        for row in media_files_repo.list_by_title(session, release.title_id)
+        if media_files_repo.is_present(row)
+    ]
     if not rows:
         return False
     if selection.paths:
@@ -279,7 +285,9 @@ def _restart_finished(
     The row is keyed by info-hash, so it cannot be recreated. Its existing
     ``media_files`` rows stay attached: the row represents the torrent and keeps
     every episode that torrent has produced (T-042). The engine entry is left in
-    place so the worker can adopt it instead of re-adding the magnet.
+    place so the worker can adopt it instead of re-adding the magnet. Nothing here
+    assumes those files are still on disk: availability ignores missing rows, and
+    the organiser re-inspects the selected paths after the retry.
     """
 
     updated = downloads_repo.update_download(
@@ -292,7 +300,7 @@ def _restart_finished(
         eta_seconds=None,
         error=None,
     )
-    payload = _payload(session, updated or row)
+    payload = _payload(request, session, updated or row)
     payload.update(selection.to_dict())
     _publish(request, "download.updated", payload)
     return payload
@@ -409,7 +417,7 @@ async def start_download(
 
     if body.url is not None:
         row = await _start_direct(request, session, body)
-        payload = _payload(session, row)
+        payload = _payload(request, session, row)
         _publish(request, "download.created", payload)
         response.status_code = 201
         return payload
@@ -443,7 +451,7 @@ async def start_download(
         and _requested_files_already_present(session, release, selection, requested_episode_id)
     ):
         response.status_code = 409
-        payload = _payload(session, existing)
+        payload = _payload(request, session, existing)
         payload.update(selection.to_dict())
         payload["code"] = DUPLICATE_CODE
         payload["message"] = _duplicate_message(existing.status)
@@ -461,7 +469,7 @@ async def start_download(
         file_match_json=selection.file_match_json,
     )
     if result.created:
-        payload = _payload(session, result.download)
+        payload = _payload(request, session, result.download)
         payload.update(selection.to_dict())
         _publish(request, "download.created", payload)
         response.status_code = 201
@@ -494,7 +502,7 @@ async def start_download(
     # The same info-hash is already tracked. Returning the existing row with 409
     # makes a double tap harmless and tells the UI to open the existing download.
     response.status_code = 409
-    payload = _payload(session, result.download)
+    payload = _payload(request, session, result.download)
     payload.update(selection.to_dict())
     payload["code"] = DUPLICATE_CODE
     payload["message"] = _duplicate_message(result.download.status)
@@ -503,11 +511,12 @@ async def start_download(
 
 @router.get("/downloads")
 def list_downloads(
+    request: Request,
     session: Annotated[Session, Depends(get_session)],
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> dict[str, Any]:
     rows = downloads_repo.list_downloads(session)[:limit]
-    return {"items": [_payload(session, row) for row in rows], "total": len(rows)}
+    return {"items": [_payload(request, session, row) for row in rows], "total": len(rows)}
 
 
 def _get_or_404(session: Session, download_id: str) -> Download:
@@ -529,7 +538,7 @@ async def pause_download(
 ) -> dict[str, Any]:
     row = _get_or_404(session, download_id)
     if row.status == "paused":
-        return _payload(session, row)
+        return _payload(request, session, row)
     if row.status in TERMINAL_STATUSES or row.status == "failed":
         raise AppError(
             code="DOWNLOAD_NOT_ACTIVE",
@@ -544,7 +553,7 @@ async def pause_download(
     updated = downloads_repo.update_download(
         session, row.id, status="paused", speed_bps=None, eta_seconds=None, error=None
     )
-    payload = _payload(session, updated or row)
+    payload = _payload(request, session, updated or row)
     _publish(request, "download.updated", payload)
     return payload
 
@@ -557,7 +566,7 @@ async def resume_download(
 ) -> dict[str, Any]:
     row = _get_or_404(session, download_id)
     if row.status in {"active", "queued", "complete", "organizing", "available"}:
-        return _payload(session, row)
+        return _payload(request, session, row)
     if row.status != "paused":
         raise AppError(
             code="DOWNLOAD_NOT_PAUSED",
@@ -569,7 +578,7 @@ async def resume_download(
     except EngineError as exc:
         raise AppError(code=exc.code, message=exc.message, status_code=502) from exc
     updated = downloads_repo.update_download(session, row.id, status="active", error=None)
-    payload = _payload(session, updated or row)
+    payload = _payload(request, session, updated or row)
     _publish(request, "download.updated", payload)
     return payload
 
@@ -582,7 +591,7 @@ async def cancel_download(
 ) -> dict[str, Any]:
     row = _get_or_404(session, download_id)
     if row.status == "cancelled":
-        return _payload(session, row)
+        return _payload(request, session, row)
     if row.status not in {"queued", "active", "paused", "failed", "complete"}:
         raise AppError(
             code="DOWNLOAD_NOT_CANCELLABLE",
@@ -603,7 +612,7 @@ async def cancel_download(
         eta_seconds=None,
         error=None,
     )
-    payload = _payload(session, updated or row)
+    payload = _payload(request, session, updated or row)
     _publish(request, "download.updated", payload)
     return payload
 
@@ -615,11 +624,11 @@ async def remove_download(
     session: Annotated[Session, Depends(get_session)],
     delete_files: Annotated[bool, Query()] = False,
 ) -> Response:
-    """Remove a queue entry without touching library files.
+    """Remove a queue entry, optionally deleting the engine's copy.
 
-    ``delete_files`` only reaches the download engine's copy. Every
-    ``media_files.lib_path`` stays where it is, and the media rows are detached
-    (not deleted) so availability survives.
+    Removing the row never touches ``media_files``; they are detached so title
+    and episode availability survive. ``delete_files=true`` is refused unless the
+    preflight can verify that every recorded file also exists in a library root.
     """
 
     row = _get_or_404(session, download_id)
@@ -629,13 +638,56 @@ async def remove_download(
             message="The organiser is still working on this download",
             status_code=409,
         )
+    engine = _engine(request, row.engine)
+    deleted_file_count = 0
+    if delete_files:
+        assessment = await assess_delete_files(
+            session,
+            row,
+            request.app.state.settings,
+            engine,
+        )
+        if not assessment.safe:
+            if assessment.unsafe_count:
+                message = (
+                    f"{assessment.unsafe_count} file(s) are still Daku's only copy. "
+                    "Remove the queue entry without deleting files."
+                )
+            else:
+                message = (
+                    "Daku could not verify a library copy for every file. "
+                    "Remove the queue entry without deleting files."
+                )
+            raise AppError(
+                code="DOWNLOAD_DELETE_FILES_UNSAFE",
+                message=message,
+                status_code=409,
+                detail={
+                    "unsafe_files": assessment.unsafe_count,
+                    "reason": assessment.reason,
+                },
+            )
+        deleted_file_count = assessment.file_count
     try:
-        await _engine(request, row.engine).remove(
+        await engine.remove(
             row.external_id,
             delete_files=delete_files,
         )
     except EngineError as exc:
         raise AppError(code=exc.code, message=exc.message, status_code=502) from exc
+
+    if delete_files and row.engine == "qbittorrent":
+        events_repo.add_event(
+            session,
+            "download.files_deleted",
+            {
+                "download_id": row.id,
+                "engine": row.engine,
+                "info_hash_prefix": (row.external_id or "").lower()[:12],
+                "file_count": deleted_file_count,
+                "reason": "library_copy_verified",
+            },
+        )
 
     downloads_repo.detach_media_files(session, row.id)
     downloads_repo.delete_download(session, row.id)
@@ -662,7 +714,7 @@ async def inspect_completed_download(
         engine=getattr(request.app.state, "qbt_engine", None),
         probe=getattr(request.app.state, "probe", None),
     )
-    _publish(request, "download.updated", _payload(session, row))
+    _publish(request, "download.updated", _payload(request, session, row))
     return result.to_dict()
 
 
@@ -674,7 +726,7 @@ async def retry_download(
 ) -> dict[str, Any]:
     row = _get_or_404(session, download_id)
     if row.status in {"queued", "active"}:
-        return _payload(session, row)
+        return _payload(request, session, row)
     if row.status not in {"failed", "cancelled"}:
         raise AppError(
             code="DOWNLOAD_NOT_RETRYABLE",
@@ -695,6 +747,6 @@ async def retry_download(
         eta_seconds=None,
         error=None,
     )
-    payload = _payload(session, updated or row)
+    payload = _payload(request, session, updated or row)
     _publish(request, "download.updated", payload)
     return payload

@@ -238,7 +238,9 @@ def test_adding_anime_persists_episodes_without_duplicates(
         assert _count(session, Episode) == 28
 
 
-def test_list_pagination_filters_and_sort(client: TestClient) -> None:
+def test_list_pagination_filters_and_sort(client: TestClient, tmp_path: Path) -> None:
+    episode_file = tmp_path / "beta-e1.mkv"
+    episode_file.write_bytes(b"video")
     with _session(client) as session:
         alpha = titles_repo.create_title(session, kind="movie", title="Alpha", year=2001)
         beta = titles_repo.create_title(session, kind="series", title="Beta", year=2002)
@@ -258,7 +260,7 @@ def test_list_pagination_filters_and_sort(client: TestClient) -> None:
             session,
             title_id=beta.id,
             episode_id=ep1.id if ep1 else None,
-            src_path="/tmp/beta-e1.mkv",
+            src_path=str(episode_file),
         )
 
     first_page = client.get("/api/titles", params={"limit": 2, "offset": 0, "sort": "title"})
@@ -335,6 +337,113 @@ def test_delete_with_keep_files_false_removes_recorded_files(
     assert response.status_code == 200
     assert response.json()["files_deleted"] == 1
     assert not library_file.exists()
+
+
+def test_detail_reports_present_and_missing_files(client: TestClient, tmp_path: Path) -> None:
+    present_file = tmp_path / "show-e1.mkv"
+    missing_file = tmp_path / "show-e2.mkv"
+    present_file.write_bytes(b"video")
+    with _session(client) as session:
+        title = titles_repo.create_title(session, kind="series", title="Show")
+        episodes_repo.sync_episodes(
+            session,
+            title_id=title.id,
+            episodes=[EpisodeRef(season=1, episode=1), EpisodeRef(season=1, episode=2)],
+        )
+        first = episodes_repo.find_episode(session, title_id=title.id, season=1, episode=1)
+        second = episodes_repo.find_episode(session, title_id=title.id, season=1, episode=2)
+        assert first is not None and second is not None
+        media_files_repo.create_media_file(
+            session,
+            title_id=title.id,
+            episode_id=first.id,
+            src_path=str(present_file),
+        )
+        media_files_repo.create_media_file(
+            session,
+            title_id=title.id,
+            episode_id=second.id,
+            src_path=str(missing_file),
+        )
+
+    response = client.get(f"/api/titles/{title.id}")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["availability"] == "partial"
+    assert payload["available_episode_count"] == 1
+    assert payload["missing_file_count"] == 1
+    by_label = {episode["label"]: episode for episode in payload["episodes"]}
+    assert by_label["S01E01"]["present"] is True
+    assert by_label["S01E01"]["status"] == "available"
+    assert by_label["S01E02"]["present"] is False
+    assert by_label["S01E02"]["status"] == "missing"
+
+
+def test_deleting_the_only_file_makes_the_title_none(client: TestClient, tmp_path: Path) -> None:
+    media_file = tmp_path / "show-e1.mkv"
+    media_file.write_bytes(b"video")
+    with _session(client) as session:
+        title = titles_repo.create_title(session, kind="series", title="Show")
+        episodes_repo.sync_episodes(
+            session, title_id=title.id, episodes=[EpisodeRef(season=1, episode=1)]
+        )
+        episode = episodes_repo.find_episode(session, title_id=title.id, season=1, episode=1)
+        assert episode is not None
+        media_files_repo.create_media_file(
+            session, title_id=title.id, episode_id=episode.id, src_path=str(media_file)
+        )
+
+    assert client.get(f"/api/titles/{title.id}").json()["availability"] == "complete"
+    media_file.unlink()
+
+    payload = client.get(f"/api/titles/{title.id}").json()
+    assert payload["availability"] == "none"
+    assert payload["available_episode_count"] == 0
+    assert payload["missing_file_count"] == 1
+    assert payload["episodes"][0]["status"] == "missing"
+
+
+def test_reconcile_removes_only_missing_media_rows(client: TestClient, tmp_path: Path) -> None:
+    present_file = tmp_path / "keep.mkv"
+    missing_file = tmp_path / "gone.mkv"
+    present_file.write_bytes(b"video")
+    with _session(client) as session:
+        title = titles_repo.create_title(session, kind="series", title="Show")
+        episodes_repo.sync_episodes(
+            session,
+            title_id=title.id,
+            episodes=[EpisodeRef(season=1, episode=1), EpisodeRef(season=1, episode=2)],
+        )
+        first = episodes_repo.find_episode(session, title_id=title.id, season=1, episode=1)
+        second = episodes_repo.find_episode(session, title_id=title.id, season=1, episode=2)
+        assert first is not None and second is not None
+        media_files_repo.create_media_file(
+            session, title_id=title.id, episode_id=first.id, src_path=str(present_file)
+        )
+        media_files_repo.create_media_file(
+            session, title_id=title.id, episode_id=second.id, src_path=str(missing_file)
+        )
+        releases_repo.create_release(session, title_id=title.id, info_hash="h1", is_saved=True)
+        title_id = title.id
+        first_id = first.id
+
+    response = client.post(f"/api/titles/{title_id}/media/reconcile")
+
+    assert response.status_code == 200
+    assert response.json() == {"removed": 1, "kept": 1}
+    with _session(client) as session:
+        rows = media_files_repo.list_by_title(session, title_id)
+        assert [row.episode_id for row in rows] == [first_id]
+        assert session.get(Title, title_id) is not None
+        assert _count(session, Episode) == 2
+        assert _count(session, Release) == 1
+    assert present_file.exists()
+    assert not missing_file.exists()
+
+    again = client.post(f"/api/titles/{title_id}/media/reconcile")
+    assert again.status_code == 200
+    assert again.json() == {"removed": 0, "kept": 1}
 
 
 def test_missing_title_returns_404(client: TestClient) -> None:

@@ -8,9 +8,11 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from daku.config import Settings
 from daku.models import Download, Episode, MediaFile, Title
 from daku.repositories import media_files as media_files_repo
 from daku.repositories import releases as releases_repo
+from daku.services.safety import payload_deletion_safety
 
 
 def _label(row: Episode) -> str:
@@ -89,6 +91,7 @@ def _downloaded_files(
             "file_name": name,
             "size_bytes": item.size_bytes,
             "is_primary": item.is_primary,
+            "present": media_files_repo.is_present(item),
         }
         if episode is None:
             order = (9999, 9999, name.casefold())
@@ -99,7 +102,9 @@ def _downloaded_files(
     return [entry for _order, entry in sorted(payload, key=lambda pair: pair[0])]
 
 
-def download_payload(session: Session, row: Download) -> dict[str, Any]:
+def download_payload(
+    session: Session, row: Download, *, settings: Settings | None = None
+) -> dict[str, Any]:
     """Return the public shape of a download row.
 
     Only relative/identifying data is included: ``save_path`` is deliberately
@@ -124,6 +129,13 @@ def download_payload(session: Session, row: Download) -> dict[str, Any]:
     selected_size = match.get("selected_size_bytes") if isinstance(match, dict) else None
     if not isinstance(selected_size, int) or selected_size <= 0:
         selected_size = None
+    if settings is None:
+        can_delete_source_files = False
+        delete_files_reason: str | None = "no_library_copy"
+    else:
+        can_delete_source_files, delete_files_reason = payload_deletion_safety(
+            session, row, settings
+        )
     return {
         "id": row.id,
         "release_id": row.release_id,
@@ -150,5 +162,7 @@ def download_payload(session: Session, row: Download) -> dict[str, Any]:
         "file_match": match,
         "selection_label": _selection_label(selected, match, episode),
         "selection_size_bytes": selected_size,
+        "can_delete_source_files": can_delete_source_files,
+        "delete_files_reason": delete_files_reason,
         "downloaded_files": _downloaded_files(session, row, release),
     }

@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { DownloadRow, isActiveDownload, isCompletedDownload, isFailedDownload } from "../components/DownloadRow";
 import { DOWNLOADS_QUERY_KEY, useEventSource } from "../hooks/useEventSource";
+import { formatBytes } from "../lib/format";
 import {
   downloadAction,
   listDownloads,
@@ -222,6 +224,36 @@ export function DownloadsPage() {
   );
 }
 
+interface DownloadGroup {
+  titleId: string | null;
+  title: string;
+  rows: DownloadRecord[];
+}
+
+function groupByTitle(rows: DownloadRecord[]): DownloadGroup[] {
+  const groups = new Map<string, DownloadGroup>();
+  for (const row of rows) {
+    const key = row.title_id ?? `download:${row.id}`;
+    const group = groups.get(key) ?? {
+      titleId: row.title_id,
+      title: row.title ?? row.filename ?? row.id,
+      rows: [],
+    };
+    group.rows.push(row);
+    groups.set(key, group);
+  }
+  const result = [...groups.values()];
+  for (const group of result) {
+    group.rows.sort((left, right) => left.created_at.localeCompare(right.created_at));
+  }
+  result.sort((left, right) => {
+    const leftAt = left.rows.at(-1)?.updated_at ?? "";
+    const rightAt = right.rows.at(-1)?.updated_at ?? "";
+    return rightAt.localeCompare(leftAt);
+  });
+  return result;
+}
+
 function DownloadSection({
   title,
   rows,
@@ -235,6 +267,7 @@ function DownloadSection({
   onRemove: (id: string, deleteFiles: boolean) => void;
   empty: string;
 }) {
+  const groups = groupByTitle(rows);
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-3">
@@ -244,13 +277,48 @@ function DownloadSection({
       {rows.length === 0 ? (
         empty ? <p className="text-small text-fg-muted">{empty}</p> : null
       ) : (
-        <ul className="flex flex-col gap-3">
-          {rows.map((row) => (
-            <li key={row.id}>
-              <DownloadRow download={row} onAction={onAction} onRemove={onRemove} />
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-panel">
+          {groups.map((group) => {
+            const files = group.rows.flatMap((row) => row.downloaded_files ?? []);
+            const size = files.reduce((total, file) => total + (file.size_bytes ?? 0), 0);
+            return (
+              <section key={group.titleId ?? group.title} className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  {group.titleId ? (
+                    <Link
+                      to={`/title/${group.titleId}`}
+                      className="text-title font-semibold text-fg hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    >
+                      {group.title}
+                    </Link>
+                  ) : (
+                    <h3 className="text-title font-semibold text-fg">{group.title}</h3>
+                  )}
+                  {group.titleId && files.length > 0 ? (
+                    <Link
+                      to={`/title/${group.titleId}/files`}
+                      className="text-small font-medium text-fg-muted hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    >
+                      Files ({files.length})
+                    </Link>
+                  ) : null}
+                  {size > 0 ? (
+                    <span className="ml-auto text-small tabular-nums text-fg-muted">
+                      {formatBytes(size)}
+                    </span>
+                  ) : null}
+                </div>
+                <ul className="flex flex-col gap-3">
+                  {group.rows.map((row) => (
+                    <li key={row.id}>
+                      <DownloadRow download={row} onAction={onAction} onRemove={onRemove} />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
       )}
     </div>
   );

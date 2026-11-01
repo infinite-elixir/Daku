@@ -52,15 +52,17 @@ export function LibraryPage() {
   const [kind, setKind] = useState<KindFilter>("all");
   const [wantedOnly, setWantedOnly] = useState(false);
   const [noFileOnly, setNoFileOnly] = useState(false);
+  const [downloadedOnly, setDownloadedOnly] = useState(false);
 
   const { data, error, isLoading, refetch } = useQuery<LibraryResponse>({
-    queryKey: ["library", kind, wantedOnly, noFileOnly],
+    queryKey: ["library", kind, wantedOnly, noFileOnly, downloadedOnly],
     queryFn: ({ signal }) =>
       listTitles(
         {
           kind: kind === "all" ? null : kind,
           wanted: wantedOnly ? true : null,
           availability: noFileOnly ? "none" : null,
+          has_files: downloadedOnly ? true : null,
           sort: "added",
           limit: 100,
         },
@@ -69,7 +71,27 @@ export function LibraryPage() {
     staleTime: 30_000,
   });
 
-  const filtered = kind !== "all" || wantedOnly || noFileOnly;
+  const filtered = kind !== "all" || wantedOnly || noFileOnly || downloadedOnly;
+
+  function toggleNoFile() {
+    setNoFileOnly((value) => {
+      const next = !value;
+      if (next) {
+        setDownloadedOnly(false);
+      }
+      return next;
+    });
+  }
+
+  function toggleDownloaded() {
+    setDownloadedOnly((value) => {
+      const next = !value;
+      if (next) {
+        setNoFileOnly(false);
+      }
+      return next;
+    });
+  }
 
   return (
     <section className="relative flex flex-col gap-section">
@@ -92,7 +114,8 @@ export function LibraryPage() {
         <KindTabs value={kind} onChange={setKind} label="Filter library by kind" />
         <div className="flex gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none]">
           <FilterChip label="Wanted" active={wantedOnly} onClick={() => setWantedOnly((value) => !value)} />
-          <FilterChip label="No file yet" active={noFileOnly} onClick={() => setNoFileOnly((value) => !value)} />
+          <FilterChip label="Downloaded" active={downloadedOnly} onClick={toggleDownloaded} />
+          <FilterChip label="No file yet" active={noFileOnly} onClick={toggleNoFile} />
         </div>
       </div>
 

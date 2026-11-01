@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DownloadRecord, DownloadsResponse } from "../../lib/api";
@@ -75,9 +76,11 @@ function stubDownloads(items: DownloadRecord[]): void {
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={client}>
-      <DownloadsPage />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={client}>
+        <DownloadsPage />
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -167,5 +170,52 @@ describe("DownloadsPage qBittorrent 5 progress", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("qBittorrent is unreachable");
     expect(screen.getByTestId("download-row-d1")).toBeInTheDocument();
+  });
+});
+
+describe("DownloadsPage title groups", () => {
+  beforeEach(() => {
+    FakeEventSource.instances = [];
+    vi.stubGlobal("EventSource", FakeEventSource);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("links a title group to its downloaded files", async () => {
+    stubDownloads([
+      record({
+        id: "d1",
+        status: "complete",
+        progress: 1,
+        downloaded_files: [
+          {
+            id: "f1",
+            episode_id: "e1",
+            episode_label: "S01E01",
+            file_name: "Dune.mkv",
+            size_bytes: 2048,
+            is_primary: true,
+          },
+          {
+            id: "f2",
+            episode_id: "e2",
+            episode_label: "S01E02",
+            file_name: "Dune.part2.mkv",
+            size_bytes: 1024,
+            is_primary: false,
+          },
+        ],
+      }),
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByRole("link", { name: "Files (2)" })).toHaveAttribute(
+      "href",
+      "/title/t1/files",
+    );
+    expect(screen.getByRole("link", { name: "Dune" })).toHaveAttribute("href", "/title/t1");
   });
 });

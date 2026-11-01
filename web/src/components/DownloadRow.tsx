@@ -242,7 +242,7 @@ export const DownloadRow = memo(function DownloadRow({
       {confirmingRemove ? (
         <RemoveDownloadDialog
           name={name}
-          showDeleteFiles={download.source === "torrent"}
+          showDeleteFiles={download.can_delete_source_files === true}
           onCancel={closeRemove}
           onConfirm={confirmRemove}
         />
