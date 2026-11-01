@@ -13,6 +13,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from daku.models import Episode, MediaFile, Release, Title
+from daku.repositories import media_files as media_files_repo
 from daku.utils import new_id, utc_now_iso
 
 KIND_ORDER = {"movie": 0, "series": 1, "anime": 2}
@@ -114,6 +115,7 @@ def query_library(
     kind: str | None = None,
     wanted: bool | None = None,
     availability: str | None = None,
+    has_files: bool | None = None,
     q: str | None = None,
     sort: str = "added",
     limit: int = 50,
@@ -126,6 +128,11 @@ def query_library(
         statement = statement.where(Title.kind == kind)
     if wanted is not None:
         statement = statement.where(Title.wanted.is_(wanted))
+    if has_files is not None:
+        with_files = select(MediaFile.title_id)
+        statement = statement.where(
+            Title.id.in_(with_files) if has_files else Title.id.not_in(with_files)
+        )
     if q:
         needle = f"%{q.strip().lower()}%"
         statement = statement.where(
@@ -169,42 +176,42 @@ def _sort_key(
 
 
 def availability_map(session: Session, title_ids: Iterable[str]) -> dict[str, str]:
-    """Derive ``none`` / ``partial`` / ``complete`` for each title in one pass."""
+    """Derive ``none`` / ``partial`` / ``complete`` for each title in one pass.
+
+    Only media rows whose file still exists count as available. All rows for the
+    requested titles are fetched once, then stat'ed in this loop.
+    """
 
     ids = list(dict.fromkeys(title_ids))
     if not ids:
         return {}
 
-    episode_counts = _group_counts(
-        session,
-        select(Episode.title_id, func.count(Episode.id))
-        .where(Episode.title_id.in_(ids), Episode.season != 0)
-        .group_by(Episode.title_id),
-    )
-    available_counts = _group_counts(
-        session,
-        select(MediaFile.title_id, func.count(func.distinct(MediaFile.episode_id)))
-        .join(Episode, Episode.id == MediaFile.episode_id)
-        .where(
-            MediaFile.title_id.in_(ids),
-            MediaFile.episode_id.is_not(None),
-            Episode.season != 0,
-        )
-        .group_by(MediaFile.title_id),
-    )
-    file_counts = _group_counts(
-        session,
-        select(MediaFile.title_id, func.count(MediaFile.id))
-        .where(MediaFile.title_id.in_(ids))
-        .group_by(MediaFile.title_id),
-    )
+    episode_rows = session.execute(
+        select(Episode.id, Episode.title_id, Episode.season).where(Episode.title_id.in_(ids))
+    ).all()
+    episode_counts: dict[str, int] = {}
+    season_by_id: dict[str, int] = {}
+    for episode_id, title_id, season in episode_rows:
+        season_by_id[str(episode_id)] = int(season)
+        if season != 0:
+            key = str(title_id)
+            episode_counts[key] = episode_counts.get(key, 0) + 1
+
+    present_counts: dict[str, int] = {}
+    available_episodes: dict[str, set[str]] = {}
+    for row in _media_rows_by_title(session, ids):
+        if not media_files_repo.is_present(row):
+            continue
+        present_counts[row.title_id] = present_counts.get(row.title_id, 0) + 1
+        if row.episode_id is not None and season_by_id.get(row.episode_id, 0) != 0:
+            available_episodes.setdefault(row.title_id, set()).add(row.episode_id)
 
     derived: dict[str, str] = {}
     for title_id in ids:
         episode_total = episode_counts.get(title_id, 0)
-        available = available_counts.get(title_id, 0)
+        available = len(available_episodes.get(title_id, ()))
         if episode_total == 0:
-            derived[title_id] = "complete" if file_counts.get(title_id, 0) else "none"
+            derived[title_id] = "complete" if present_counts.get(title_id, 0) else "none"
         elif available == 0:
             derived[title_id] = "none"
         elif available >= episode_total:
@@ -214,21 +221,42 @@ def availability_map(session: Session, title_ids: Iterable[str]) -> dict[str, st
     return derived
 
 
+def _media_rows_by_title(session: Session, title_ids: Sequence[str]) -> list[MediaFile]:
+    return media_files_repo.list_by_titles(session, title_ids)
+
+
 def availability_for(session: Session, title: Title) -> str:
     return availability_map(session, [title.id]).get(title.id, "none")
 
 
 def available_episode_ids(session: Session, title_id: str) -> set[str]:
     return {
-        episode_id
-        for episode_id in session.scalars(
-            select(MediaFile.episode_id).where(
-                MediaFile.title_id == title_id,
-                MediaFile.episode_id.is_not(None),
-            )
-        )
-        if episode_id is not None
+        row.episode_id
+        for row in media_files_repo.list_by_title(session, title_id)
+        if row.episode_id is not None and media_files_repo.is_present(row)
     }
+
+
+def missing_file_count(session: Session, title_id: str) -> int:
+    return sum(
+        1
+        for row in media_files_repo.list_by_title(session, title_id)
+        if not media_files_repo.is_present(row)
+    )
+
+
+def file_counts(session: Session, title_ids: Sequence[str]) -> dict[str, int]:
+    """Count every recorded media file per title, including files not on disk."""
+
+    ids = list(dict.fromkeys(title_ids))
+    if not ids:
+        return {}
+    return _group_counts(
+        session,
+        select(MediaFile.title_id, func.count(MediaFile.id))
+        .where(MediaFile.title_id.in_(ids))
+        .group_by(MediaFile.title_id),
+    )
 
 
 def saved_release_counts(session: Session, title_ids: Sequence[str]) -> dict[str, int]:
