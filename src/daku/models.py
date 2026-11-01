@@ -52,6 +52,8 @@ class Title(Base):
     anilist_id: Mapped[int | None] = mapped_column(Integer)
     mal_id: Mapped[int | None] = mapped_column(Integer)
     overview: Mapped[str | None] = mapped_column(Text)
+    # JSON array of every known release-search spelling (T-053).
+    aliases_json: Mapped[str | None] = mapped_column(Text)
     poster_url: Mapped[str | None] = mapped_column(Text)
     # Wide 16:9 art for the title banner. Optional: older rows fall back to the poster.
     banner_url: Mapped[str | None] = mapped_column(Text)
@@ -212,6 +214,9 @@ class MediaFile(Base):
     width: Mapped[int | None] = mapped_column(Integer)
     height: Mapped[int | None] = mapped_column(Integer)
     duration_s: Mapped[float | None] = mapped_column(Float)
+    playback_position_s: Mapped[float | None] = mapped_column(Float)
+    playback_duration_s: Mapped[float | None] = mapped_column(Float)
+    playback_updated_at: Mapped[str | None] = mapped_column(String(40))
     sidecars_json: Mapped[str | None] = mapped_column(Text)
     is_primary: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=text("0")
@@ -272,6 +277,28 @@ class TitleSeason(Base):
     source_id: Mapped[str] = mapped_column(String(64), nullable=False)
     provider_season: Mapped[int] = mapped_column(Integer, nullable=False)
     anilist_id: Mapped[int | None] = mapped_column(Integer)
+    absolute_offset: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    created_at: Mapped[str] = mapped_column(String(40), nullable=False)
+    updated_at: Mapped[str] = mapped_column(String(40), nullable=False)
+
+
+class TitleCour(Base):
+    """One AniList cour inside a library season (T-052 split-cour identity)."""
+
+    __tablename__ = "title_cours"
+    __table_args__ = (Index("ix_title_cours_title_season", "title_id", "library_season"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    title_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("titles.id", ondelete="CASCADE"), nullable=False
+    )
+    library_season: Mapped[int] = mapped_column(Integer, nullable=False)
+    provider_season: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    start_episode: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_episode: Mapped[int] = mapped_column(Integer, nullable=False)
+    anilist_id: Mapped[int] = mapped_column(Integer, nullable=False)
     absolute_offset: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default=text("0")
     )

@@ -44,6 +44,57 @@ export interface TitleSummary {
   wanted_at: string | null;
   availability: Availability;
   saved_release_count: number;
+  file_count?: number;
+  has_files?: boolean;
+}
+
+export interface MediaFileItem {
+  id: string;
+  download_id: string | null;
+  episode_id: string | null;
+  episode_label: string | null;
+  episode_name: string | null;
+  season: number | null;
+  episode: number | null;
+  file_name: string;
+  size_bytes: number | null;
+  is_primary: boolean;
+  has_episode: boolean;
+  playback?: MediaFilePlayback | null;
+}
+
+export interface MediaFilePlayback {
+  position_s: number;
+  duration_s: number | null;
+  updated_at: string | null;
+}
+
+export interface PlaybackState {
+  media_file_id: string;
+  position_s: number;
+  duration_s: number | null;
+  playing: boolean;
+  updated_at: string;
+}
+
+export function getPlaybackState(
+  signal?: AbortSignal,
+): Promise<{ active: PlaybackState | null }> {
+  return request<{ active: PlaybackState | null }>("/api/media-files/playback", { signal });
+}
+
+export interface TitleFilesSeason {
+  library_season: number;
+  file_count: number;
+  total_size_bytes: number;
+}
+
+export interface TitleFilesResponse {
+  title_id: string;
+  file_count: number;
+  total_size_bytes: number;
+  seasons: TitleFilesSeason[];
+  items: MediaFileItem[];
 }
 
 export interface Episode {
@@ -55,6 +106,7 @@ export interface Episode {
   name: string | null;
   air_date: string | null;
   status: string;
+  present?: boolean;
 }
 
 export interface SeasonInfo {
@@ -87,11 +139,13 @@ export interface SeasonRebuildResult {
 export interface TitleDetail extends TitleSummary {
   episode_count: number;
   available_episode_count: number;
+  missing_file_count?: number;
   episodes: Episode[];
   metadata_source?: string | null;
   metadata_synced_at?: string | null;
   metadata_state?: "empty" | "stale" | "ok";
   classification?: Classification;
+  aliases?: string[];
   overrides?: TitleOverrides;
   seasons?: SeasonInfo[];
   rebuild?: SeasonRebuildResult;
@@ -110,6 +164,25 @@ export interface TitleMetadata {
   banner_url?: string | null;
   stale: boolean;
   sources?: string[];
+}
+
+export interface AniListCandidate {
+  anilist_id: number;
+  type: string | null;
+  format: string | null;
+  episodes: number | null;
+  season_year: number | null;
+  title: string;
+  is_anime: boolean;
+}
+
+export interface MetadataRefreshResult {
+  title_id: string;
+  source: string;
+  partial: boolean;
+  refresh_error: { code: string; message: string } | null;
+  report: { added: number; updated: number; skipped: number; stale: boolean };
+  overridden_fields: string[];
 }
 
 export interface PreviewTitle {
@@ -169,6 +242,7 @@ export interface LibraryFilters {
   kind?: Kind | null;
   availability?: Availability | null;
   wanted?: boolean | null;
+  has_files?: boolean | null;
   q?: string | null;
   sort?: SortOrder;
   limit?: number;
@@ -202,7 +276,10 @@ export type EditableField =
   | "imdb_id"
   | "tvdb_id"
   | "anilist_id"
-  | "metadata_source";
+  | "metadata_source"
+  | "aliases";
+
+export type EditableValue = string | number | string[] | null;
 
 export interface SeasonOffset {
   provider_season: number;
@@ -221,10 +298,10 @@ export interface EpisodeOverride {
 
 export interface TitleOverrides {
   title_id: string;
-  fields: Partial<Record<EditableField, string | number | null>>;
+  fields: Partial<Record<EditableField, EditableValue>>;
   season_offsets: SeasonOffset[];
   episodes: EpisodeOverride[];
-  provider_values: Partial<Record<EditableField, string | number | null>>;
+  provider_values: Partial<Record<EditableField, EditableValue>>;
 }
 
 export interface IdentityPatchBody {
@@ -235,6 +312,7 @@ export interface IdentityPatchBody {
   tvdb_id?: string | null;
   anilist_id?: number | null;
   metadata_source?: "cinemeta" | "tvdb" | "anilist" | null;
+  aliases?: string[] | null;
   confirm?: boolean;
   force?: boolean;
 }
@@ -256,6 +334,16 @@ export class ApiError extends Error {
     this.code = code;
     this.detail = detail;
   }
+}
+
+export interface AnilistCandidate {
+  anilist_id: number;
+  type: string | null;
+  format: string | null;
+  episodes: number | null;
+  season_year: number | null;
+  title: string;
+  is_anime: boolean;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -320,6 +408,7 @@ export function listTitles(filters: LibraryFilters = {}, signal?: AbortSignal): 
       kind: filters.kind ?? null,
       availability: filters.availability ?? null,
       wanted: filters.wanted ?? null,
+      has_files: filters.has_files ?? null,
       q: filters.q ?? null,
       sort: filters.sort ?? "added",
       limit: filters.limit ?? 100,
@@ -333,8 +422,56 @@ export function getTitle(id: string, signal?: AbortSignal): Promise<TitleDetail>
   return request<TitleDetail>(`/api/titles/${encodeURIComponent(id)}`, { signal });
 }
 
+export function getTitleFiles(id: string, signal?: AbortSignal): Promise<TitleFilesResponse> {
+  return request<TitleFilesResponse>(
+    `/api/titles/${encodeURIComponent(id)}/files`,
+    { signal },
+  );
+}
+
+export function mediaFileThumbnailUrl(id: string): string {
+  return `/api/media-files/${encodeURIComponent(id)}/thumbnail`;
+}
+
+export interface PlayMediaFileResponse {
+  media_file_id: string;
+  launched: boolean;
+}
+
+export function playMediaFile(id: string): Promise<PlayMediaFileResponse> {
+  return request<PlayMediaFileResponse>(
+    `/api/media-files/${encodeURIComponent(id)}/play`,
+    { method: "POST" },
+  );
+}
+
 export function getTitleMetadata(id: string, signal?: AbortSignal): Promise<TitleMetadata> {
   return request<TitleMetadata>(`/api/titles/${encodeURIComponent(id)}/metadata`, { signal });
+}
+
+export function refreshTitleMetadata(
+  id: string,
+  signal?: AbortSignal,
+): Promise<MetadataRefreshResult> {
+  return request<MetadataRefreshResult>(
+    `/api/titles/${encodeURIComponent(id)}/metadata/refresh`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "auto" }),
+      signal,
+    },
+  );
+}
+
+export function getAnilistCandidate(
+  anilistId: number,
+  signal?: AbortSignal,
+): Promise<AniListCandidate> {
+  return request<AniListCandidate>(
+    `/api/metadata/anilist/${encodeURIComponent(String(anilistId))}`,
+    { signal },
+  );
 }
 
 export function addTitle(body: AddTitleBody): Promise<TitleDetail> {
@@ -371,6 +508,15 @@ export function deleteTitle(id: string, keepFiles = true): Promise<{ id: string;
   return request<{ id: string; deleted: boolean }>(
     withQuery(`/api/titles/${encodeURIComponent(id)}`, { keep_files: keepFiles }),
     { method: "DELETE" },
+  );
+}
+
+export function reconcileTitleMedia(
+  id: string,
+): Promise<{ removed: number; kept: number }> {
+  return request<{ removed: number; kept: number }>(
+    `/api/titles/${encodeURIComponent(id)}/media/reconcile`,
+    { method: "POST" },
   );
 }
 
@@ -434,7 +580,7 @@ export function putTitleSeasons(
 
 // ------------------------------------------------------------------ releases
 
-export type ResolvedFrom = "torrentio" | "nyaa" | "manual";
+export type ResolvedFrom = "torrentio" | "animetosho" | "manual";
 
 export interface ReleaseHints {
   source: string | null;
@@ -464,6 +610,8 @@ export interface ReleaseItem {
   saved_at: string | null;
   last_checked_at: string | null;
   resolved_from: ResolvedFrom;
+  is_pack?: boolean;
+  pack_label?: string | null;
 }
 
 export interface StoredRelease extends ReleaseItem {
@@ -573,6 +721,8 @@ export interface DownloadRecord {
   file_match?: Record<string, unknown> | null;
   selection_label?: string | null;
   selection_size_bytes?: number | null;
+  can_delete_source_files?: boolean;
+  delete_files_reason?: string | null;
   downloaded_files?: DownloadFile[];
 }
 
@@ -629,6 +779,12 @@ export function getReleaseOptions(kind?: Kind, signal?: AbortSignal): Promise<Re
   );
 }
 
+export interface PlayerSettings {
+  mpv_enabled: boolean;
+  mpv_bin: string;
+  mpv_path: string | null;
+}
+
 export interface ReleaseSettings {
   release: {
     providers: Record<Kind, string[]>;
@@ -638,20 +794,27 @@ export interface ReleaseSettings {
     limit: number;
   };
   sources: { database: boolean; config_keys: string[]; anime_sources: string[] };
+  player: PlayerSettings;
 }
 
 export function getSettings(signal?: AbortSignal): Promise<ReleaseSettings> {
   return request<ReleaseSettings>("/api/settings", { signal });
 }
 
-export function patchSettings(body: Partial<Omit<ReleaseSettings["release"], "providers" | "config_providers">> & {
-  providers?: Partial<Record<Kind, string[]>>;
-  anime_sources?: string[];
-}): Promise<ReleaseSettings> {
+export function patchSettings(
+  body: Partial<Omit<ReleaseSettings["release"], "providers" | "config_providers">> & {
+    providers?: Partial<Record<Kind, string[]>>;
+    anime_sources?: string[];
+  },
+  player?: Partial<Pick<PlayerSettings, "mpv_enabled">>,
+): Promise<ReleaseSettings> {
   return request<ReleaseSettings>("/api/settings", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ release: body }),
+    body: JSON.stringify({
+      ...(Object.keys(body).length ? { release: body } : {}),
+      ...(player ? { player } : {}),
+    }),
   });
 }
 

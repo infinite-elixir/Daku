@@ -15,10 +15,11 @@ import httpx
 
 from daku.errors import AppError
 from daku.services.metadata import jikan
+from daku.services.metadata.anime_identity import validate_anilist_anime
 from daku.services.metadata.cache import TTLCache
 from daku.services.metadata.cinemeta import _as_year
 from daku.services.metadata.models import EpisodeRef, TitleDetail
-from daku.services.metadata.search import get_anime_detail, get_detail
+from daku.services.metadata.search import get_detail
 from daku.services.metadata.tvdb import TVDBClient
 
 logger = logging.getLogger("daku.metadata.resolve")
@@ -209,7 +210,7 @@ async def resolve_candidate_detail(
             raise _invalid("AniList ids are numeric", detail={"source_id": source_id}) from exc
         if anilist_id <= 0:
             raise _invalid("AniList ids are positive", detail={"source_id": source_id})
-        detail, stale = await get_anime_detail(client, cache, anilist_id)
+        detail, stale = await validate_anilist_anime(client, cache, anilist_id)
         detail.episodes = _anime_episodes(detail)
         await enrich_anime_episode_names(
             client,

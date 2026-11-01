@@ -13,9 +13,12 @@ from sqlalchemy.orm import Session
 from daku.config import Settings
 from daku.errors import AppError
 from daku.models import Title
+from daku.repositories import cours as cours_repo
 from daku.repositories import episodes as episodes_repo
 from daku.repositories import seasons as seasons_repo
-from daku.services.metadata import structure
+from daku.services.metadata import artwork, structure
+from daku.services.metadata import cours as cours_service
+from daku.services.metadata.aliases import build_generated_aliases, store_generated_aliases
 from daku.services.metadata.cache import TTLCache
 from daku.services.metadata.models import EpisodeRef
 from daku.services.metadata.overrides import (
@@ -278,7 +281,56 @@ async def refresh_title(
         )
 
     specs: list[dict[str, Any]] = []
-    if season_rows and kind != "movie":
+    existing_cours = cours_repo.list_cours(session, title.id) if is_anime else []
+    split_episodes: list[EpisodeRef] | None = None
+    cour_ranges: list[cours_service.CourRange] = []
+    if is_anime and existing_cours:
+        if existing_cours[0].anilist_id == title.anilist_id:
+            entries = await cours_service.stored_cours(
+                client, cache, rows=existing_cours, deadline=deadline
+            )
+            ranges = cours_service.ranges_from_stored(existing_cours, entries)
+            cour_ranges = ranges
+            refreshed_rows = cours_service.cour_rows(ranges)
+            if any(
+                (row.library_season, row.start_episode, row.end_episode, row.anilist_id)
+                != (
+                    new["library_season"],
+                    new["start_episode"],
+                    new["end_episode"],
+                    new["anilist_id"],
+                )
+                for row, new in zip(existing_cours, refreshed_rows, strict=False)
+            ):
+                cours_repo.replace_cours(session, title.id, refreshed_rows)
+            split_episodes = cours_service.combined_refs(ranges)
+            specs = cours_service.season_specs(ranges)
+        else:
+            # The primary identity changed; old cours no longer describe it.
+            cours_repo.delete_cours(session, title.id)
+            existing_cours = []
+
+    if is_anime and not existing_cours and not season_rows and title.anilist_id:
+        entries = await cours_service.resolve_cours(
+            client,
+            cache,
+            primary_id=int(title.anilist_id),
+            primary=detail,
+            deadline=deadline,
+        )
+        if len(entries) > 1:
+            provider = cours_service.provider_season_for_anilist(
+                session, [entry.anilist_id for entry in entries]
+            )
+            ranges = cours_service.build_ranges(entries, provider_season=provider)
+            cour_ranges = ranges
+            cours_repo.replace_cours(session, title.id, cours_service.cour_rows(ranges))
+            split_episodes = cours_service.combined_refs(ranges)
+            specs = cours_service.season_specs(ranges)
+
+    if split_episodes is not None:
+        episodes = split_episodes
+    elif season_rows and kind != "movie":
         episodes, specs, _fetched = await _refresh_structure_rows(
             client,
             cache,
@@ -366,6 +418,40 @@ async def refresh_title(
     added = len(after_keys - before_keys)
     updated = max(0, len(episodes) - added)
 
+    poster_candidates: list[str | None] = [detail.poster_url]
+    if is_anime:
+        poster_candidates.extend(item.entry.poster_url for item in cour_ranges)
+    poster: str | None = None
+    seen_posters: set[str] = set()
+    for candidate in poster_candidates:
+        if not candidate or candidate in seen_posters:
+            continue
+        seen_posters.add(candidate)
+        if await artwork.artwork_ok(client, candidate):
+            poster = candidate
+            break
+
+    stored_poster = title.poster_url
+    if not poster and stored_poster and await artwork.artwork_ok(client, stored_poster):
+        poster = stored_poster
+
+    banner_candidates: list[str | None] = [detail.banner_url]
+    if is_anime:
+        banner_candidates.extend(item.entry.banner_url for item in cour_ranges)
+    banner: str | None = None
+    seen_banners: set[str] = set()
+    for candidate in banner_candidates:
+        if not candidate or candidate in seen_banners:
+            continue
+        seen_banners.add(candidate)
+        if await artwork.artwork_ok(client, candidate):
+            banner = candidate
+            break
+
+    stored_banner = title.banner_url
+    if not banner and stored_banner and await artwork.artwork_ok(client, stored_banner):
+        banner = stored_banner
+
     updates: dict[str, object] = {}
     if detail.title and detail.title.strip():
         updates["title"] = detail.title.strip()
@@ -373,10 +459,15 @@ async def refresh_title(
         updates["year"] = detail.year
     if detail.overview and detail.overview.strip():
         updates["overview"] = detail.overview.strip()
-    if detail.poster_url:
-        updates["poster_url"] = detail.poster_url
-    if detail.banner_url:
-        updates["banner_url"] = detail.banner_url
+    if poster:
+        updates["poster_url"] = poster
+    elif stored_poster:
+        # A dead or unverifiable URL must not survive as if it were artwork.
+        updates["poster_url"] = None
+    if banner:
+        updates["banner_url"] = banner
+    elif stored_banner:
+        updates["banner_url"] = None
     if source != "auto":
         updates["metadata_source"] = source
     updates["metadata_synced_at"] = utc_now_iso()
@@ -384,11 +475,28 @@ async def refresh_title(
 
     for field, value in updates.items():
         setattr(title, field, value)
+    alias_details = [detail, *(item.entry.detail for item in cour_ranges)]
+    store_generated_aliases(
+        session,
+        title,
+        build_generated_aliases(str(updates.get("title") or title.title), alias_details),
+    )
     session.commit()
 
+    artwork_missing = not (title.poster_url or "")
+    refresh_error = (
+        {
+            "code": "ARTWORK_UNAVAILABLE",
+            "message": "No usable poster artwork was found for this title",
+        }
+        if artwork_missing
+        else None
+    )
     return {
         "title_id": title.id,
         "source": chosen,
+        "partial": artwork_missing,
+        "refresh_error": refresh_error,
         "report": {
             "added": added,
             "updated": updated,

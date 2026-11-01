@@ -71,15 +71,46 @@ query Detail($id: Int) {
         node {
           id
           idMal
+          type
           format
           episodes
           seasonYear
+          countryOfOrigin
           startDate { year }
           title { romaji english native }
           coverImage { extraLarge }
+          bannerImage
         }
       }
     }
+  }
+}
+"""
+
+PROBE_QUERY = """
+query Probe($id: Int) {
+  Media(id: $id) {
+    id
+    idMal
+    type
+    format
+    episodes
+    seasonYear
+    title { romaji english native }
+  }
+}
+"""
+
+PROBE_MAL_QUERY = """
+query ProbeMal($idMal: Int) {
+  Media(idMal: $idMal) {
+    id
+    idMal
+    type
+    format
+    episodes
+    seasonYear
+    title { romaji english native }
   }
 }
 """
@@ -234,10 +265,13 @@ def _related(node: dict[str, Any]) -> dict[str, Any] | None:
         "source_id": str(source_id),
         "title": title,
         "year": _year(node),
+        "type": _text(node.get("type")),
         "format": _text(node.get("format")),
         "episode_count": _as_int(node.get("episodes")),
         "id_mal": _as_int(node.get("idMal")),
+        "country_of_origin": _text(node.get("countryOfOrigin")),
         "poster_url": _poster(node),
+        "banner_url": _text(node.get("bannerImage")),
     }
 
 
@@ -357,6 +391,7 @@ def parse_detail(payload: Any) -> TitleDetail | None:
         season=_text(media.get("season")),
         season_year=_as_int(media.get("seasonYear")),
         synonyms=synonyms,
+        aliases=list(_title_variants(media)),
         relations=_parse_relations(media),
         streaming_episodes=parse_streaming_episodes(media),
     )
@@ -371,6 +406,61 @@ def search_body(query: str, limit: int) -> dict[str, Any]:
 
 def detail_body(anilist_id: int) -> dict[str, Any]:
     return {"query": _DETAIL_QUERY, "variables": {"id": anilist_id}}
+
+
+def probe_body(anilist_id: int) -> dict[str, Any]:
+    return {"query": PROBE_QUERY, "variables": {"id": anilist_id}}
+
+
+def probe_mal_body(mal_id: int) -> dict[str, Any]:
+    return {"query": PROBE_MAL_QUERY, "variables": {"idMal": mal_id}}
+
+
+def parse_probe(payload: Any) -> dict[str, Any] | None:
+    """Return the raw type/format row even when it is not an anime."""
+
+    if not isinstance(payload, dict):
+        return None
+    media = payload.get("Media")
+    if not isinstance(media, dict):
+        return None
+    return media
+
+
+async def probe_media(
+    client: httpx.AsyncClient,
+    cache: TTLCache,
+    anilist_id: int,
+    *,
+    deadline: float | None = None,
+) -> dict[str, Any] | None:
+    """Look up an AniList id without the ``type: ANIME`` filter.
+
+    ``fetch_detail`` deliberately asks for ``type: ANIME``, so a manga id looks
+    exactly like a missing entry. This probe tells the two apart for validation.
+    """
+
+    body = probe_body(anilist_id)
+    key = request_cache_key(ENDPOINT, body)
+    payload = await post_json(client, ENDPOINT, body, cache, deadline=deadline, cache_key=key)
+    data = _graphql_data(payload, cache, key)
+    return parse_probe(data)
+
+
+async def probe_media_by_mal(
+    client: httpx.AsyncClient,
+    cache: TTLCache,
+    mal_id: int,
+    *,
+    deadline: float | None = None,
+) -> dict[str, Any] | None:
+    """Resolve a MyAnimeList id to its AniList row, for manual-id suggestions."""
+
+    body = probe_mal_body(mal_id)
+    key = request_cache_key(ENDPOINT, body)
+    payload = await post_json(client, ENDPOINT, body, cache, deadline=deadline, cache_key=key)
+    data = _graphql_data(payload, cache, key)
+    return parse_probe(data)
 
 
 async def search(

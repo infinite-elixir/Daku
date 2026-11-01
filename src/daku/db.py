@@ -340,6 +340,47 @@ def _migration_010(engine: Engine) -> None:
         conn.exec_driver_sql("ALTER TABLE titles ADD COLUMN banner_url TEXT")
 
 
+def _migration_011(engine: Engine) -> None:
+    """T-052: split-cour AniList entries inside one library season."""
+
+    statements = [
+        """
+        CREATE TABLE title_cours (
+            id TEXT PRIMARY KEY NOT NULL,
+            title_id TEXT NOT NULL REFERENCES titles (id) ON DELETE CASCADE,
+            library_season INTEGER NOT NULL,
+            provider_season INTEGER NOT NULL DEFAULT 1,
+            start_episode INTEGER NOT NULL,
+            end_episode INTEGER NOT NULL,
+            anilist_id INTEGER NOT NULL,
+            absolute_offset INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """,
+        "CREATE INDEX ix_title_cours_title_season ON title_cours (title_id, library_season)",
+    ]
+    with engine.begin() as conn:
+        for statement in statements:
+            conn.exec_driver_sql(statement)
+
+
+def _migration_012(engine: Engine) -> None:
+    """T-053: persist every known release-search alias per title."""
+
+    with engine.begin() as conn:
+        conn.exec_driver_sql("ALTER TABLE titles ADD COLUMN aliases_json TEXT")
+
+
+def _migration_013(engine: Engine) -> None:
+    """T-054: remember how far the host player got through a media file."""
+
+    with engine.begin() as conn:
+        conn.exec_driver_sql("ALTER TABLE media_files ADD COLUMN playback_position_s REAL")
+        conn.exec_driver_sql("ALTER TABLE media_files ADD COLUMN playback_duration_s REAL")
+        conn.exec_driver_sql("ALTER TABLE media_files ADD COLUMN playback_updated_at TEXT")
+
+
 class Migration:
     __slots__ = ("name", "upgrade", "version")
 
@@ -360,6 +401,9 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(8, "per-season provider structure", _migration_008),
     Migration(9, "selective torrent file downloads", _migration_009),
     Migration(10, "wide banner art for title pages", _migration_010),
+    Migration(11, "split-cour anime identities", _migration_011),
+    Migration(12, "release-search aliases", _migration_012),
+    Migration(13, "media file playback progress", _migration_013),
 )
 SCHEMA_VERSION = MIGRATIONS[-1].version
 

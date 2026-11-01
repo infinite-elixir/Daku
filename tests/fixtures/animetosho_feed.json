@@ -1,0 +1,72 @@
+[
+  {
+    "id": 517028,
+    "info_hash": "90970B8EE6ED88ECE847CB97815560C493F41E39",
+    "leechers": 6,
+    "link": "https://animetosho.net/view/517028",
+    "article_url": "https://nyaa.si/view/1900395",
+    "article_title": "Nyaa",
+    "magnet_uri": "magnet:?xt=urn:btih:SCLQXDXG5WEOZ2CHZOLYCVLAYSJ7IHRZ",
+    "num_files": 25,
+    "seeders": 56,
+    "status": "complete",
+    "timestamp": 1731788522,
+    "title": "[Judas] Kore wa Zombie Desuka (Is this a Zombie) (Complete Series) [BD 1080p][HEVC x265 10bit][Dual-Audio][Eng-Subs] (Batch)",
+    "torrent_name": "[Judas] Kore wa Zombie Desuka (Is this a Zombie) (Complete Series) [BD 1080p][HEVC x265 10bit][Dual-Audio][Eng-Subs] (Batch)",
+    "torrent_url": "https://storage.animetosho.net/torrents/909/70b8ee6ed88ece847cb97815560c493f41e39.torrent",
+    "total_size": 8843302239
+  },
+  {
+    "id": 1,
+    "info_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "leechers": 1,
+    "link": "https://animetosho.net/view/1",
+    "num_files": 12,
+    "seeders": 3,
+    "status": "complete",
+    "timestamp": 1731788500,
+    "title": "Zom 100 - 01 [1080p] &amp; [Multi-Subs]",
+    "torrent_name": "Zom 100 - 01 [1080p]",
+    "total_size": 123456789
+  },
+  {
+    "id": 2,
+    "leechers": 1,
+    "seeders": 30,
+    "title": "No hash, must be dropped",
+    "total_size": 1000
+  },
+  {
+    "id": 3,
+    "info_hash": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+    "seeders": 10,
+    "total_size": 2000
+  },
+  {
+    "id": 4,
+    "info_hash": "not-a-valid-hash",
+    "seeders": 10,
+    "title": "Bad hash, must be dropped",
+    "total_size": 2000
+  },
+  {
+    "id": 5,
+    "info_hash": "cccccccccccccccccccccccccccccccccccccccc",
+    "leechers": "4",
+    "seeders": null,
+    "timestamp": "not-a-timestamp",
+    "title": "Example Show - 02 [720p]",
+    "total_size": "987654"
+  },
+  {
+    "id": 6,
+    "info_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "leechers": 2,
+    "seeders": 7,
+    "status": "complete",
+    "timestamp": 1731788600,
+    "title": "Zom 100 - 01 [720p]",
+    "torrent_name": "Zom 100 - 01 [720p]",
+    "total_size": 734003200
+  }
+]

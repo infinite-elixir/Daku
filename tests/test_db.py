@@ -55,6 +55,7 @@ ALL_TABLES = {
     "title_episode_overrides",
     "title_season_offsets",
     "title_seasons",
+    "title_cours",
 }
 
 
@@ -74,7 +75,7 @@ def _count(session: Session, model: type[object]) -> int:
 def test_fresh_database_has_full_schema(db: tuple[Engine, sessionmaker[Session]]) -> None:
     engine, _factory = db
 
-    assert current_version(engine) == SCHEMA_VERSION == 10
+    assert current_version(engine) == SCHEMA_VERSION == 13
     assert set(table_names(engine)) == ALL_TABLES
 
 

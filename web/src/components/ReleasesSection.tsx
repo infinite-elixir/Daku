@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useMemo, useState } from "react";
 
 import { findEpisode } from "../lib/episodes";
+import { describeReleaseSources, releaseSourceChoices, releaseSourceLabel } from "../lib/releaseSources";
 import {
   createRelease,
   getReleaseOptions,
@@ -29,6 +30,38 @@ const SORT_LABELS: Record<string, string> = {
   quality: "Quality",
   size: "Size",
 };
+
+function SourceBadge({ release }: { release: ReleaseItem }) {
+  const animeTosho =
+    release.provider === "animetosho" ||
+    release.provider === "nyaa" ||
+    release.resolved_from === "animetosho";
+  const source = animeTosho ? "animetosho" : release.provider || "torrentio";
+  const label = releaseSourceLabel(source);
+  return (
+    <span
+      aria-label={`Source ${label}`}
+      className="rounded-full bg-fg-muted/10 px-1.5 py-0.5 text-micro"
+    >
+      {label.toUpperCase()}
+    </span>
+  );
+}
+
+function PackBadge({ release }: { release: ReleaseItem }) {
+  if (!release.is_pack) {
+    return null;
+  }
+  const label = release.pack_label ? `Pack ${release.pack_label}` : "Pack";
+  return (
+    <span
+      title="This release contains several episodes. Downloading it fetches only the selected episode's file."
+      className="rounded-full bg-accent/15 px-1.5 py-0.5 text-micro font-medium text-accent"
+    >
+      {label.toUpperCase()}
+    </span>
+  );
+}
 
 function storage(): Storage | null {
   try {
@@ -201,7 +234,10 @@ export function ReleasesSection({
   const effectiveSort = sortMode || options?.defaults?.sort || "seeders";
   const limitSteps = options?.limit_steps?.length ? options.limit_steps : [20, 50, 100, 200];
   const effectiveLimit = limitOverride ?? options?.defaults?.limit ?? 20;
-  const effectiveSources = sources ?? (options?.anime_sources ?? ["torrentio", "nyaa"]);
+  const effectiveSources = sources ?? (options?.anime_sources ?? ["torrentio", "animetosho"]);
+  const displaySources =
+    title.kind !== "anime" ? ["torrentio"] : options || sources ? effectiveSources : [];
+  const sourceChoices = releaseSourceChoices(effectiveSources);
 
   const findQuery = useQuery({
     queryKey: [
@@ -533,10 +569,10 @@ export function ReleasesSection({
                 {title.kind === "anime" ? (
                   <>
                     <p className="mt-2 border-t border-border-subtle pt-2 text-micro font-semibold text-fg-muted">Sources</p>
-                    {["torrentio", "nyaa"].map((source) => (
-                      <label key={source} className="flex items-center gap-2 rounded-control px-2 py-1 text-small text-fg-muted hover:bg-hover">
-                        <input type="checkbox" aria-label={`Source ${source}`} checked={effectiveSources.includes(source)} onChange={() => toggleSource(source)} />
-                        {source === "nyaa" ? "Nyaa" : "Torrentio"}
+                    {sourceChoices.map((source) => (
+                      <label key={source.id} className="flex items-center gap-2 rounded-control px-2 py-1 text-small text-fg-muted hover:bg-hover">
+                        <input type="checkbox" aria-label={`Source ${source.id}`} checked={effectiveSources.includes(source.id)} onChange={() => toggleSource(source.id)} />
+                        {source.number} · {source.label}
                       </label>
                     ))}
                   </>
@@ -560,7 +596,7 @@ export function ReleasesSection({
           </div>
 
           {findQuery.isLoading ? (
-            <p className="text-small text-fg-muted">Searching Torrentio…</p>
+            <p className="text-small text-fg-muted">{describeReleaseSources(displaySources)}</p>
           ) : null}
           {findQuery.error ? (
             <p role="alert" className="text-small text-danger">
@@ -580,7 +616,7 @@ export function ReleasesSection({
                 {countLabel ? <span>· {countLabel}</span> : null}
                 {findQuery.data.sources_degraded?.map((source) => (
                   <span key={source} className="rounded-full bg-warning/15 px-2 py-0.5 text-warning">
-                    {source === "nyaa" ? "Nyaa unavailable; showing Torrentio results." : `${source} unavailable.`}
+                    {releaseSourceLabel(source)} unavailable.
                   </span>
                 ))}
                 {findQuery.data.stale ? (
@@ -635,7 +671,8 @@ export function ReleasesSection({
                             <span>{release.quality ?? "unknown"}</span>
                             <span>· {formatSize(release.size_bytes)}</span>
                             <span>· {release.seeders ?? 0} seeders</span>
-                            <span aria-label={`Source ${release.provider === "nyaa" ? "Nyaa" : "Torrentio"}`} className="rounded-full bg-fg-muted/10 px-1.5 py-0.5 text-micro">{release.provider === "nyaa" ? "NYAA" : "TORRENTIO"}</span>
+                            <SourceBadge release={release} />
+                            <PackBadge release={release} />
                           </p>
                           {hintsLine(release) ? (
                             <p className="mt-0.5 text-micro text-fg-comment">{hintsLine(release)}</p>
@@ -779,7 +816,7 @@ export function ReleasesSection({
                         <span>{release.quality ?? "unknown"}</span>
                         <span>· {formatSize(release.size_bytes)}</span>
                         <span>· {release.seeders ?? 0} seeders</span>
-                        <span aria-label={`Source ${release.provider === "nyaa" ? "Nyaa" : "Torrentio"}`} className="rounded-full bg-fg-muted/10 px-1.5 py-0.5 text-micro">{release.provider === "nyaa" ? "NYAA" : "TORRENTIO"}</span>
+                        <SourceBadge release={release} />
                       </p>
                       <p className="mt-0.5 flex flex-wrap items-center gap-2 text-micro text-fg-comment">
                         <span>Checked {formatChecked(release.last_checked_at)}</span>

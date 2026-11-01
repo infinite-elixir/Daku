@@ -28,7 +28,7 @@ from urllib.parse import parse_qs, quote, urlsplit
 
 from daku.config import Settings
 from daku.services.releases.magnet import BTIH_PREFIX, MagnetError, ParsedMagnet, parse_magnet
-from daku.services.torrents.nyaa import NYAA_TRACKERS
+from daku.services.torrents.animetosho import PUBLIC_TRACKERS
 
 logger = logging.getLogger(__name__)
 
@@ -357,7 +357,7 @@ class ProbeService:
             save_dir = self.settings.data_dir / "probes" / key
             probe_magnet = parsed.magnet
             if not parsed.trackers:
-                additions = "".join(f"&tr={quote(tracker, safe='')}" for tracker in NYAA_TRACKERS)
+                additions = "".join(f"&tr={quote(tracker, safe='')}" for tracker in PUBLIC_TRACKERS)
                 probe_magnet = f"{parsed.magnet}{additions}"
 
             logger.info(

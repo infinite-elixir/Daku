@@ -16,6 +16,8 @@ from sqlalchemy.orm import Session
 from daku.config import Settings
 from daku.models import Setting
 
+ANIME_SOURCES: tuple[str, ...] = ("torrentio", "animetosho")
+
 DEFAULT_SETTING_KEYS: tuple[str, ...] = (
     "host",
     "port",
@@ -64,7 +66,7 @@ def default_settings_map(settings: Settings) -> dict[str, Any]:
             "providers_movie": list(settings.providers),
             "providers_series": list(settings.providers),
             "providers_anime": list(settings.providers),
-            "anime_sources": ["torrentio", "nyaa"],
+            "anime_sources": list(ANIME_SOURCES),
             "default_min_quality": None,
             "default_sort": settings.sort,
             "default_limit": settings.limit,
@@ -104,6 +106,27 @@ def get_setting(session: Session, key: str, default: Any = None) -> Any:
     if row is None:
         return default
     return _decode(row.value)
+
+
+def normalize_anime_sources(values: object) -> list[str]:
+    """Return the selectable anime sources, accepting the legacy ``nyaa`` value."""
+
+    if not isinstance(values, list):
+        return list(ANIME_SOURCES)
+    normalised: list[str] = []
+    for raw in values:
+        if not isinstance(raw, str):
+            continue
+        value = raw.strip().lower()
+        if value == "nyaa":
+            value = "animetosho"
+        if value in ANIME_SOURCES and value not in normalised:
+            normalised.append(value)
+    return normalised or list(ANIME_SOURCES)
+
+
+def get_anime_sources(session: Session) -> list[str]:
+    return normalize_anime_sources(get_setting(session, "anime_sources", list(ANIME_SOURCES)))
 
 
 def set_setting(session: Session, key: str, value: Any) -> Setting:

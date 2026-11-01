@@ -468,7 +468,7 @@ class Worker:
                 row = downloads_repo.get_download(session, download_id)
                 if row is None:
                     return
-                payload = download_payload(session, row)
+                payload = download_payload(session, row, settings=self._settings)
             self._bus.publish("download.updated", payload)
         except Exception:  # pragma: no cover - events must not stop the worker
             logger.exception("failed to publish download event")

@@ -20,6 +20,11 @@ class Release:
     provider: str
     magnet: str
     metadata: dict[str, Any] = field(default_factory=dict)
+    # A pack may be offered as a source for a single episode, but it is never an
+    # exact episode match. The UI badges these rows and the file selector picks
+    # the one file the user asked for.
+    is_pack: bool = False
+    pack_label: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -32,6 +37,8 @@ class Release:
             "magnet": self.magnet,
             # A snapshot dict, matching ``releases.metadata_json`` in T-008.
             "metadata_json": dict(self.metadata),
+            "is_pack": self.is_pack,
+            "pack_label": self.pack_label,
         }
 
 

@@ -39,6 +39,7 @@ EDITABLE_FIELDS = (
     "tvdb_id",
     "anilist_id",
     "metadata_source",
+    "aliases",
 )
 KINDS = frozenset({"movie", "series", "anime"})
 METADATA_SOURCES = frozenset({"cinemeta", "tvdb", "anilist"})
@@ -95,8 +96,15 @@ def overrides_bundle(session: Session, title: Title) -> dict[str, Any]:
     fields = load_field_overrides(session, title.id)
     offsets = load_season_offsets(session, title.id)
     episodes = load_episode_overrides(session, title.id)
+    from daku.services.metadata.aliases import generated_aliases
+
     provider = {
-        field: None if field in fields else getattr(title, field, None) for field in EDITABLE_FIELDS
+        field: (
+            generated_aliases(title)
+            if field == "aliases"
+            else (None if field in fields else getattr(title, field, None))
+        )
+        for field in EDITABLE_FIELDS
     }
     return {
         "title_id": title.id,
@@ -155,6 +163,15 @@ def _normalise_identity(field: str, value: Any) -> Any:
                 detail={"metadata_source": value},
             )
         return source
+    if field == "aliases":
+        if not isinstance(value, (list, tuple)):
+            raise _invalid("aliases must be a list of strings", detail={"aliases": value})
+        from daku.services.metadata.aliases import dedupe_aliases
+
+        aliases = dedupe_aliases(str(item) for item in value if isinstance(item, str))
+        if len(aliases) > 50:
+            raise _invalid("at most 50 aliases may be stored", detail={"aliases": len(aliases)})
+        return aliases
     text = str(value).strip()
     if not text:
         return None
@@ -271,9 +288,11 @@ def update_identity(
             session.execute(delete(Episode).where(Episode.title_id == title.id))
 
     for field, value in normalised.items():
-        setattr(title, field, value)
+        if field != "aliases":
+            setattr(title, field, value)
     for field in normalised:
-        _write_field_override(session, title.id, field, getattr(title, field, None))
+        value = normalised[field] if field == "aliases" else getattr(title, field, None)
+        _write_field_override(session, title.id, field, value)
 
     try:
         session.commit()

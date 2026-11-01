@@ -1,12 +1,13 @@
-"""Persisted, non-secret release settings."""
+"""Persisted, non-secret settings: release defaults and the player toggle."""
 
 from __future__ import annotations
 
 import re
+import shutil
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy.orm import Session
 
 from daku.db import get_session
@@ -31,10 +32,17 @@ class ReleasePatch(BaseModel):
     anime_sources: list[str] | None = None
 
 
+class PlayerPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mpv_enabled: bool | None = None
+
+
 class SettingsPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     release: ReleasePatch | None = None
+    player: PlayerPatch | None = None
 
 
 def _invalid(message: str, detail: Any = None) -> AppError:
@@ -57,6 +65,8 @@ def _resolved(session: Session, request: Request) -> dict[str, Any]:
                 ]
                 break
     first = defaults["movie"]
+    stored_mpv = settings_repo.get_setting(session, "mpv_enabled", None)
+    mpv_enabled = stored_mpv if isinstance(stored_mpv, bool) else runtime.mpv_enabled
     return {
         "release": {
             "providers": {kind: defaults[kind].providers for kind in KINDS},
@@ -68,9 +78,12 @@ def _resolved(session: Session, request: Request) -> dict[str, Any]:
         "sources": {
             "database": True,
             "config_keys": ["providers", "sort", "limit"],
-            "anime_sources": settings_repo.get_setting(
-                session, "anime_sources", ["torrentio", "nyaa"]
-            ),
+            "anime_sources": settings_repo.get_anime_sources(session),
+        },
+        "player": {
+            "mpv_enabled": mpv_enabled,
+            "mpv_bin": runtime.mpv_bin,
+            "mpv_path": shutil.which(runtime.mpv_bin),
         },
     }
 
@@ -88,11 +101,45 @@ def patch_settings(
     request: Request,
     session: Annotated[Session, Depends(get_session)],
 ) -> dict[str, Any]:
-    if set(body) - {"release"}:
+    if set(body) - {"release", "player"}:
         raise AppError(code="UNKNOWN_SETTING", message="Unknown setting", status_code=422)
-    if not isinstance(body.get("release"), dict):
+    if "release" not in body and "player" not in body:
         raise AppError(code="UNKNOWN_SETTING", message="No settings were supplied", status_code=422)
-    unknown_release = set(body["release"]) - {
+    if "release" in body:
+        release_payload = body["release"]
+        if not isinstance(release_payload, dict):
+            raise _invalid("Release settings must be an object")
+        _apply_release(session, release_payload)
+    if "player" in body:
+        player_payload = body["player"]
+        if not isinstance(player_payload, dict):
+            raise _invalid("Player settings must be an object")
+        unknown_player = set(player_payload) - {"mpv_enabled"}
+        if unknown_player:
+            raise AppError(
+                code="UNKNOWN_SETTING", message="Unknown player setting", status_code=422
+            )
+        try:
+            player = PlayerPatch.model_validate(player_payload)
+        except ValidationError as exc:
+            raise _invalid("Invalid player setting") from exc
+        if player.mpv_enabled is not None:
+            settings_repo.set_setting(session, "mpv_enabled", player.mpv_enabled)
+            # Apply immediately: the player and doctor read the runtime settings object.
+            request.app.state.settings.mpv_enabled = player.mpv_enabled
+
+    payload = _resolved(session, request)
+    bus: EventBus | None = getattr(request.app.state, "event_bus", None)
+    if bus is not None:
+        bus.publish(
+            "settings.updated",
+            {"release": payload["release"], "player": payload["player"]},
+        )
+    return payload
+
+
+def _apply_release(session: Session, body: dict[str, Any]) -> None:
+    unknown_release = set(body) - {
         "providers",
         "min_quality",
         "sort",
@@ -101,13 +148,20 @@ def patch_settings(
     }
     if unknown_release:
         raise AppError(code="UNKNOWN_SETTING", message="Unknown release setting", status_code=422)
-    release = ReleasePatch.model_validate(body["release"])
+    try:
+        release = ReleasePatch.model_validate(body)
+    except ValidationError as exc:
+        raise _invalid("Invalid release setting") from exc
     if release.anime_sources is not None:
-        sources = list(dict.fromkeys(value.strip().lower() for value in release.anime_sources))
-        if not sources or any(value not in {"torrentio", "nyaa"} for value in sources):
+        raw_sources = [value.strip().lower() for value in release.anime_sources]
+        if not raw_sources or any(
+            value not in {*settings_repo.ANIME_SOURCES, "nyaa"} for value in raw_sources
+        ):
             raise _invalid(
-                "Anime sources must include Torrentio or Nyaa", {"anime_sources": sources}
+                "Anime sources must include Torrentio or AnimeTosho",
+                {"anime_sources": raw_sources},
             )
+        sources = settings_repo.normalize_anime_sources(raw_sources)
         settings_repo.set_setting(session, "anime_sources", sources)
     if release.providers is not None:
         unknown = set(release.providers) - set(KINDS)
@@ -142,9 +196,3 @@ def patch_settings(
         settings_repo.set_setting(session, "default_sort", release.sort)
     if release.limit is not None:
         settings_repo.set_setting(session, "default_limit", release.limit)
-
-    payload = _resolved(session, request)
-    bus: EventBus | None = getattr(request.app.state, "event_bus", None)
-    if bus is not None:
-        bus.publish("settings.updated", {"release": payload["release"]})
-    return payload

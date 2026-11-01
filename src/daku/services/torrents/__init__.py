@@ -1,1 +1,1 @@
-"""Release providers. Torrentio is the only provider in v1."""
+"""Release providers: Torrentio for movies/TV and AnimeTosho for anime."""

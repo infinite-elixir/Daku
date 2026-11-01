@@ -5,11 +5,13 @@ import { Link } from "react-router-dom";
 import {
   ApiError,
   deleteTitleOverride,
+  getAnilistCandidate,
   getTitleOverrides,
   patchTitleIdentity,
   putEpisodeMap,
   putTitleSeasons,
   rebuildTitleSeasons,
+  type AniListCandidate,
   type EditableField,
   type EpisodeOverride,
   type IdentityPatchBody,
@@ -53,6 +55,7 @@ interface FormState {
   tvdb_id: string;
   anilist_id: string;
   metadata_source: string;
+  aliases: string;
   offsets: OffsetRow[];
   episodes: EpisodeRow[];
 }
@@ -63,6 +66,8 @@ function initialState(title: TitleDetail, overrides: TitleOverrides | undefined)
     const value = field in fields ? fields[field] : fallback;
     return value === null || value === undefined ? "" : String(value);
   };
+  const aliasOverride = fields.aliases;
+  const aliasValues = Array.isArray(aliasOverride) ? aliasOverride : (title.aliases ?? []);
   return {
     kind: (fields.kind as Kind | undefined) ?? title.kind,
     title: text("title", title.title),
@@ -70,8 +75,8 @@ function initialState(title: TitleDetail, overrides: TitleOverrides | undefined)
     imdb_id: text("imdb_id", title.imdb_id),
     tvdb_id: text("tvdb_id", title.tvdb_id),
     anilist_id: text("anilist_id", title.anilist_id),
-    metadata_source: text("metadata_source", title.metadata_source ?? "",
-    ),
+    metadata_source: text("metadata_source", title.metadata_source ?? ""),
+    aliases: aliasValues.join("\n"),
     offsets: (overrides?.season_offsets ?? []).map((offset) => ({
       provider_season: String(offset.provider_season),
       library_season: String(offset.library_season),
@@ -103,6 +108,12 @@ function identityChanges(initial: FormState, form: FormState): IdentityPatchBody
     changes.metadata_source = form.metadata_source
       ? (form.metadata_source as "cinemeta" | "tvdb" | "anilist")
       : null;
+  }
+  if (form.aliases !== initial.aliases) {
+    changes.aliases = form.aliases
+      .split("\n")
+      .map((value) => value.trim())
+      .filter(Boolean);
   }
   return changes;
 }
@@ -137,6 +148,9 @@ function validate(form: FormState): string | null {
     return "Movie and TV entries need an IMDb or TVDB id.";
   }
   if (form.imdb_id && !/^tt\d+$/.test(form.imdb_id)) return "IMDb ids look like tt0000000.";
+  if (form.aliases.split("\n").filter((value) => value.trim()).length > 50) {
+    return "At most 50 search aliases may be stored.";
+  }
   for (const item of form.offsets) {
     if (!isValidNumber(item.provider_season) || !isValidNumber(item.library_season)) {
       return "Season offset values must be whole numbers.";
@@ -187,6 +201,16 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
   const [form, setForm] = useState<FormState>(() => initialState(title, undefined));
   const [initial, setInitial] = useState<FormState>(() => initialState(title, undefined));
   const [hydrated, setHydrated] = useState(false);
+
+  const parsedAnilistId = Number(form.anilist_id);
+  const anilistPreview = useQuery<AniListCandidate>({
+    queryKey: ["anilist-candidate", parsedAnilistId],
+    queryFn: ({ signal }) => getAnilistCandidate(parsedAnilistId, signal),
+    enabled: Number.isInteger(parsedAnilistId) && parsedAnilistId > 0,
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
+  const anilistBlocked = anilistPreview.data?.is_anime === false;
 
   const suggested = title.classification?.suggested_anilist_id ?? null;
 
@@ -402,6 +426,12 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
       setError(message);
       return;
     }
+    if (anilistBlocked) {
+      setError(
+        `AniList ${parsedAnilistId} is not an anime entry. Pick the anime adaptation instead.`,
+      );
+      return;
+    }
     if (destructive && !confirmDestructive) {
       setError("Confirm the destructive kind change first.");
       return;
@@ -505,6 +535,30 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
               </label>
             </div>
 
+            <label className={LABEL_CLASS}>
+              <span className="flex items-center justify-between gap-2">
+                Search aliases
+                {overridden.has("aliases") ? (
+                  <button
+                    type="button"
+                    onClick={() => remove.mutate("aliases")}
+                    className="text-micro font-semibold text-accent underline"
+                  >
+                    Remove override
+                  </button>
+                ) : null}
+              </span>
+              <textarea
+                className={`${FIELD_CLASS} h-24 py-2`}
+                value={form.aliases}
+                placeholder={"One alias per line\nSteel Ball Run\nJoJo's Bizarre Adventure"}
+                onChange={(event) => update("aliases", event.target.value)}
+              />
+              <span className="text-micro text-fg-comment">
+                Every spelling release sources should search. Clear to use the generated list.
+              </span>
+            </label>
+
             {(
               [
                 ["imdb_id", "IMDb id", form.imdb_id, "tt0000000"],
@@ -537,6 +591,69 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
                 />
               </label>
             ))}
+
+            {parsedAnilistId > 0 ? (
+              <div
+                role="group"
+                aria-label="AniList candidate"
+                className="rounded-panel border border-border-subtle p-3"
+              >
+                <p className="text-micro font-semibold uppercase tracking-[0.08em] text-fg-muted">
+                  AniList preview
+                </p>
+                {anilistPreview.isLoading ? (
+                  <p className="text-small text-fg-muted">Checking AniList {parsedAnilistId}…</p>
+                ) : anilistPreview.error ? (
+                  <p role="alert" className="text-small text-danger">
+                    AniList {parsedAnilistId} could not be checked:{" "}
+                    {anilistPreview.error.message}
+                  </p>
+                ) : anilistPreview.data ? (
+                  <div className="mt-2 flex flex-col gap-2">
+                    <p className="text-small font-semibold text-fg">
+                      {anilistPreview.data.title}
+                    </p>
+                    <p className="text-small text-fg-muted">
+                      Type {anilistPreview.data.type ?? "unknown"}
+                      {anilistPreview.data.format
+                        ? ` · ${anilistPreview.data.format}`
+                        : ""}
+                      {anilistPreview.data.episodes !== null
+                        ? ` · ${anilistPreview.data.episodes} episodes`
+                        : ""}
+                      {anilistPreview.data.season_year !== null
+                        ? ` · ${anilistPreview.data.season_year}`
+                        : ""}
+                    </p>
+                    {anilistPreview.data.is_anime ? (
+                      <button
+                        type="button"
+                        onClick={() => update("kind", "anime")}
+                        className="min-h-control-sm w-fit rounded-control border border-accent px-3 text-small font-semibold text-accent hover:bg-accent/10"
+                      >
+                        Use this anime entry
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          disabled
+                          aria-disabled="true"
+                          className="min-h-control-sm w-fit cursor-not-allowed rounded-control border border-border-subtle px-3 text-small font-semibold text-fg-comment opacity-60"
+                        >
+                          Use this anime entry
+                        </button>
+                        <p role="alert" className="text-small text-danger">
+                          AniList {parsedAnilistId} is a{" "}
+                          {(anilistPreview.data.type ?? "non-anime").toLowerCase()} entry, not
+                          an anime. Pick the anime adaptation instead.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </section>
 
           <section className="mt-5 flex flex-col gap-3">
@@ -866,7 +983,7 @@ export function MetadataFixerDialog({ title, onClose }: MetadataFixerDialogProps
           </button>
           <button
             type="button"
-            disabled={save.isPending || overridesQuery.isLoading}
+            disabled={save.isPending || overridesQuery.isLoading || anilistBlocked}
             onClick={submit}
             className="min-h-control rounded-control bg-accent px-4 text-small font-semibold text-canvas hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
           >

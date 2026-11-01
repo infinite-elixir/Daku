@@ -19,10 +19,15 @@ from daku.config import DEFAULT_PROVIDERS
 from daku.db import get_session
 from daku.errors import AppError
 from daku.models import Episode, Release, Title
+from daku.repositories import cours as cours_repo
 from daku.repositories import episodes as episodes_repo
 from daku.repositories import releases as releases_repo
+from daku.repositories import seasons as seasons_repo
 from daku.repositories import settings as settings_repo
 from daku.repositories import titles as titles_repo
+from daku.services.metadata import cours as cours_service
+from daku.services.metadata.aliases import effective_aliases
+from daku.services.metadata.overrides import load_season_offsets
 from daku.services.releases.magnet import MagnetError, parse_magnet
 from daku.services.releases.metadata import (
     ResolvedFrom,
@@ -38,7 +43,6 @@ from daku.services.torrents.ranking import (
     apply_min_quality,
     dedupe_releases,
     extract_hints,
-    filter_quality,
     quality_counts,
     sort_releases,
 )
@@ -181,6 +185,31 @@ def _episode_row(
     return episodes_repo.find_episode(session, title_id=title.id, season=season, episode=episode)
 
 
+def _provider_seasons(session: Session, title: Title, season: int | None) -> list[int]:
+    """Provider seasons whose release names can supply a library season (T-052)."""
+
+    if season is None:
+        return []
+    values: list[int] = []
+    row = seasons_repo.get_season(session, title.id, season)
+    if row is not None:
+        values.append(row.provider_season)
+    for cour in cours_repo.list_cours(session, title.id):
+        if cour.library_season == season:
+            values.append(cour.provider_season)
+    for provider_season, library_season in load_season_offsets(session, title.id).items():
+        if library_season == season:
+            values.append(provider_season)
+    if title.anilist_id:
+        # A split cour published inside a long franchise may not have a
+        # ``title_cours`` row yet. The mapping dataset still knows the
+        # provider season that release names use.
+        mapped = cours_service.provider_season_for_anilist(session, [title.anilist_id])
+        if mapped > 1:
+            values.append(mapped)
+    return sorted(set(values))
+
+
 def _existing_rows(session: Session, title: Title) -> dict[tuple[str, str | None], Release]:
     rows: dict[tuple[str, str | None], Release] = {}
     for row in releases_repo.list_releases(session, title.id):
@@ -283,7 +312,7 @@ def release_options(
     providers = list(dict.fromkeys([*DEFAULT_PROVIDERS, *defaults.providers]))
     return {
         "providers": providers,
-        "anime_sources": settings_repo.get_setting(session, "anime_sources", ["torrentio", "nyaa"]),
+        "anime_sources": settings_repo.get_anime_sources(session),
         "quality_labels": list(QUALITY_DISPLAY_ORDER),
         "min_qualities": list(MIN_QUALITIES),
         "sorts": ["seeders", "quality", "size"],
@@ -318,7 +347,7 @@ async def list_releases(
     ] = None,
     sources: Annotated[
         str | None,
-        Query(description="Comma-separated anime sources: torrentio,nyaa"),
+        Query(description="Comma-separated anime sources: torrentio,animetosho"),
     ] = None,
     min_quality: Annotated[
         MinQuality | None,
@@ -353,20 +382,20 @@ async def list_releases(
     cache: PayloadCache = request.app.state.releases_cache
     client: httpx.AsyncClient = request.app.state.http_client
     episode_row = _episode_row(session, title, season=season, episode=episode)
-    configured_sources = settings_repo.get_setting(session, "anime_sources", ["torrentio", "nyaa"])
+    configured_sources = settings_repo.get_anime_sources(session)
     if title.kind == "anime":
-        selected_sources = [
+        raw_sources = [
             value.strip().lower()
             for value in (sources.split(",") if sources else configured_sources)
             if value.strip()
         ]
-        selected_sources = list(dict.fromkeys(selected_sources))
-        if not selected_sources or any(
-            value not in {"torrentio", "nyaa"} for value in selected_sources
+        if not raw_sources or any(
+            value not in {*settings_repo.ANIME_SOURCES, "nyaa"} for value in raw_sources
         ):
             raise AppError(
                 code="INVALID_SOURCES", message="Invalid anime source selection", status_code=422
             )
+        selected_sources = settings_repo.normalize_anime_sources(raw_sources)
     else:
         selected_sources = ["torrentio"]
     if "torrentio" in selected_sources and title.kind == "anime" and not title.imdb_id:
@@ -383,7 +412,10 @@ async def list_releases(
             pack=pack,
             sources=selected_sources,
             torrentio_config=config,
+            synonyms=effective_aliases(session, title) if title.kind == "anime" else None,
             absolute=episode_row.absolute if episode_row is not None else None,
+            provider_seasons=_provider_seasons(session, title, season),
+            season_fallback=len(seasons_repo.list_seasons(session, title.id)) <= 1,
         )
     except TorrentioError as exc:
         raise AppError(
@@ -394,9 +426,22 @@ async def list_releases(
         ) from exc
 
     # Behaviour order: parse → dedupe → drop blocked labels → min quality → sort → slice.
-    deduped, duplicates_removed = dedupe_releases(outcome.releases)
+    # Season packs that contain the requested episode are kept in the same ranked
+    # list as exact matches, but flagged so the UI can badge them. They stay
+    # sources for one episode, never an exact episode match.
+    combined = [*outcome.releases, *outcome.packs]
+    deduped, duplicates_removed = dedupe_releases(combined)
     total_unfiltered = len(deduped)
-    matched = filter_quality(deduped, blocked)
+    # A season/batch pack may not carry a video-quality token, but it is still
+    # a valid source because the selected episode file is inspected later. Only
+    # packs get the ``unknown`` exemption; ordinary rows still obey the filter.
+    blocked_lower = {label.strip().lower() for label in blocked if label and label.strip()}
+    matched = [
+        release
+        for release in deduped
+        if (release.is_pack and release.quality.lower() == "unknown")
+        or release.quality.lower() not in blocked_lower
+    ]
     matched = apply_min_quality(matched, resolved_min_quality)
     ranked = sort_releases(matched, resolved_sort)
     visible = ranked[:resolved_limit]
@@ -408,7 +453,7 @@ async def list_releases(
     releases: list[dict[str, Any]] = []
     for release in visible:
         item = release.to_dict()
-        origin = "nyaa" if release.provider == "nyaa" else "torrentio"
+        origin = "animetosho" if release.provider in {"animetosho", "nyaa"} else "torrentio"
         item["metadata_json"] = {**item["metadata_json"], "resolved_from": origin}
         stored = rows.get((release.info_hash, episode_id))
         item.update(
@@ -443,11 +488,13 @@ async def list_releases(
         "returned": len(visible),
         "duplicates_removed": duplicates_removed,
         "quality_counts": counts,
+        "search": {
+            "queries": outcome.queries,
+            "aliases": outcome.aliases,
+            "degraded": outcome.sources_degraded,
+        },
         "releases": releases,
     }
-
-
-# --------------------------------------------------------------------- saved + CRUD
 
 
 @router.post("/releases", status_code=201)

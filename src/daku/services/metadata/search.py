@@ -15,6 +15,7 @@ from daku.errors import AppError
 from daku.services.metadata import anilist, cinemeta, imdb
 from daku.services.metadata.cache import TTLCache
 from daku.services.metadata.classification import (
+    anilist_ids_with_mapping,
     enrich_exact,
     mapped_anilist_ids,
     mapping_dataset_present,
@@ -116,7 +117,11 @@ async def _enrich_candidates(
     except UpstreamError:
         media = anilist.cached_search(cache, query, limit=10)
     if media:
-        enrich_exact(unmapped, media)
+        mapped_ids = anilist_ids_with_mapping(
+            session,
+            [int(item.source_id) for item in media if item.source_id.isdigit()],
+        )
+        enrich_exact(unmapped, media, mapped_ids)
 
 
 async def _mapped_imdb_candidates(

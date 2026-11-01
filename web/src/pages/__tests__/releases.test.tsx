@@ -232,6 +232,57 @@ describe("ReleasesSection", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("Saved");
   });
 
+  it("labels an AnimeTosho row with its source badge", async () => {
+    const animeRelease: ReleaseItem = {
+      ...RELEASE,
+      provider: "animetosho",
+      resolved_from: "animetosho",
+      metadata_json: { ...RELEASE.metadata_json, resolved_from: "animetosho" },
+    };
+    stubApi((url) => {
+      if (url.includes("/releases")) {
+        return jsonResponse(findPayload([animeRelease]));
+      }
+      return undefined;
+    });
+
+    renderPage(<ReleasesSection title={makeTitle()} />);
+
+    expect(await screen.findByText("Big.Buck.Bunny.1080p.mkv")).toBeInTheDocument();
+    expect(screen.getByLabelText("Source AnimeTosho")).toHaveTextContent("ANIMETOSHO");
+  });
+
+  it("labels a season pack with a pack badge", async () => {
+    const packRelease: ReleaseItem = {
+      ...RELEASE,
+      info_hash: "2222222222222222222222222222222222222222",
+      filename: "[Judas] Big Buck Bunny (Season 1) (Batch)",
+      quality: "unknown",
+      provider: "animetosho",
+      resolved_from: "animetosho",
+      is_pack: true,
+      pack_label: "S01",
+      metadata_json: { ...RELEASE.metadata_json, resolved_from: "animetosho" },
+    };
+    stubApi((url) => {
+      if (url.includes("/releases")) {
+        return jsonResponse(findPayload([packRelease]));
+      }
+      return undefined;
+    });
+
+    renderPage(<ReleasesSection title={makeTitle()} />);
+
+    expect(
+      await screen.findByText("[Judas] Big Buck Bunny (Season 1) (Batch)"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("PACK S01")).toBeInTheDocument();
+    expect(screen.getByText("PACK S01")).toHaveAttribute(
+      "title",
+      expect.stringContaining("only the selected episode"),
+    );
+  });
+
   it("saves a pasted magnet", async () => {
     const fetchMock = stubApi((url, init) => {
       if (init?.method === "POST" && url === "/api/releases") {

@@ -19,7 +19,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 from daku.models import Release
-from daku.services.releases.metadata import load_metadata
+from daku.services.releases.metadata import load_metadata, resolved_from
 from daku.utils import new_id, utc_now_iso
 
 DEAD_AFTER_MISSES = 3
@@ -310,11 +310,7 @@ def to_payload(row: Release) -> dict[str, Any]:
     """Serialise a stored release with the T-007 key names plus its row identity."""
 
     metadata = load_metadata(row.metadata_json)
-    origin = metadata.get("resolved_from")
-    if origin not in ("torrentio", "nyaa", "manual"):
-        origin = "manual" if row.provider == "manual" else "torrentio"
-        if row.provider == "nyaa":
-            origin = "nyaa"
+    origin = resolved_from(row)
     return {
         "id": row.id,
         "release_id": row.id,

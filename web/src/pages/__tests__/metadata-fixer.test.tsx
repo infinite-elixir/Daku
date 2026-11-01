@@ -62,6 +62,29 @@ function jsonResponse(payload: unknown, status = 200) {
 function renderDialog(title = makeTitle(), onClose = vi.fn()) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.includes("/metadata/anilist/")) {
+      const id = Number(url.split("/").pop());
+      if (id === 31706) {
+        return jsonResponse({
+          anilist_id: 31706,
+          type: "MANGA",
+          format: "MANGA",
+          episodes: null,
+          season_year: null,
+          title: "JoJo's Bizarre Adventure: Part 7 - Steel Ball Run",
+          is_anime: false,
+        });
+      }
+      return jsonResponse({
+        anilist_id: id,
+        type: "ANIME",
+        format: "TV",
+        episodes: 28,
+        season_year: 2023,
+        title: "Frieren: Beyond Journey's End",
+        is_anime: true,
+      });
+    }
     if (url.endsWith("/overrides")) {
       return jsonResponse(emptyOverrides());
     }
@@ -116,6 +139,18 @@ describe("MetadataFixerDialog", () => {
       });
     });
     expect(await screen.findByText(/Identity updated/)).toBeInTheDocument();
+  });
+
+  it("disables a manga AniList candidate and explains why", async () => {
+    renderDialog(makeTitle({ kind: "anime", anilist_id: 31706 }));
+
+    expect(
+      await screen.findByText(/manga entry, not an anime/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Use this anime entry" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
   });
 
   it("blocks a destructive kind change until it is confirmed", async () => {

@@ -87,6 +87,8 @@ class TitleDetail:
     season: str | None = None
     season_year: int | None = None
     synonyms: list[str] = field(default_factory=list)
+    # Every title spelling the provider knows (English/romaji/native/synonyms).
+    aliases: list[str] = field(default_factory=list)
     relations: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     # AniList streaming episode labels, used as a last-resort name source (T-036).
     streaming_episodes: list[dict[str, Any]] = field(default_factory=list)
@@ -113,6 +115,7 @@ class TitleDetail:
                 "season",
                 "season_year",
                 "synonyms",
+                "aliases",
                 "relations",
                 "streaming_episodes",
             ):
