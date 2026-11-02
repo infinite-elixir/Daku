@@ -102,6 +102,24 @@ export function getPlaybackState(
   return request<{ active: PlaybackState | null }>("/api/media-files/playback", { signal });
 }
 
+export interface ContinueWatchingItem {
+  title_id: string;
+  title: string;
+  kind: Kind;
+  poster_url: string | null;
+  played_at: string | null;
+  up_next: boolean;
+  file: MediaFileItem;
+}
+
+export interface ContinueWatchingResponse {
+  items: ContinueWatchingItem[];
+}
+
+export function getContinueWatching(signal?: AbortSignal): Promise<ContinueWatchingResponse> {
+  return request<ContinueWatchingResponse>("/api/continue-watching", { signal });
+}
+
 export interface TitleFilesSeason {
   library_season: number;
   file_count: number;

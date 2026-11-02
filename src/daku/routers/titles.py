@@ -21,12 +21,13 @@ from sqlalchemy.orm import Session
 
 from daku.db import get_session
 from daku.errors import AppError
-from daku.models import Episode, MediaFile, Title
+from daku.models import MediaFile, Title
 from daku.repositories import cours as cours_repo
 from daku.repositories import episodes as episodes_repo
 from daku.repositories import media_files as media_files_repo
 from daku.repositories import seasons as seasons_repo
 from daku.repositories import titles as titles_repo
+from daku.routers.payloads import media_file_payload
 from daku.services.metadata import anilist, structure
 from daku.services.metadata import cours as cours_service
 from daku.services.metadata.aliases import (
@@ -836,36 +837,6 @@ def delete_title_override(
     return payload
 
 
-def _media_file_payload(session: Session, row: MediaFile) -> dict[str, Any]:
-    episode = session.get(Episode, row.episode_id) if row.episode_id else None
-    path = media_files_repo.usable_path(row)
-    return {
-        "id": row.id,
-        "download_id": row.download_id,
-        "episode_id": row.episode_id,
-        "episode_label": f"S{episode.season:02d}E{episode.episode:02d}" if episode else None,
-        "episode_name": episode.name if episode else None,
-        "season": episode.season if episode else None,
-        "episode": episode.episode if episode else None,
-        "file_name": path.name if path is not None else Path(row.src_path).name,
-        "size_bytes": row.size_bytes,
-        "is_primary": row.is_primary,
-        "has_episode": episode is not None,
-        "playback": _playback_payload(row),
-    }
-
-
-def _playback_payload(row: MediaFile) -> dict[str, Any] | None:
-    if row.playback_position_s is None:
-        return None
-    duration = row.playback_duration_s or row.duration_s
-    return {
-        "position_s": row.playback_position_s,
-        "duration_s": duration,
-        "updated_at": row.playback_updated_at,
-    }
-
-
 @router.get("/titles/{title_id}/files")
 def list_title_files(
     title_id: str,
@@ -880,7 +851,7 @@ def list_title_files(
     for row in media_files_repo.list_by_title(session, title.id):
         if not media_files_repo.is_present(row):
             continue
-        entry = _media_file_payload(session, row)
+        entry = media_file_payload(session, row)
         size = int(entry["size_bytes"] or 0)
         total_size += size
         filename = str(entry["file_name"]).casefold()

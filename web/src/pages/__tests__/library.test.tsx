@@ -48,10 +48,11 @@ function stubLibrary(items: TitleSummary[]) {
     limit: 100,
     offset: 0,
   };
-  const fetchMock = vi.fn().mockResolvedValue({
-    ok: true,
-    status: 200,
-    json: async () => payload,
+  const fetchMock = vi.fn(async (url: string) => {
+    if (url === "/api/continue-watching") {
+      return { ok: true, status: 200, json: async () => ({ items: [] }) };
+    }
+    return { ok: true, status: 200, json: async () => payload };
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;

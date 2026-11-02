@@ -20,6 +20,9 @@ const PLACEHOLDER_TEXT: Record<Kind, string> = {
 
 const CARD_CLASS =
   "group flex min-h-row-lg min-w-0 flex-col gap-2 rounded-panel border border-border-subtle bg-panel p-panel-compact text-left transition-colors hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+/** Art fills the card's outer frame, like a library poster card; the text keeps its padding. */
+const BLEED_CARD_CLASS =
+  "group flex min-h-row-lg min-w-0 flex-col overflow-hidden rounded-panel border border-border-subtle bg-panel text-left transition-colors hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const HERO_CLASS =
   "group relative block w-full max-w-[560px] overflow-hidden rounded-panel border border-border-subtle bg-panel text-left transition-colors hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
@@ -49,6 +52,12 @@ export interface MediaFileCardProps {
   mpvEnabled?: boolean;
   /** Live position from the host player; falls back to the persisted value on the file. */
   livePlayback?: PlaybackState | null;
+  /** Library-wide rows need to name the title the file belongs to. */
+  titleName?: string | null;
+  /** Small pill over the artwork, e.g. "Up next". */
+  badge?: string | null;
+  /** Let the artwork touch the card's outer border instead of sitting in an inner box. */
+  bleed?: boolean;
 }
 
 export function MediaFileCard({
@@ -60,6 +69,9 @@ export function MediaFileCard({
   variant = "card",
   mpvEnabled,
   livePlayback = null,
+  titleName = null,
+  badge = null,
+  bleed = false,
 }: MediaFileCardProps) {
   const player = usePlayerSettings();
   const launchEnabled = mpvEnabled ?? player?.mpv_enabled ?? false;
@@ -219,13 +231,26 @@ export function MediaFileCard({
       </div>
     ) : (
       <>
-        <div className="relative aspect-video w-full overflow-hidden rounded-panel bg-panel-alt">
+        <div
+          className={[
+            "relative aspect-video w-full overflow-hidden bg-panel-alt",
+            bleed ? "" : "rounded-panel",
+          ].join(" ")}
+        >
           {art}
           {playOverlay}
           {seekBar}
           {busy}
+          {badge !== null ? (
+            <span className="pointer-events-none absolute left-2 top-2 z-10 rounded-full bg-accent px-2 py-0.5 text-micro font-semibold text-canvas">
+              {badge}
+            </span>
+          ) : null}
         </div>
-        <div className="min-w-0">
+        <div className={bleed ? "min-w-0 px-panel-compact pb-panel-compact pt-2" : "min-w-0"}>
+          {titleName !== null ? (
+            <p className="truncate text-micro font-medium text-fg-muted">{titleName}</p>
+          ) : null}
           <p className="flex min-w-0 items-baseline gap-1.5 text-small">
             {file.has_episode && file.episode_label ? (
               <span className="shrink-0 font-mono text-micro tabular-nums text-fg-muted">
@@ -249,7 +274,9 @@ export function MediaFileCard({
         aria-busy={pending}
         onPointerDown={onPointerDown}
         onClick={onClick}
-        className={variant === "hero" ? HERO_CLASS : `${CARD_CLASS} w-full`}
+        className={
+          variant === "hero" ? HERO_CLASS : `${bleed ? BLEED_CARD_CLASS : CARD_CLASS} w-full`
+        }
       >
         {body}
       </button>
@@ -259,7 +286,7 @@ export function MediaFileCard({
         to={`/title/${titleId}/files#media-file-${file.id}`}
         data-testid={`media-file-card-${file.id}`}
         data-media-file-card
-        className={variant === "hero" ? HERO_CLASS : CARD_CLASS}
+        className={variant === "hero" ? HERO_CLASS : bleed ? BLEED_CARD_CLASS : CARD_CLASS}
       >
         {body}
       </Link>

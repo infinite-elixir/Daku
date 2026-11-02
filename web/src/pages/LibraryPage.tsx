@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
+import { ContinueWatching } from "../components/ContinueWatching";
 import { LibraryCard } from "../components/LibraryCard";
 import { ChevronDownIcon } from "../components/icons";
 import { listTitles, type LibraryResponse, type WatchStatusFilter } from "../lib/api";
@@ -176,6 +177,8 @@ export function LibraryPage() {
           />
         </button>
       </div>
+
+      <ContinueWatching />
 
       {error ? (
         <div className="rounded-panel border-l-2 border-danger bg-panel px-panel py-panel-compact">

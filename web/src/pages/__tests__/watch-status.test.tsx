@@ -215,7 +215,12 @@ function renderTitlePage(initial: TitleDetail) {
 
 function stubLibrary(items: TitleSummary[]) {
   const payload: LibraryResponse = { items, total: items.length, limit: 100, offset: 0 };
-  const fetchMock = vi.fn().mockResolvedValue(jsonResponse(payload));
+  const fetchMock = vi.fn(async (url: string) => {
+    if (url === "/api/continue-watching") {
+      return jsonResponse({ items: [] });
+    }
+    return jsonResponse(payload);
+  });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }

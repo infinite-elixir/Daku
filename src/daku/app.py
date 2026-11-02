@@ -22,6 +22,7 @@ from daku.logging_setup import configure_logging
 from daku.repositories import media_files as media_files_repo
 from daku.repositories import settings as settings_repo
 from daku.routers import (
+    continue_watching,
     downloads,
     events,
     health,
@@ -171,6 +172,7 @@ def create_app(settings: Settings | None = None, *, configure_logs: bool = True)
     app.include_router(events.router)
     app.include_router(search.router)
     app.include_router(titles.router)
+    app.include_router(continue_watching.router)
     app.include_router(media_files.router)
     app.include_router(releases.router)
     app.include_router(magnets.router)
