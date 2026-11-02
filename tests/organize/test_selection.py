@@ -278,6 +278,33 @@ async def test_a_null_selection_keeps_every_file(
     assert sum(1 for item in files if item.is_primary) == 1
 
 
+async def test_a_null_selection_is_scoped_to_the_torrents_own_files(
+    db: tuple[Any, sessionmaker[Session]], tmp_path: Path
+) -> None:
+    _engine, factory = db
+    root = tmp_path / "downloads"
+    # Two completed downloads share the downloads root, exactly like qBittorrent's
+    # default save path. Inspecting one must never attach the neighbour's file.
+    make_file(root / "Show.S02E05.mkv", 120 * MB)
+    make_file(root / "Some.Other.Movie.2026.mkv", 160 * MB)
+    _title_id, episodes, download = _series(factory, root)
+
+    with factory() as session:
+        row = downloads_repo.get_download(session, download.id)
+        assert row is not None
+        await select.inspect_download(
+            session,
+            row,
+            probe_fn=_probe,
+            engine=FakeTorrentEngine(["Show.S02E05.mkv"]),
+        )
+        files = media_repo.list_by_download(session, row.id)
+
+    assert [Path(item.src_path).name for item in files] == ["Show.S02E05.mkv"]
+    assert files[0].episode_id == episodes[5]
+    assert files[0].is_primary
+
+
 async def test_a_single_unnumbered_episode_falls_back_to_the_release_episode(
     db: tuple[Any, sessionmaker[Session]], tmp_path: Path
 ) -> None:

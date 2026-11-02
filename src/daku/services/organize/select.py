@@ -284,6 +284,28 @@ def _filter_selected(paths: list[Path], root: Path, selected_paths: list[str]) -
     return [path for path in paths if _path_keys(path, root) & wanted]
 
 
+async def _torrent_file_paths(download: Download, engine: Any | None) -> list[str]:
+    """Paths belonging to this torrent, straight from the engine's file list.
+
+    A download's save path is usually the shared downloads root, not a per-torrent
+    directory: two completed movies can sit side by side in it. Scanning that root
+    for one download would attach the neighbour's file to this title. The engine
+    knows exactly which files this torrent owns, so use them as the default scope
+    when no explicit selection was recorded.
+    """
+
+    files = getattr(engine, "files", None)
+    if files is None:
+        return []
+    try:
+        entries = await files(download.external_id)
+    except Exception:
+        return []
+    return [
+        str(item.path) for item in entries if getattr(item, "path", None) and str(item.path).strip()
+    ]
+
+
 async def _resolved_selected_paths(
     download: Download,
     release: Release,
@@ -382,6 +404,10 @@ async def inspect_download(
         engine=engine,
         probe=probe,
     )
+    if not selected_paths:
+        # No explicit selection: restrict the scan to this torrent's own files so
+        # a shared downloads root never leaks a neighbouring download into it.
+        selected_paths = await _torrent_file_paths(download, engine)
     paths = _filter_selected(paths, scan_root, selected_paths)
     if not paths:
         raise AppError(
