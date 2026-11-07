@@ -28,6 +28,7 @@ def list_continue_watching(
             "poster_url": entry.title.poster_url,
             "played_at": entry.played_at,
             "up_next": entry.up_next,
+            "is_new": entry.is_new,
             "file": media_file_payload(session, entry.file),
         }
         for entry in continue_repo.list_continue_watching(session)

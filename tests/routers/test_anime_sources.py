@@ -20,6 +20,11 @@ from daku.services.torrents.torrentio import build_stream_url
 def client(settings: Settings) -> Iterator[TestClient]:
     plain = settings.model_copy(update={"torrentio_config": "", "providers": []})
     with TestClient(create_app(plain, configure_logs=False)) as test_client:
+        from daku.repositories import settings as settings_repo
+
+        with test_client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+            for kind in ("movie", "series"):
+                settings_repo.set_setting(session, f"sources_{kind}", ["torrentio"])
         yield test_client
 
 

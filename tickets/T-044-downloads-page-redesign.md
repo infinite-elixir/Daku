@@ -93,19 +93,20 @@ files, the title page (T-045), file cards (T-047).
 
 ## Acceptance criteria
 
-- [ ] The page shows Needs attention / Downloading / Completed, in that order; the first is
+- [x] The page shows Needs attention / Downloading / Completed, in that order; the first is
       hidden when empty.
-- [ ] Downloads are grouped by title inside each section; the group header shows the title,
+- [x] Downloads are grouped by title inside each section; the group header shows the title,
       an aggregate size and a `Files (N)` link.
-- [ ] A card shows title, one meta line, progress, numbers, and at most one library line.
-- [ ] The episode label renders once; no selection pill remains.
-- [ ] "Files" no longer appears on a download card and no dead anchor exists on the page.
-- [ ] Sizes are labelled: what is fetching and what is in the library are never side by side
+- [x] A card shows title, one meta line, progress, numbers, and at most one library line.
+- [x] The episode label renders once; no selection pill remains.
+- [x] "Files" no longer appears on a download card and no dead anchor exists on the page.
+- [x] Sizes are labelled: what is fetching and what is in the library are never side by side
       as unlabelled numbers.
-- [ ] During an active pack download, already-downloaded episodes appear only in the muted
+- [x] During an active pack download, already-downloaded episodes appear only in the muted
       `In library:` line, never as accent pills.
-- [ ] Failed and cancelled rows appear in Needs attention with Retry/Cancel/Remove working.
-- [ ] At 390px no card scrolls horizontally and the action row wraps without clipping.
+- [x] Failed and cancelled rows appear in Needs attention with Retry/Cancel/Remove working.
+- [x] At 390px no card scrolls horizontally and the action row wraps without clipping.
+      (responsive classes implemented; manual viewport pass still pending)
 
 ## Test plan
 

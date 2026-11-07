@@ -181,7 +181,8 @@ body {
 /* Title hero (T-045). The poster and identity are one object: the identity column
    stretches to the poster's height and pins its actions to the bottom edge. */
 .title-hero-scope,
-.title-facts-scope {
+.title-facts-scope,
+.episode-master-detail {
   container-type: inline-size;
 }
 

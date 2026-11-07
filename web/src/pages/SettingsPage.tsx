@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { getSettings, patchSettings, type Kind, type ReleaseSettings } from "../lib/api";
-import { RELEASE_SOURCES } from "../lib/releaseSources";
+import { RELEASE_SOURCES, releaseSourceNote } from "../lib/releaseSources";
 
 const KINDS: Array<{ key: Kind; label: string }> = [
   { key: "movie", label: "Movies" },
@@ -24,7 +24,7 @@ export function SettingsPage() {
   const [minQuality, setMinQuality] = useState<string | null>(null);
   const [sort, setSort] = useState<ReleaseSettings["release"]["sort"] | null>(null);
   const [limit, setLimit] = useState<number | null>(null);
-  const [animeSources, setAnimeSources] = useState<string[] | null>(null);
+  const [sources, setSources] = useState<Partial<Record<Kind, string[]>>>({});
   const [custom, setCustom] = useState<Partial<Record<Kind, string>>>({});
   const [mpvEnabled, setMpvEnabled] = useState<boolean | null>(null);
 
@@ -34,22 +34,22 @@ export function SettingsPage() {
   const changed = useMemo(
     () =>
       Object.keys(providers).length > 0 ||
+      Object.keys(sources).length > 0 ||
       minQuality !== null ||
       sort !== null ||
       limit !== null ||
-      animeSources !== null ||
       mpvEnabled !== null,
-    [providers, minQuality, sort, limit, animeSources, mpvEnabled],
+    [providers, sources, minQuality, sort, limit, mpvEnabled],
   );
   const mutation = useMutation({
     mutationFn: () =>
       patchSettings(
         {
           ...(Object.keys(providers).length ? { providers } : {}),
+          ...(Object.keys(sources).length ? { sources } : {}),
           ...(minQuality !== null ? { min_quality: minQuality || null } : {}),
           ...(sort !== null ? { sort } : {}),
           ...(limit !== null ? { limit } : {}),
-          ...(animeSources !== null ? { anime_sources: animeSources } : {}),
         },
         mpvEnabled !== null ? { mpv_enabled: mpvEnabled } : undefined,
       ),
@@ -57,10 +57,10 @@ export function SettingsPage() {
       queryClient.setQueryData(["settings"], value);
       void queryClient.invalidateQueries({ queryKey: ["release-options"] });
       setProviders({});
+      setSources({});
       setMinQuality(null);
       setSort(null);
       setLimit(null);
-      setAnimeSources(null);
       setMpvEnabled(null);
     },
   });
@@ -75,12 +75,14 @@ export function SettingsPage() {
       : [...selected(kind), provider];
     setProviders((old) => ({ ...old, [kind]: next }));
   }
-  const selectedSources = animeSources ?? settings.data?.sources.anime_sources ?? ["torrentio", "animetosho"];
-  function toggleSource(source: string) {
-    const next = selectedSources.includes(source)
-      ? selectedSources.filter((item) => item !== source)
-      : [...selectedSources, source];
-    if (next.length > 0) setAnimeSources(next);
+  const selectedSources = (kind: Kind) =>
+    sources[kind] ?? settings.data?.sources.by_kind?.[kind] ?? settings.data?.sources.anime_sources ?? [];
+  function toggleSource(kind: Kind, source: string) {
+    const current = selectedSources(kind);
+    const next = current.includes(source)
+      ? current.filter((item) => item !== source)
+      : [...current, source];
+    if (next.length > 0) setSources((old) => ({ ...old, [kind]: next }));
   }
 
   return (
@@ -123,14 +125,24 @@ export function SettingsPage() {
         </div>
       </section>
       <section className="rounded-panel border border-border-subtle bg-panel p-panel">
-        <h2 className="text-h2 font-semibold tracking-tight text-fg">Anime sources</h2>
-        <p className="mt-1 text-small text-fg-muted">AnimeTosho aggregates anime torrents and is rate-limited; Torrentio covers the rest. Search status shows these as numbered sources.</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {RELEASE_SOURCES.map((source, index) => (
-            <label key={source.id} className="inline-flex min-h-control-sm items-center rounded-control border border-border-strong px-panel-compact py-grid text-small text-fg">
-              <input type="checkbox" className="mr-1" checked={selectedSources.includes(source.id)} onChange={() => toggleSource(source.id)} />
-              {index + 1} · {source.label}
-            </label>
+        <h2 className="text-h2 font-semibold tracking-tight text-fg">Release sources</h2>
+        <p className="mt-1 text-small text-fg-muted">Each kind searches its selected sources. Torrentio needs an IMDb id; keyword sources answer without one.</p>
+        <div className="mt-4 flex flex-col gap-4">
+          {KINDS.map(({ key, label }) => (
+            <fieldset key={key}>
+              <legend className="text-small font-semibold text-fg">{label}</legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {RELEASE_SOURCES.map((source, index) => (
+                  <label key={source.id} className="inline-flex min-h-control-sm items-center rounded-control border border-border-strong px-panel-compact py-grid text-small text-fg">
+                    <input type="checkbox" className="mr-1" checked={selectedSources(key).includes(source.id)} onChange={() => toggleSource(key, source.id)} />
+                    {index + 1} · {source.label}
+                  </label>
+                ))}
+              </div>
+              <p className="mt-1 text-micro text-fg-muted">
+                {RELEASE_SOURCES.map((source) => `${source.label}: ${releaseSourceNote(source.id)}`).join(" ")}
+              </p>
+            </fieldset>
           ))}
         </div>
       </section>

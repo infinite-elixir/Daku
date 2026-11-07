@@ -178,3 +178,11 @@ replacing qBittorrent as the torrent engine. Private-tracker credentials.
   Edgerunners magnet: full season-pack metadata returned via DHT. Payload safety is unchanged;
   the payload guard and `upload_mode` still apply. Probe failures (including timeouts) are now
   logged with the info hash and error code.
+- 2026-11-03 fix: a long system suspend (39 min observed) leaves the cached libtorrent session
+  permanently wedged — DHT stops exchanging packets, trackers return no peers and every probe
+  times out until the process restarts, while a fresh session fetches the same magnet in ~4 s
+  (verified against `Widows.Bay.S01.1080p`, hash `f610976a4b02`). `LibtorrentBackend` now
+  compares wall-clock and monotonic time between probes; a drift above
+  `SESSION_RESUME_THRESHOLD_SECONDS` (60 s) means the host slept and the session is rebuilt
+  before the next probe. Any `ProbeTimeout`/`ProbeFailed` also drops the session so the next
+  attempt starts clean (the 5 min failure cache is unchanged).

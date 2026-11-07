@@ -1,6 +1,6 @@
 # Daku
 
-**Alpha release — `0.1.0a1`.** A self-hosted, single-user, LAN-only media librarian for Linux.
+**Alpha release — `0.1.0a2`.** A self-hosted, single-user, LAN-only media librarian for Linux.
 
 Daku finds titles, saves releases, downloads them with qBittorrent or aria2c, and puts the
 finished files one click away from your host player. It is driven from any browser on your
@@ -83,13 +83,34 @@ This is an alpha; some planned pieces are still missing:
   not populated by Daku yet.
 - **Jellyfin (T-014):** no library scan or item lookup.
 - **Telegram (T-015–T-017):** no bot, archive channel or file pull-back.
-- **PWA install (T-018)** and the real installer/systemd setup (T-019).
+- **PWA install (T-018).**
+- **`/setup` first-run wizard (T-019):** `install.sh` and `install.ps1` now create the
+  service and config, but the browser wizard and a clean-VM acceptance pass are still open.
 - **Hardening (T-020)** and remaining metadata-recovery tickets.
-- A real installer, wider platform support (macOS/Windows) and multi-user auth are out of
-  scope for v1.
+- macOS packaging and multi-user auth are out of scope for v1.
 
 The full ticket list and dependency graph live in [`plan.md`](plan.md) and
 [`tickets/`](tickets/README.md).
+
+---
+
+## Portable bundle
+
+To build a self-contained directory (Python runtime, backend and SPA) and a zip for users
+who do not have Python or Node:
+
+```bash
+uv sync --extra package
+python scripts/build_bundle.py
+
+# reuse an existing SPA build
+python scripts/build_bundle.py --skip-web
+```
+
+Artifacts land in `dist/daku/` and `dist/daku-<version>-<platform>-<arch>.zip`. Run
+`start-daku.cmd` on Windows or `./start-daku.sh` on Linux. The bundle still uses
+`~/.config/daku` and `~/.local/share/daku` unless `DAKU_CONFIG_DIR` / `DAKU_DATA_DIR` are
+set.
 
 ---
 
@@ -111,7 +132,28 @@ The full ticket list and dependency graph live in [`plan.md`](plan.md) and
 
 ## Install on Linux
 
-### 1. Install the runtime dependencies
+### Quick install
+
+On a Linux host with `systemd --user`, from the repository root:
+
+```bash
+./install.sh
+```
+
+The installer is idempotent: it creates the virtualenv, builds the SPA when `pnpm` is
+available, writes `~/.config/daku/config.json` only when absent, installs the user unit,
+enables linger and prints the LAN URL. It never installs OS packages for you.
+
+Remove the service (keeping config, data and media) with:
+
+```bash
+./uninstall.sh
+```
+
+### Manual install
+
+#### 1. Install the runtime dependencies
+
 
 ```bash
 # Debian/Ubuntu example — use your distro's packages
@@ -120,7 +162,7 @@ sudo apt install python3.12 qbittorrent-nox aria2 ffmpeg mpv
 
 Install `uv`, `pnpm` and Node from their own installers if you do not already have them.
 
-### 2. Clone and install the project
+#### 2. Clone and install the project
 
 ```bash
 git clone <your-fork-url> daku
@@ -134,12 +176,12 @@ pnpm -C web install
 pnpm -C web build        # emits the SPA into src/daku/webdist/
 ```
 
-### 3. Configure qBittorrent
+#### 3. Configure qBittorrent
 
 Enable the Web UI on `127.0.0.1:8080` in qBittorrent's preferences, then put the username
 and password in Daku's `secrets.json`.
 
-### 4. Configure Daku
+#### 4. Configure Daku
 
 Daku reads configuration from, in order: environment variables (`DAKU_*`), then
 `~/.config/daku/config.json`, then built-in defaults. Secrets are read from
@@ -176,7 +218,7 @@ Environment overrides use the same field names uppercased with a `DAKU_` prefix,
 example `DAKU_PORT=8420`, `DAKU_DOWNLOADS_DIR=/srv/media/downloads`,
 `DAKU_MPV_ENABLED=false`, `DAKU_QBT_PASS=...`.
 
-### 5. Run it
+#### 5. Run it
 
 ```bash
 uv run daku            # serve on http://0.0.0.0:8420
@@ -185,11 +227,12 @@ uv run daku doctor     # check every integration first
 
 Open `http://<host-ip>:8420` from any device on the LAN.
 
-### 6. Run it as a user service (optional, placeholder)
+#### 6. Run it as a user service
 
-`packaging/daku.service` is a starting point. A real installer (T-019) is planned, so adjust
-`ExecStart` to your checkout/virtualenv and add your display environment so mpv can open a
-window when the service is started outside a graphical session:
+`./install.sh` writes and enables the unit for you. If you prefer to do it by hand, copy
+`packaging/daku.service` to `~/.config/systemd/user/daku.service`, point `ExecStart` at your
+virtualenv, and add your display environment so mpv can open a window when the service is
+started outside a graphical session:
 
 ```ini
 Environment=DISPLAY=:0
@@ -205,7 +248,7 @@ systemctl --user status daku
 journalctl --user -u daku -f
 ```
 
-### 7. Verify
+#### 7. Verify
 
 ```bash
 uv run daku doctor
@@ -223,6 +266,21 @@ You do **not** need WSL2 to run Daku. The backend is plain Python + FastAPI + SQ
 one feature that needs Unix-domain sockets (mpv playback progress) or if you prefer the
 Linux tooling/systemd.
 
+### Quick install (native Windows)
+
+From PowerShell in the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+The script installs `uv` with `winget` when missing, creates `.venv`, builds the SPA (pnpm,
+npm or the shipped `webdist`), writes `%USERPROFILE%\.config\daku\config.json` only when
+absent, and registers an at-logon Scheduled Task named `Daku`. It prints the LAN URL and
+the exact firewall command.
+
+Useful switches: `-SkipWebBuild`, `-NoService`, `-NoStart`.
+
 ### What works on native Windows
 
 | Feature | Native Windows |
@@ -232,11 +290,11 @@ Linux tooling/systemd.
 | Downloaded files, ffmpeg thumbnails | Yes |
 | Launching files in mpv | Yes (needs `mpv.exe` on `PATH`) |
 | mpv playback progress / seek bar | **No** — Daku reads mpv over a Unix-domain socket |
-| `systemd` user unit | No — use Task Scheduler or NSSM |
+| `systemd` user unit | No — the installer registers a Scheduled Task |
 | `libtorrent` probe extra | Untested; wheels may not exist for Windows |
 | `secrets.json` mode `0600` | Mode bits are ignored; rely on NTFS folder permissions |
 
-### Option A — native Windows (recommended)
+### Manual step-by-step (native Windows)
 
 1. Install the dependencies with `winget` (or the upstream installers):
 

@@ -63,8 +63,8 @@ export interface TitleViewProps {
   bulkWatchPending?: boolean;
   /** Called when switching seasons should close the currently open card. */
   onCollapse?: () => void;
-  /** Rendered inside the expanded episode card. Omit for a read-only preview. */
-  renderEpisodeExpanded?: (episode: Episode) => ReactNode;
+  /** Rendered in the release pane next to the episode list. Omit for a read-only preview. */
+  renderEpisodePane?: (episode: Episode) => ReactNode;
   emptyEpisodesAction?: ReactNode;
   notices?: ReactNode;
   /** Library-only counters (saved releases, episodes, folder). Hidden in a preview. */
@@ -118,7 +118,7 @@ export function TitleView({
   onBulkWatched,
   bulkWatchPending = false,
   onCollapse,
-  renderEpisodeExpanded,
+  renderEpisodePane,
   emptyEpisodesAction,
   notices,
   showCounters = true,
@@ -373,17 +373,30 @@ export function TitleView({
         </div>
       </div>
 
+      {files !== null && files.file_count > 0 ? (
+        <DownloadedFiles
+          files={files}
+          titleKind={title.kind}
+          posterUrl={title.poster_url}
+          activeSeason={activeSeason}
+        />
+      ) : null}
+
       {!isMovie ? (
         <section className="flex flex-col gap-4" aria-labelledby="episodes-heading">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div className="episode-master-detail">
+          <div
+            className={
+              selected !== null
+                ? "grid grid-cols-1 gap-gutter @min-[900px]:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]"
+                : "grid grid-cols-1"
+            }
+          >
+          <div className={selected !== null ? "hidden min-w-0 @min-[900px]:block" : "min-w-0"}>
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
             <h2 id="episodes-heading" className="text-h2 font-semibold tracking-tight text-fg">
               Episodes
             </h2>
-            {renderEpisodeExpanded ? (
-              <p className="text-small text-fg-comment">
-                Expand an episode to see its releases.
-              </p>
-            ) : null}
           </div>
           {seasons.length === 0 ? (
             <div className="rounded-panel border border-border-subtle bg-panel px-panel py-gutter">
@@ -407,51 +420,46 @@ export function TitleView({
             </div>
           ) : (
             <>
-              <div
-                role="tablist"
-                aria-label="Seasons"
-                className="flex gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none]"
-              >
-                {seasons.map((season) => {
-                  const active = season === activeSeason;
-                  return (
-                    <button
-                      key={season}
-                      ref={(node) => {
-                        if (node) {
-                          tabRefs.current.set(season, node);
-                        } else {
-                          tabRefs.current.delete(season);
-                        }
-                      }}
-                      type="button"
-                      role="tab"
-                      id={`season-tab-${season}`}
-                      aria-selected={active}
-                      aria-controls={`season-panel-${season}`}
-                      tabIndex={active ? 0 : -1}
-                      onClick={() => changeSeason(season)}
-                      onKeyDown={(event) => handleTabKeyDown(event, season)}
-                      className={[
-                        TAB_CLASS,
-                        active
-                          ? "border-accent/60 bg-accent/15 text-accent"
-                          : "border-border-subtle text-fg-muted hover:bg-hover hover:text-fg",
-                      ].join(" ")}
-                    >
-                      {season === 0 ? "Specials" : seasonLabel(season)}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div
-                role="tabpanel"
-                id={`season-panel-${activeSeason ?? 0}`}
-                aria-labelledby={`season-tab-${activeSeason ?? 0}`}
-              >
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div
+                  role="tablist"
+                  aria-label="Seasons"
+                  className="flex min-w-0 flex-1 gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none]"
+                >
+                  {seasons.map((season) => {
+                    const active = season === activeSeason;
+                    return (
+                      <button
+                        key={season}
+                        ref={(node) => {
+                          if (node) {
+                            tabRefs.current.set(season, node);
+                          } else {
+                            tabRefs.current.delete(season);
+                          }
+                        }}
+                        type="button"
+                        role="tab"
+                        id={`season-tab-${season}`}
+                        aria-selected={active}
+                        aria-controls={`season-panel-${season}`}
+                        tabIndex={active ? 0 : -1}
+                        onClick={() => changeSeason(season)}
+                        onKeyDown={(event) => handleTabKeyDown(event, season)}
+                        className={[
+                          TAB_CLASS,
+                          active
+                            ? "border-accent/60 bg-accent/15 text-accent"
+                            : "border-border-subtle text-fg-muted hover:bg-hover hover:text-fg",
+                        ].join(" ")}
+                      >
+                        {season === 0 ? "Specials" : seasonLabel(season)}
+                      </button>
+                    );
+                  })}
+                </div>
                 {onBulkWatched ? (
-                  <div className="relative mb-2 flex justify-end">
+                  <div className="relative shrink-0">
                     <button
                       type="button"
                       aria-haspopup="menu"
@@ -496,10 +504,17 @@ export function TitleView({
                     ) : null}
                   </div>
                 ) : null}
+              </div>
+
+              <div
+                role="tabpanel"
+                id={`season-panel-${activeSeason ?? 0}`}
+                aria-labelledby={`season-tab-${activeSeason ?? 0}`}
+              >
                 <ul className="flex flex-col gap-2">
                   {visibleEpisodes.map((episode) => {
                     const expanded = selected?.id === episode.id;
-                    const expandable = Boolean(renderEpisodeExpanded);
+                    const expandable = Boolean(renderEpisodePane);
                     return (
                       <li
                         key={episode.id}
@@ -513,12 +528,12 @@ export function TitleView({
                           type="button"
                           aria-expanded={expandable ? expanded : undefined}
                           aria-controls={
-                            expandable ? `episode-panel-${episode.season}-${episode.episode}` : undefined
+                            expandable && expanded ? "episode-release-pane" : undefined
                           }
                           onClick={() => onSelectEpisode?.(episode)}
                           className={[
                             ROW_CLASS,
-                            onToggleWatched ? "pr-12" : "",
+                            onToggleWatched ? "pr-14" : "",
                             expanded ? "bg-accent/10 text-fg" : "hover:bg-hover",
                           ].join(" ")}
                         >
@@ -533,21 +548,23 @@ export function TitleView({
                               ▶
                             </span>
                           ) : null}
-                          <span className="font-mono text-small tabular-nums text-fg-muted">
+                          <span className="shrink-0 font-mono text-small tabular-nums text-fg-muted">
                             {episode.label}
                           </span>
                           <span className="min-w-0 flex-1 truncate text-body text-fg">
                             {episode.name ?? `Episode ${episode.episode}`}
                           </span>
-                          {title.kind === "anime" && episode.absolute !== null ? (
-                            <span className="text-micro text-fg-comment">#{episode.absolute}</span>
-                          ) : null}
-                          {expanded ? (
-                            <span className="inline-flex items-center rounded-full bg-accent/15 px-2 py-0.5 text-micro font-semibold text-accent">
-                              ✓ {expandable ? "Open" : "Selected"}
-                            </span>
-                          ) : null}
-                          <EpisodeStatusPill status={episode.status} />
+                          <span className="flex shrink-0 items-center gap-2">
+                            {title.kind === "anime" && episode.absolute !== null ? (
+                              <span className="text-micro text-fg-comment">#{episode.absolute}</span>
+                            ) : null}
+                            {expanded ? (
+                              <span className="inline-flex items-center rounded-full bg-accent/15 px-2 py-0.5 text-micro font-semibold text-accent">
+                                ✓ {expandable ? "Open" : "Selected"}
+                              </span>
+                            ) : null}
+                            <EpisodeStatusPill status={episode.status} />
+                          </span>
                         </button>
                         {onToggleWatched ? (
                           <span
@@ -575,14 +592,6 @@ export function TitleView({
                             </label>
                           </span>
                         ) : null}
-                        {expandable && expanded ? (
-                          <div
-                            id={`episode-panel-${episode.season}-${episode.episode}`}
-                            className="border-t border-border-subtle px-3 py-3"
-                          >
-                            {renderEpisodeExpanded?.(episode)}
-                          </div>
-                        ) : null}
                       </li>
                     );
                   })}
@@ -590,16 +599,15 @@ export function TitleView({
               </div>
             </>
           )}
+          </div>
+          {renderEpisodePane && selected !== null ? (
+            <div id="episode-release-pane" className="min-w-0">
+              {renderEpisodePane(selected)}
+            </div>
+          ) : null}
+          </div>
+          </div>
         </section>
-      ) : null}
-
-      {files !== null && files.file_count > 0 ? (
-        <DownloadedFiles
-          files={files}
-          titleKind={title.kind}
-          posterUrl={title.poster_url}
-          activeSeason={activeSeason}
-        />
       ) : null}
 
       {releases}

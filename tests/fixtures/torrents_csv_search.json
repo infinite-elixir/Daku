@@ -1,0 +1,53 @@
+[
+  {
+    "id": 1,
+    "infohash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "name": "Big.Buck.Bunny.2008.2160p.WEB-DL.DDP5.1-GROUP.mkv",
+    "size_bytes": 5000000000,
+    "seeders": 120,
+    "leechers": 4,
+    "completed": 51,
+    "created_unix": 1700000000
+  },
+  {
+    "id": 2,
+    "infohash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "name": "Severance.S02E05.1080p.WEB-DL.mkv",
+    "size_bytes": 900000000,
+    "seeders": 40,
+    "leechers": 2,
+    "completed": 12,
+    "created_unix": 1700000100
+  },
+  {
+    "id": 3,
+    "infohash": "cccccccccccccccccccccccccccccccccccccccc",
+    "name": "Severance.S02.1080p.BluRay.x265-GROUP.mkv",
+    "size_bytes": 9000000000,
+    "seeders": 20,
+    "leechers": 1,
+    "completed": 7,
+    "created_unix": 1700000200
+  },
+  {
+    "id": 4,
+    "infohash": "not-a-valid-hash",
+    "name": "Broken.2020.1080p.mkv",
+    "size_bytes": 100,
+    "seeders": 9
+  },
+  {
+    "id": 5,
+    "infohash": "dddddddddddddddddddddddddddddddddddddddd",
+    "name": "",
+    "size_bytes": 100,
+    "seeders": 3
+  },
+  {
+    "id": 6,
+    "infohash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "name": "Big.Buck.Bunny.2008.1080p.mkv",
+    "size_bytes": 0,
+    "seeders": 0
+  }
+]

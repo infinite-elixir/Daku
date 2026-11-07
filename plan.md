@@ -413,9 +413,10 @@ never gets the chance to apply file priorities.
 | T-043 | Spacing tokens and app-wide density |
 | T-044 | Downloads page: three sections, grouped cards, honest sizes |
 | T-045 | Title hero rewrite (supersedes T-034) |
-| T-046 | Taller release panel with one action row |
+| T-046 | Episode master–detail and three-level release navigation |
 | T-047 | Downloaded-files carousel, files page, ffmpeg thumbnails, library filter |
 | T-048 | Launch a downloaded file in the host's mpv |
+| T-056 | Release options: collapsible files, pack flow, dead releases |
 
 Phase 12 is presentation plus one new capability. T-043 lands first because every later
 ticket describes tokens rather than pixels. T-048 is gated on T-047: it needs file cards to
@@ -487,7 +488,7 @@ T-013, T-039 → T-050
 T-050, T-013 → T-051
 T-037 → T-052 (also needs T-004, T-022, T-028, T-029)
 T-052 → T-053 (also needs T-037, T-049)
-T-030, T-031 → T-046 (also needs T-043, T-045)
+T-030, T-031 → T-046 (also needs T-043, T-045) → T-056
 T-014 → T-047 (also needs T-043, T-044, T-045)
 T-047 → T-048 (also needs T-043)
 T-033 consumes the T-043 spacing tokens.

@@ -323,13 +323,37 @@ def extract_hints(filename: str, title: str | None = None) -> dict[str, Any]:
     }
 
 
+REMUX_RE = re.compile(r"\bremux\b", re.IGNORECASE)
+
+
+def is_high_quality_unlabelled(release: Release) -> bool:
+    """An ``unknown`` row that is still clearly 4K-grade: an unlabelled remux.
+
+    ``2160p``/``4k``/``uhd`` already map to ``2160p``; ``remux`` is the one marker
+    the label parser can miss while the row is unambiguous.
+    """
+
+    return release.quality.lower() == UNKNOWN_QUALITY and bool(REMUX_RE.search(release.filename))
+
+
 def filter_quality(releases: Iterable[Release], blocked: Sequence[str]) -> list[Release]:
-    """Drop releases whose quality label is in ``blocked`` (case-insensitive)."""
+    """Drop releases whose quality label is in ``blocked`` (case-insensitive).
+
+    A pack may not carry a video-quality token; it is still a valid source because
+    the selected file is inspected later. An unlabelled remux is likewise kept even
+    when ``unknown`` is blocked.
+    """
 
     bad = {label.strip().lower() for label in blocked if label and label.strip()}
     if not bad:
         return list(releases)
-    return [release for release in releases if release.quality.lower() not in bad]
+    return [
+        release
+        for release in releases
+        if (release.is_pack and release.quality.lower() == UNKNOWN_QUALITY)
+        or is_high_quality_unlabelled(release)
+        or release.quality.lower() not in bad
+    ]
 
 
 MIN_QUALITIES: tuple[str, ...] = ("480p", "576p", "720p", "1080p", "1440p", "2160p")

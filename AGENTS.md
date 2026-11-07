@@ -134,11 +134,12 @@ Resolution order: environment → `~/.config/daku/config.json` → defaults.
 | `telegram_api_base` | `https://api.telegram.org` | set to local server to lift the 20 MB cap |
 | `telegram_archive_channel` | empty | numeric `-100...` id |
 | `telegram_allowlist` | `[]` | numeric user ids; empty = deny all |
-| `torrentio_config` | `providers=yts,eztv,1337x,thepiratebay,torrentgalaxy|qualityfilter=scr,cam,unknown|sort=seeders` | override of last resort |
-| `providers` | `yts,eztv,1337x,thepiratebay,torrentgalaxy` | default Torrentio provider set; comma string or list |
+| `torrentio_config` | `sort=seeders` | override of last resort; no `providers=` part means every Torrentio provider |
+| `providers` | `[]` | default Torrentio provider set; empty means **all providers**; comma string or list |
 | `quality_filter` | `cam,scr,unknown` | labels dropped after parsing; empty means no local filter |
 | `sort` / `limit` | `seeders` / `20` | release display defaults; API limit ceiling is 200 |
-| `providers_movie` / `providers_series` / `providers_anime` | current `providers` | persisted per-kind release provider defaults in SQLite |
+| `providers_movie` / `providers_series` / `providers_anime` | `[]` | persisted per-kind provider selection in SQLite; empty means all providers |
+| `sources_movie` / `sources_series` / `sources_anime` | installed defaults | persisted per-kind release sources; legacy `anime_sources` is read and normalised |
 | `default_min_quality` | empty | persisted release minimum quality; empty means any |
 | `default_sort` / `default_limit` | current `sort` / `limit` | persisted release display defaults |
 
@@ -233,8 +234,21 @@ Discovery controls (`GET /api/titles/{id}/releases`): `providers`, `min_quality`
 `limit` (max 200). The order is parse → dedupe by lowercased `info_hash` (keep highest
 seeders) → drop `quality_filter` labels → `min_quality` (unknown excluded) → sort → slice.
 The raw-payload cache key is the URL, so a different provider set is a different entry.
-`providers=` is rewritten with `with_providers`; empty means the configured default.
-`GET /api/releases/options` exposes the provider/label/sort choices and limit steps.
+`providers=` is rewritten with `with_providers`; an empty list means **all providers** and
+sends no `providers=` part. `GET /api/releases/options` exposes the provider/label/sort
+choices, the available/selected sources per kind and the limit steps.
+
+### Torrents-CSV JSON API
+Movies and non-anime TV may also use `https://torrents-csv.com/service/search?size=100&q=...`.
+It is a DHT-wide index; it is a **source**, never a Torrentio provider or download engine.
+The query is URL-encoded, control characters are removed and it is capped at 120 characters.
+One request per search, throttled to one per second per process. Read only the fields that
+exist: `infohash` (40-hex), `name`, `size_bytes` (bytes), `seeders`, and optionally
+`leechers`, `completed`, `created_unix`, `id`. Missing/invalid hash, empty name or a
+non-positive size drops the row. Build the magnet locally from the validated hash and the
+shared public tracker list; the payload has no magnet and no `.torrent` is downloaded.
+Raw JSON is cached for one hour by full URL; stale payloads are served with `stale=true`.
+Torrents-CSV is never queried for anime; Torrentio/AnimeTosho are never queried for it.
 
 ### AnimeTosho JSON feed
 Anime-only release discovery may also use `https://feed.animetosho.xyz/json?q=...`.
@@ -258,6 +272,11 @@ queried for movies or non-anime TV. A stored legacy `nyaa` source or origin maps
   Incoming peer connections stay disabled, so the probe only fetches metadata and never
   serves or receives payload. Add the magnet in `upload_mode` under
   `data_dir/probes/<info_hash>` and remove it after success, timeout or error.
+- The session does not survive a long system suspend: DHT and peer sockets go stale and every
+  probe times out until the process restarts. Compare wall-clock (`time.time`) and monotonic
+  (`time.monotonic`) between probes; drift above 60 s means the host slept, so rebuild the
+  session before the next probe. A `PROBE_TIMEOUT`/`PROBE_FAILED` also drops the session so
+  the next attempt starts clean.
 - One active probe, at most 10 outstanding, 30 s deadline. Reject the 11th with
   `429 PROBE_BUSY`. Success cache 24 h / LRU 200; failure cache 5 min. A per-hash lock
   deduplicates clicks.

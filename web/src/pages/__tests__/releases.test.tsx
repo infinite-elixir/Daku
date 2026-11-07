@@ -252,6 +252,44 @@ describe("ReleasesSection", () => {
     expect(screen.getByLabelText("Source AnimeTosho")).toHaveTextContent("ANIMETOSHO");
   });
 
+  it("persists a per-kind source selection and badges Torrents-CSV", async () => {
+    const storage = installMemoryStorage();
+    const csvRelease: ReleaseItem = {
+      ...RELEASE,
+      provider: "torrents-csv",
+      resolved_from: "torrents-csv",
+      metadata_json: { ...RELEASE.metadata_json, resolved_from: "torrents-csv" },
+    };
+    stubApi((url) => {
+      if (url.includes("/releases/options")) {
+        return jsonResponse(
+          optionsPayload({
+            sources: ["torrentio", "torrents-csv"],
+            selected_sources: ["torrentio", "torrents-csv"],
+          }),
+        );
+      }
+      if (url.includes("/releases")) {
+        return jsonResponse(findPayload([csvRelease]));
+      }
+      return undefined;
+    });
+
+    renderPage(<ReleasesSection title={makeTitle()} />);
+
+    expect(await screen.findByLabelText("Source Torrents-CSV")).toHaveTextContent(
+      "TORRENTS-CSV",
+    );
+
+    fireEvent.click(screen.getByLabelText("Source torrentio"));
+
+    await waitFor(() => {
+      expect(storage.getItem("daku.releaseSources.override.movie")).toBe(
+        JSON.stringify(["torrents-csv"]),
+      );
+    });
+  });
+
   it("labels a season pack with a pack badge", async () => {
     const packRelease: ReleaseItem = {
       ...RELEASE,
@@ -293,6 +331,7 @@ describe("ReleasesSection", () => {
 
     renderPage(<ReleasesSection title={makeTitle()} />);
 
+    fireEvent.click(screen.getByRole("button", { name: /^Saved/ }));
     fireEvent.change(await screen.findByLabelText("Paste a magnet"), {
       target: { value: "magnet:?xt=urn:btih:" + "a".repeat(40) + "&dn=Manual.mkv" },
     });
@@ -530,5 +569,118 @@ describe("ReleasesSection", () => {
 
     expect(await screen.findByText("Big.Buck.Bunny.1080p.mkv")).toBeInTheDocument();
     expect(screen.getByLabelText("Minimum quality")).toHaveValue("");
+  });
+});
+
+describe("ReleasesSection — episode menu", () => {
+  const EPISODE = {
+    id: "ep-3",
+    season: 1,
+    episode: 3,
+    label: "S01E03",
+    absolute: null,
+    name: "The Jacket",
+    air_date: null,
+    status: "missing",
+    present: false,
+    watched: false,
+    watched_at: null,
+  };
+  const series = makeTitle({
+    kind: "series",
+    title: "Cyberpunk: Edgerunners",
+    episodes: [EPISODE],
+    episode_count: 1,
+  });
+
+  function renderEpisode() {
+    return renderPage(
+      <ReleasesSection
+        title={series}
+        mode="episode"
+        season={1}
+        episode={3}
+        onBack={() => undefined}
+        onPlayEpisode={() => undefined}
+      />,
+    );
+  }
+
+  it("renders a release as a navigation row with no action buttons", async () => {
+    stubApi((url) => {
+      if (url.includes("/releases/saved")) {
+        return jsonResponse(savedPayload([]));
+      }
+      if (url.includes("/releases")) {
+        return jsonResponse(findPayload([RELEASE]));
+      }
+      return undefined;
+    });
+
+    renderEpisode();
+
+    const row = await screen.findByRole("button", { name: /Big\.Buck\.Bunny/ });
+    expect(row).toHaveTextContent("WEB-DL");
+    expect(screen.queryByRole("button", { name: /^Download / })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy magnet link" })).not.toBeInTheDocument();
+  });
+
+  it("opens release options in place with one primary and no magnet text", async () => {
+    stubApi((url) => {
+      if (url.includes("/magnets/inspect") || url.includes("/files")) {
+        return jsonResponse({
+          info_hash: "1".repeat(40),
+          name: "Big Buck Bunny",
+          total_size_bytes: 4_500_000_000,
+          piece_length: 262144,
+          private: false,
+          files: [{ index: 0, path: "Big.Buck.Bunny.1080p.mkv", size_bytes: 4_500_000_000 }],
+          fetched_at: "2026-10-26T00:00:00Z",
+          cached: false,
+          source: "probe",
+          release_id: "release-1",
+        });
+      }
+      if (url.includes("/releases/saved")) {
+        return jsonResponse(savedPayload([]));
+      }
+      if (url.includes("/releases")) {
+        return jsonResponse(findPayload([RELEASE]));
+      }
+      return undefined;
+    });
+
+    renderEpisode();
+
+    fireEvent.click(await screen.findByRole("button", { name: /Big\.Buck\.Bunny/ }));
+
+    expect(screen.getByRole("button", { name: "Download S01E03" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy magnet link" })).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/magnet:\?xt=urn:btih/);
+    expect(screen.getByRole("button", { name: /^Save Big\.Buck/ })).toBeInTheDocument();
+    expect(
+      (await screen.findAllByText("Big.Buck.Bunny.1080p.mkv")).length,
+    ).toBeGreaterThanOrEqual(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "← Releases" }));
+    expect(screen.queryByRole("button", { name: "Download S01E03" })).not.toBeInTheDocument();
+  });
+
+  it("shows the manual magnet form on the Saved tab only", async () => {
+    stubApi((url) => {
+      if (url.includes("/releases/saved")) {
+        return jsonResponse(savedPayload([]));
+      }
+      if (url.includes("/releases")) {
+        return jsonResponse(findPayload([]));
+      }
+      return undefined;
+    });
+
+    renderEpisode();
+
+    expect(screen.queryByLabelText("Paste a magnet")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Saved/ }));
+    expect(await screen.findByLabelText("Paste a magnet")).toBeInTheDocument();
   });
 });

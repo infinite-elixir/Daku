@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from "react";
+import { Fragment, memo, useCallback, useState } from "react";
 
 import type { DownloadAction, DownloadRecord } from "../lib/api";
 import { formatBytes, formatEta, formatSpeed, percent } from "../lib/format";
@@ -58,7 +58,7 @@ function RowButton({
       type="button"
       onClick={() => onAction(id, action)}
       className={[
-        "min-h-control-sm rounded-control border px-3 text-small font-semibold transition-colors",
+        "inline-flex min-h-control-sm w-full items-center justify-center rounded-control border px-3 text-small font-semibold transition-colors sm:w-auto",
         primary
           ? "border-accent/50 bg-accent/15 text-accent hover:bg-accent/25"
           : "border-border-subtle text-fg-muted hover:bg-hover hover:text-fg",
@@ -67,6 +67,14 @@ function RowButton({
       {actionLabel(action)}
     </button>
   );
+}
+
+function libraryNames(files: NonNullable<DownloadRecord["downloaded_files"]>): {
+  shown: string[];
+  extra: number;
+} {
+  const names = files.map((file) => file.episode_label ?? file.file_name);
+  return { shown: names.slice(0, 3), extra: Math.max(0, names.length - 3) };
 }
 
 export const DownloadRow = memo(function DownloadRow({
@@ -93,13 +101,34 @@ export const DownloadRow = memo(function DownloadRow({
   const active = isActiveDownload(download);
   const failed = isFailedDownload(download);
   const completed = isCompletedDownload(download);
-  const selectionText = download.selection_label
-    ? `${download.selection_label}${
-        download.selection_size_bytes
-          ? ` · ${formatBytes(download.selection_size_bytes)}`
-          : ""
+  const engineLabel = download.engine === "aria2" ? "Direct" : "Torrent";
+  const facts = [download.episode_label, download.quality, engineLabel].filter(
+    (fact): fact is string => Boolean(fact),
+  );
+  const meta = facts.join(" · ");
+  const selectionSize =
+    typeof download.selection_size_bytes === "number" && download.selection_size_bytes > 0
+      ? download.selection_size_bytes
+      : null;
+  const hasSelection = Boolean(download.selection_label) || selectionSize !== null;
+  const selectionSubject =
+    download.selection_label === "Whole pack"
+      ? "Whole pack"
+      : (download.episode_label ??
+        download.selection_label ??
+        download.filename ??
+        "selected files");
+  const fetchingText = hasSelection
+    ? `Fetching ${selectionSubject}${
+        selectionSize !== null ? ` · ${formatBytes(selectionSize)}` : ""
       }`
     : null;
+  const progressText = completed
+    ? `Downloaded ${formatBytes(download.total_bytes)} · ${Math.round(value)}%`
+    : `Downloading ${formatBytes(download.downloaded_bytes)} of ${formatBytes(
+        download.total_bytes,
+      )} · ${Math.round(value)}%`;
+  const numbersText = fetchingText ?? progressText;
   const errorText =
     download.error && download.error.includes("FILE_SELECTION_FAILED")
       ? `Could not restrict this torrent to ${
@@ -107,98 +136,57 @@ export const DownloadRow = memo(function DownloadRow({
         }. Nothing is downloading.`
       : download.error;
   const downloadedFiles = download.downloaded_files ?? [];
+  const librarySize = downloadedFiles.reduce(
+    (total, file) => total + (file.size_bytes ?? 0),
+    0,
+  );
+  const sameSingleFile =
+    downloadedFiles.length === 1 &&
+    (!hasSelection ||
+      (selectionSize !== null && selectionSize === downloadedFiles[0]?.size_bytes));
+  const showLibrary = downloadedFiles.length > 0 && !sameSingleFile;
+  const library = libraryNames(downloadedFiles);
+  const fullLibraryTitle = downloadedFiles
+    .map(
+      (file) =>
+        `${file.episode_label ?? file.file_name}${
+          file.size_bytes ? ` · ${formatBytes(file.size_bytes)}` : ""
+        }`,
+    )
+    .join("\n");
 
   return (
     <article
       data-testid={`download-row-${download.id}`}
-      className="rounded-panel border border-border-subtle bg-panel p-panel"
+      className="min-w-0 rounded-panel border border-border-subtle bg-panel p-panel"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="truncate text-body font-semibold text-fg">{name}</h3>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-fg-muted">
-            <span
-              className={[
-                "inline-flex items-center rounded-full px-2 py-0.5 text-micro font-medium",
-                failed ? "bg-danger/15 text-danger" : "bg-hover text-fg-muted",
-              ].join(" ")}
-            >
-              {label}
-            </span>
-            {download.episode_label ? <span>{download.episode_label}</span> : null}
-            {selectionText ? (
-              <span
-                className="rounded-full bg-accent/15 px-2 py-0.5 text-micro font-medium text-accent"
-                title="The magnet adds the whole torrent; Daku only fetches the selected files."
-              >
-                {selectionText}
-              </span>
-            ) : null}
-            {download.selection_label && download.release_id ? (
-              <a
-                href={`#release-files-${download.release_id}`}
-                className="underline decoration-dotted hover:text-fg"
-                title="Open the torrent file list"
-              >
-                Files
-              </a>
-            ) : null}
-            {download.quality ? <span>{download.quality}</span> : null}
-            <span>{download.engine === "aria2" ? "Direct" : "Torrent"}</span>
-          </p>
-          {downloadedFiles.length > 0 ? (
-            <div className="mt-1.5 flex flex-wrap items-center gap-1 text-micro">
-              <span className="text-fg-comment">Downloaded</span>
-              {downloadedFiles.map((file) => (
-                <span
-                  key={file.id}
-                  title={`${file.file_name}${
-                    file.size_bytes ? ` · ${formatBytes(file.size_bytes)}` : ""
-                  }`}
-                  className="max-w-[22ch] truncate rounded-full bg-hover px-2 py-0.5 font-medium text-fg-muted"
-                >
-                  {file.episode_label ?? file.file_name}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          {download.status === "active" ? (
-            <RowButton action="pause" onAction={onAction} id={download.id} />
-          ) : null}
-          {download.status === "paused" ? (
-            <RowButton action="resume" onAction={onAction} id={download.id} primary />
-          ) : null}
-          {active || failed ? (
-            <RowButton action="cancel" onAction={onAction} id={download.id} />
-          ) : null}
-          {failed ? (
-            <RowButton action="retry" onAction={onAction} id={download.id} primary />
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setConfirmingRemove(true)}
-            aria-label="Remove download"
-            title="Remove download"
-            className="inline-flex min-h-control-sm items-center gap-1.5 rounded-control border border-border-subtle px-panel-compact text-small font-semibold text-fg-muted hover:bg-hover hover:text-danger"
-          >
-            <svg
-              aria-hidden
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-4 w-4"
-            >
-              <path d="M3.5 5.5h13M8 3.5h4M5.5 5.5l.7 10a1.5 1.5 0 0 0 1.5 1.4h4.6a1.5 1.5 0 0 0 1.5-1.4l.7-10M8.3 8.5v5.4M11.7 8.5v5.4" />
-            </svg>
-            <span className="hidden sm:inline">Remove</span>
-          </button>
-        </div>
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <h4
+          className="min-w-0 flex-1 truncate text-title font-semibold text-fg"
+          title={name}
+        >
+          {name}
+        </h4>
+        <span
+          className={[
+            "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-micro font-medium",
+            failed ? "bg-danger/15 text-danger" : "bg-hover text-fg-muted",
+          ].join(" ")}
+        >
+          {label}
+        </span>
       </div>
+
+      {meta ? (
+        <p className="mt-0.5 truncate text-small text-fg-muted" title={meta}>
+          {facts.map((fact, index) => (
+            <Fragment key={`${fact}-${index}`}>
+              {index > 0 ? " · " : null}
+              <span>{fact}</span>
+            </Fragment>
+          ))}
+        </p>
+      ) : null}
 
       <div className="mt-3">
         <div
@@ -217,13 +205,19 @@ export const DownloadRow = memo(function DownloadRow({
             style={{ width: `${value}%` }}
           />
         </div>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-small text-fg-muted">
-          <span className="tabular-nums">
-            {formatBytes(download.downloaded_bytes)} / {formatBytes(download.total_bytes)} ·{" "}
-            {Math.round(value)}%
+        <div className="mt-2 flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 text-small">
+          <span
+            className={[
+              "min-w-0 tabular-nums",
+              fetchingText && download.status === "active"
+                ? "text-accent"
+                : "text-fg-muted",
+            ].join(" ")}
+          >
+            {numbersText}
           </span>
-          <span className="flex gap-3 tabular-nums">
-            {active ? (
+          <span className="flex shrink-0 gap-3 tabular-nums text-fg-muted">
+            {download.status === "active" ? (
               <>
                 <span>{formatSpeed(download.speed_bps)}</span>
                 <span>ETA {formatEta(download.eta_seconds)}</span>
@@ -233,11 +227,70 @@ export const DownloadRow = memo(function DownloadRow({
         </div>
       </div>
 
+      {showLibrary ? (
+        <p
+          className="mt-1.5 min-w-0 truncate text-small text-fg-muted"
+          title={fullLibraryTitle}
+        >
+          In library:{" "}
+          <span className="tabular-nums">
+            {formatBytes(librarySize)} · {downloadedFiles.length}{" "}
+            {downloadedFiles.length === 1 ? "file" : "files"}
+          </span>{" "}
+          <span>
+            ·{" "}
+            {library.shown.map((name, index) => (
+              <Fragment key={`${name}-${index}`}>
+                {index > 0 ? ", " : null}
+                <span>{name}</span>
+              </Fragment>
+            ))}
+            {library.extra > 0 ? ` +${library.extra}` : ""}
+          </span>
+        </p>
+      ) : null}
+
       {errorText ? (
         <p className="mt-2 rounded-control border-l-2 border-danger bg-canvas px-3 py-2 text-small text-danger">
           {errorText}
         </p>
       ) : null}
+
+      <div className="mt-3 flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
+        {download.status === "active" ? (
+          <RowButton action="pause" onAction={onAction} id={download.id} primary />
+        ) : null}
+        {download.status === "paused" ? (
+          <RowButton action="resume" onAction={onAction} id={download.id} primary />
+        ) : null}
+        {failed ? (
+          <RowButton action="retry" onAction={onAction} id={download.id} primary />
+        ) : null}
+        {active || failed ? (
+          <RowButton action="cancel" onAction={onAction} id={download.id} />
+        ) : null}
+        <button
+          type="button"
+          onClick={() => setConfirmingRemove(true)}
+          aria-label="Remove download"
+          title="Remove download"
+          className="inline-flex min-h-control-sm w-full items-center justify-center gap-1.5 rounded-control border border-border-subtle px-panel-compact text-small font-semibold text-fg-muted hover:bg-hover hover:text-danger sm:w-auto"
+        >
+          <svg
+            aria-hidden
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+          >
+            <path d="M3.5 5.5h13M8 3.5h4M5.5 5.5l.7 10a1.5 1.5 0 0 0 1.5 1.4h4.6a1.5 1.5 0 0 0 1.5-1.4l.7-10M8.3 8.5v5.4M11.7 8.5v5.4" />
+          </svg>
+          <span className="hidden sm:inline">Remove</span>
+        </button>
+      </div>
 
       {confirmingRemove ? (
         <RemoveDownloadDialog

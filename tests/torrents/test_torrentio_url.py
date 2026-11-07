@@ -4,6 +4,7 @@ import httpx
 import pytest
 import respx
 
+from daku.config import TORRENTIO_DEFAULT
 from daku.services.torrents.cache import PayloadCache
 from daku.services.torrents.torrentio import (
     build_stream_url,
@@ -32,6 +33,16 @@ def test_with_providers_empty_list_keeps_configured_default() -> None:
     assert with_providers(config, []) == config
     assert with_providers(config, ["  "]) == config
     assert with_providers("", []) == ""
+
+
+def test_shipped_default_sends_no_providers_or_qualityfilter() -> None:
+    assert TORRENTIO_DEFAULT == "sort=seeders"
+
+    url = build_stream_url(TORRENTIO_DEFAULT, "movie", "tt1")
+
+    assert url == "https://torrentio.strem.fun/sort=seeders/stream/movie/tt1.json"
+    assert "providers=" not in url
+    assert "qualityfilter=" not in url
 
 
 def test_provider_selection_changes_the_stream_url() -> None:

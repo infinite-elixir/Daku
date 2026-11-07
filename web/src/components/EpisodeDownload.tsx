@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
 import {
   ApiError,
@@ -45,12 +46,15 @@ export function EpisodeDownload({
   episodeLabel,
   ensureRelease,
   onQueued,
+  actions,
 }: {
   release: ReleaseItem;
   episodeId: string;
   episodeLabel: string;
   ensureRelease: () => Promise<string>;
   onQueued: (message: string) => void;
+  /** Secondary controls rendered beside the primary Download trigger. */
+  actions?: ReactNode;
 }) {
   const queryClient = useQueryClient();
   const [phase, setPhase] = useState<Phase>("idle");
@@ -155,10 +159,11 @@ export function EpisodeDownload({
           type="button"
           disabled={phase === "loading" || startMutation.isPending}
           onClick={() => void begin()}
-          className="min-h-control-sm rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
+          className="min-h-control-sm rounded-control border border-accent/50 bg-accent/15 px-3 text-small font-semibold text-accent hover:bg-accent/25 disabled:opacity-40"
         >
           {phase === "loading" ? "Checking files…" : `Download ${episodeLabel}`}
         </button>
+        {actions}
       </div>
 
       {phase === "confirm" && confirmed ? (

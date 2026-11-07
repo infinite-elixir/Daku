@@ -1,6 +1,6 @@
 [project]
 name = "daku"
-version = "0.1.0a1"
+version = "0.1.0a2"
 description = "Self-hosted, LAN-only media librarian"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 probe = ["libtorrent>=2.0"]
+package = ["pyinstaller>=6.10"]
 
 [dependency-groups]
 dev = [

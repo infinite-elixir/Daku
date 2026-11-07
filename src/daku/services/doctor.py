@@ -149,26 +149,35 @@ def run_doctor(
             else "bot arrives in T-015",
             bool(settings.telegram_bot_token and settings.telegram_archive_channel),
         ),
-        Check(
-            name="torrentio",
-            status=STATUS_OK,
-            detail=settings.torrentio_config or "no config prefix (Torrentio defaults)",
-        ),
     ]
-    anime_sources = (
-        settings_repo.get_anime_sources(session)
-        if session is not None
-        else list(settings_repo.ANIME_SOURCES)
-    )
-    checks.append(
-        Check(
-            name="animetosho",
-            status=STATUS_OK if "animetosho" in anime_sources else STATUS_NOT_CONFIGURED,
-            detail="enabled for anime feed searches"
-            if "animetosho" in anime_sources
-            else "disabled in anime source settings",
+    # One row per configured release source, without issuing a search.
+    configured: dict[str, list[str]] = {}
+    for kind in ("movie", "series", "anime"):
+        selected = (
+            settings_repo.get_sources(session, kind)
+            if session is not None
+            else list(settings_repo.DEFAULT_SOURCES.get(kind, ()))
         )
-    )
+        for name in selected:
+            configured.setdefault(name, []).append(kind)
+    for name, kinds in configured.items():
+        enabled_for = ", ".join(kinds)
+        checks.append(
+            Check(
+                name=name,
+                status=STATUS_OK,
+                detail=f"enabled for {enabled_for} searches",
+            )
+        )
+    for name in ("torrentio", "animetosho", "torrents-csv"):
+        if name not in configured:
+            checks.append(
+                Check(
+                    name=name,
+                    status=STATUS_NOT_CONFIGURED,
+                    detail="disabled in release source settings",
+                )
+            )
 
     ffprobe = shutil.which("ffprobe")
     checks.append(

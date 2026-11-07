@@ -13,6 +13,7 @@ import {
   getTitle,
   getTitleFiles,
   getTitleMetadata,
+  listSavedReleases,
   patchEpisode,
   patchTitle,
   playMediaFile,
@@ -127,6 +128,14 @@ export function TitlePage() {
     retry: false,
   });
 
+  const { data: savedReleases } = useQuery({
+    queryKey: ["saved-releases", id, "unassigned"],
+    queryFn: ({ signal }) => listSavedReleases(id, {}, signal),
+    enabled: id.length > 0,
+    staleTime: 60_000,
+    retry: false,
+  });
+
   const watchStatusMutation = useMutation({
     mutationFn: ({
       status,
@@ -206,7 +215,10 @@ export function TitlePage() {
   }
 
   const playMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: (fileId?: string) => {
+      if (fileId) {
+        return playMediaFile(fileId);
+      }
       if (!title) {
         throw new Error("Title is not loaded");
       }
@@ -296,6 +308,13 @@ export function TitlePage() {
   }
 
   const playable = choosePlayableFile(files, title);
+  const unassignedSaved = (savedReleases?.releases ?? []).filter(
+    (release) => release.episode_id === null,
+  );
+
+  function episodeFile(episode: Episode): MediaFileItem | null {
+    return files?.items?.find((file) => file.episode_id === episode.id) ?? null;
+  }
 
   const actions = (
     <>
@@ -460,30 +479,60 @@ export function TitlePage() {
       onCollapse={clearSelection}
       onCleanupMissing={() => cleanupMutation.mutate()}
       cleanupPending={cleanupMutation.isPending}
-      renderEpisodeExpanded={
+      renderEpisodePane={
         title.kind === "movie"
           ? undefined
-          : (episode) => (
-              <ReleasesSection
-                title={title}
-                mode="find"
-                season={episode.season}
-                episode={episode.episode}
-              />
-            )
+          : (episode) => {
+              const file = episodeFile(episode);
+              return (
+                <ReleasesSection
+                  title={title}
+                  mode="episode"
+                  season={episode.season}
+                  episode={episode.episode}
+                  onBack={clearSelection}
+                  onPlayEpisode={(target) => {
+                    const targetFile = episodeFile(target);
+                    if (targetFile) {
+                      playMutation.mutate(targetFile.id);
+                    }
+                  }}
+                  episodePlayable={file !== null}
+                  playPending={playMutation.isPending}
+                />
+              );
+            }
       }
       releases={
         <div id="releases" className="scroll-mt-6">
           {title.kind === "movie" ? (
             <ReleasesSection title={title} mode="all" />
-          ) : (
-            <ReleasesSection
-              title={title}
-              mode="saved"
-              season={selected?.season ?? null}
-              episode={selected?.episode ?? null}
-            />
-          )}
+          ) : unassignedSaved.length > 0 ? (
+            <section className="flex flex-col gap-2">
+              <h2 className="text-h2 font-semibold tracking-tight text-fg">
+                Saved, no episode
+              </h2>
+              <p className="text-small text-fg-muted">
+                These saved magnets are not tied to an episode yet.
+              </p>
+              <ul className="divide-y divide-border-subtle rounded-panel border border-border-subtle bg-panel">
+                {unassignedSaved.map((release) => (
+                  <li key={release.id} className="px-panel py-row">
+                    <p
+                      className="truncate text-body font-semibold text-fg"
+                      title={release.filename ?? release.info_hash}
+                    >
+                      {release.filename ?? release.info_hash}
+                    </p>
+                    <p className="text-small text-fg-muted">
+                      {release.quality ?? "unknown"} · {release.seeders ?? 0} seeders
+                      {release.dead ? " · Dead" : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </div>
       }
     />

@@ -10,6 +10,18 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 
+@dataclass(frozen=True, slots=True)
+class KeywordQuery:
+    """A title-shaped query for keyword sources that need no IMDb id."""
+
+    title: str
+    year: int | None = None
+    season: int | None = None
+    episode: int | None = None
+    pack: bool = False
+    aliases: tuple[str, ...] = ()
+
+
 @dataclass(slots=True)
 class Release:
     info_hash: str

@@ -34,6 +34,7 @@ function makeItem(overrides: Partial<ContinueWatchingItem> = {}): ContinueWatchi
     poster_url: overrides.poster_url ?? "https://images.example/poster.jpg",
     played_at: overrides.played_at ?? "2026-11-01T10:00:00Z",
     up_next: overrides.up_next ?? false,
+    is_new: overrides.is_new ?? false,
     file: overrides.file ?? makeFile(),
   };
 }
@@ -96,6 +97,19 @@ describe("ContinueWatching", () => {
 
     expect(await screen.findByText("Up next")).toBeInTheDocument();
     expect(screen.queryByTestId("media-file-progress-file-next")).not.toBeInTheDocument();
+  });
+
+  it("marks a freshly downloaded, never-played file as New", async () => {
+    renderStrip([
+      makeItem({
+        played_at: null,
+        is_new: true,
+        file: makeFile({ id: "file-new", episode_label: "S02E03", playback: null }),
+      }),
+    ]);
+
+    expect(await screen.findByText("New")).toBeInTheDocument();
+    expect(screen.getByText("S02E03")).toBeInTheDocument();
   });
 
   it("links a card to the title's files page when playback is disabled", async () => {

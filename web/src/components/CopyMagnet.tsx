@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
+import { ClipboardIcon } from "./icons";
+
 const COPIED_RESET_MS = 2000;
 
 /** Copy text with the Clipboard API, falling back to a hidden textarea. */
@@ -41,9 +43,11 @@ export function shortMagnet(magnet: string | null | undefined): string {
 export function CopyMagnet({
   magnet,
   compact = false,
+  iconOnly = false,
 }: {
   magnet: string | null | undefined;
   compact?: boolean;
+  iconOnly?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -73,7 +77,7 @@ export function CopyMagnet({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className={iconOnly ? "flex items-center gap-1" : "flex flex-wrap items-center gap-1.5"}>
       <button
         type="button"
         aria-label="Copy magnet link"
@@ -82,20 +86,28 @@ export function CopyMagnet({
         onClick={() => void handleCopy()}
         className={[
           "rounded-control border border-border-strong text-small font-semibold text-fg hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40",
-          compact ? "min-h-control-sm px-2" : "min-h-control-sm px-panel-compact",
+          iconOnly
+            ? "flex h-9 w-9 items-center justify-center"
+            : compact
+              ? "min-h-control-sm px-2"
+              : "min-h-control-sm px-panel-compact",
         ].join(" ")}
       >
-        Copy
+        {iconOnly ? <ClipboardIcon /> : "Copy"}
       </button>
-      <span className="text-micro text-fg-comment" aria-hidden="true">
-        {shortMagnet(magnet)}
-      </span>
+      {iconOnly ? null : (
+        <span className="text-micro text-fg-comment" aria-hidden="true">
+          {shortMagnet(magnet)}
+        </span>
+      )}
       {copied ? (
         <span role="status" className="text-micro text-success">
           Copied
         </span>
       ) : null}
-      {!magnet ? <span className="text-micro text-fg-comment">no magnet</span> : null}
+      {!iconOnly && !magnet ? (
+        <span className="text-micro text-fg-comment">no magnet</span>
+      ) : null}
     </div>
   );
 }

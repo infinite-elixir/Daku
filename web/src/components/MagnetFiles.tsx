@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   ApiError,
@@ -145,6 +145,9 @@ export function MagnetFiles({
   episodeId = null,
   buttonLabel = "Files",
   timeoutMs = PROBE_TIMEOUT_MS,
+  defaultOpen = false,
+  showCopy = true,
+  ensureRelease,
   onQueued,
 }: {
   magnet: string | null | undefined;
@@ -152,21 +155,55 @@ export function MagnetFiles({
   episodeId?: string | null;
   buttonLabel?: string;
   timeoutMs?: number;
+  /** Fetch the file list as soon as this release is shown. */
+  defaultOpen?: boolean;
+  /** Render the inline copy control. Turn off when the parent owns it. */
+  showCopy?: boolean;
+  /**
+   * Store the release on demand. Find results are not release rows yet, so the
+   * parent passes the same helper its episode download uses. Without it a file
+   * selection cannot be queued.
+   */
+  ensureRelease?: () => Promise<string | null>;
   onQueued?: (message: string) => void;
 }) {
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [attempt, setAttempt] = useState(0);
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const controllerRef = useRef<AbortController | null>(null);
   const timeoutFlag = useRef(false);
+  // The release row can be created by the first file selection.
+  const resolvedReleaseId = useRef<string | null>(releaseId);
+
+  // A different release is a different file list: show it immediately again.
+  useEffect(() => {
+    resolvedReleaseId.current = releaseId;
+    if (defaultOpen) {
+      setOpen(true);
+      setSelected(new Set());
+    }
+  }, [defaultOpen, releaseId, magnet]);
 
   const downloadMutation = useMutation({
-    mutationFn: (paths: string[]) =>
-      startDownload(releaseId ?? "", {
+    mutationFn: async (paths: string[]) => {
+      let id = resolvedReleaseId.current;
+      if (!id && ensureRelease) {
+        id = await ensureRelease();
+        resolvedReleaseId.current = id;
+      }
+      if (!id) {
+        throw new ApiError(
+          "Save this release before downloading individual files.",
+          400,
+          "RELEASE_NOT_SAVED",
+        );
+      }
+      return startDownload(id, {
         episode_id: episodeId,
         file_paths: paths,
-      }),
+      });
+    },
     onSuccess: () => {
       onQueued?.("Queued the selected files for download.");
       setSelected(new Set());
@@ -187,6 +224,7 @@ export function MagnetFiles({
   }
 
   const enabled = Boolean(magnet || releaseId);
+  const canQueueFiles = Boolean(releaseId || ensureRelease);
   const query = useQuery({
     queryKey: ["magnet-files", releaseId ?? magnetHash(magnet), attempt],
     queryFn: async ({ signal }) => {
@@ -246,7 +284,7 @@ export function MagnetFiles({
         >
           {buttonLabel}
         </button>
-        {open && enabled ? <CopyMagnet magnet={magnet} compact /> : null}
+        {open && enabled && showCopy ? <CopyMagnet magnet={magnet} iconOnly /> : null}
       </div>
 
       {open && enabled ? (
@@ -315,11 +353,11 @@ export function MagnetFiles({
                   type="button"
                   disabled={
                     selected.size === 0 ||
-                    !releaseId ||
+                    !canQueueFiles ||
                     downloadMutation.isPending
                   }
                   title={
-                    !releaseId
+                    !canQueueFiles
                       ? "Save this release before downloading individual files"
                       : selected.size === 0
                         ? "Tick at least one file"
@@ -338,7 +376,7 @@ export function MagnetFiles({
                   {downloadMutation.isPending ? "Queueing…" : "Download selected"}
                 </button>
                 <span className="text-micro text-fg-comment">
-                  {!releaseId
+                  {!canQueueFiles
                     ? "Save this release to download individual files."
                     : selected.size === 0
                       ? "Tick at least one file to download a subset."

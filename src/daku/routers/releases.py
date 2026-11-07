@@ -43,9 +43,11 @@ from daku.services.torrents.ranking import (
     apply_min_quality,
     dedupe_releases,
     extract_hints,
+    filter_quality,
     quality_counts,
     sort_releases,
 )
+from daku.services.torrents.registry import available_sources
 from daku.services.torrents.sources import search_all_sources
 from daku.services.torrents.torrentio import TorrentioError, with_providers, with_qualityfilter
 
@@ -258,21 +260,15 @@ def _provider_list(raw: str | None) -> list[str]:
     return providers
 
 
-def _configured_providers(config: str) -> list[str]:
-    for part in config.split("|"):
-        if part.strip().lower().startswith("providers="):
-            value = part.split("=", 1)[1]
-            return _provider_list(value)
-    return []
+def _release_origin(release: Any) -> str:
+    """Map a release provider to its ``resolved_from`` origin."""
 
-
-def _effective_providers(settings: Any, config: str) -> list[str]:
-    """Settings.providers wins; otherwise read the ``providers=`` config part."""
-
-    providers = list(getattr(settings, "providers", []) or [])
-    if providers:
-        return providers
-    return _configured_providers(config)
+    provider = getattr(release, "provider", None)
+    if provider in {"animetosho", "nyaa"}:
+        return "animetosho"
+    if provider == "torrents-csv":
+        return "torrents-csv"
+    return "torrentio"
 
 
 def _snapshot_for_row(row: Release) -> str:
@@ -310,9 +306,13 @@ def release_options(
         resolved_kind = "movie"
     defaults = settings_repo.effective_release_defaults(session, runtime, resolved_kind)
     providers = list(dict.fromkeys([*DEFAULT_PROVIDERS, *defaults.providers]))
+    selected_sources = settings_repo.effective_sources(session, resolved_kind)
     return {
         "providers": providers,
-        "anime_sources": settings_repo.get_anime_sources(session),
+        "sources": list(available_sources(resolved_kind)),
+        "selected_sources": selected_sources,
+        # Legacy alias kept for older SPA builds.
+        "anime_sources": settings_repo.get_sources(session, "anime"),
         "quality_labels": list(QUALITY_DISPLAY_ORDER),
         "min_qualities": list(MIN_QUALITIES),
         "sorts": ["seeders", "quality", "size"],
@@ -357,10 +357,6 @@ async def list_releases(
 ) -> dict[str, Any]:
     settings = request.app.state.settings
     title = _require_title(session, title_id)
-    if title.kind == "anime" and not title.imdb_id:
-        media_type, media_id = "series", f"anilist:{title.anilist_id or title.id}"
-    else:
-        media_type, media_id = _media_query(title, season=season, episode=episode, pack=pack)
     defaults = settings_repo.effective_release_defaults(session, settings, title.kind)
 
     resolved_sort: str = sort or defaults.sort
@@ -373,33 +369,44 @@ async def list_releases(
     requested = _provider_list(providers)
     resolved_min_quality = min_quality if min_quality is not None else defaults.min_quality
     config = with_qualityfilter(settings.torrentio_config, blocked)
-    configured_providers = defaults.providers or _effective_providers(settings, config)
-    if configured_providers:
-        config = with_providers(config, configured_providers)
+    configured_providers = list(defaults.providers)
+    # An empty list means "all providers": ``with_providers`` leaves the prefix alone.
+    config = with_providers(config, configured_providers)
     if requested:
         config = with_providers(config, requested)
 
     cache: PayloadCache = request.app.state.releases_cache
     client: httpx.AsyncClient = request.app.state.http_client
     episode_row = _episode_row(session, title, season=season, episode=episode)
-    configured_sources = settings_repo.get_anime_sources(session)
-    if title.kind == "anime":
-        raw_sources = [
-            value.strip().lower()
-            for value in (sources.split(",") if sources else configured_sources)
-            if value.strip()
-        ]
-        if not raw_sources or any(
-            value not in {*settings_repo.ANIME_SOURCES, "nyaa"} for value in raw_sources
-        ):
-            raise AppError(
-                code="INVALID_SOURCES", message="Invalid anime source selection", status_code=422
-            )
-        selected_sources = settings_repo.normalize_anime_sources(raw_sources)
+
+    if sources is not None:
+        raw_sources = [value.strip().lower() for value in sources.split(",") if value.strip()]
+        selected_sources = settings_repo.normalize_sources(title.kind, raw_sources)
     else:
-        selected_sources = ["torrentio"]
-    if "torrentio" in selected_sources and title.kind == "anime" and not title.imdb_id:
+        selected_sources = settings_repo.effective_sources(session, title.kind)
+
+    # Torrentio needs an IMDb id; without it the source is dropped from the
+    # selection. Keyword sources have no such requirement.
+    if "torrentio" in selected_sources and not title.imdb_id:
         selected_sources = [value for value in selected_sources if value != "torrentio"]
+    if not selected_sources:
+        raise AppError(
+            code="RELEASE_SOURCE_UNAVAILABLE",
+            message=(
+                "None of the selected release sources can answer: Torrentio needs an "
+                "IMDb id and no keyword source is enabled"
+            ),
+            status_code=422,
+            detail={"title_id": title.id, "kind": title.kind},
+        )
+
+    media_type, media_id = ("", "")
+    if "torrentio" in selected_sources:
+        if title.kind == "anime" and not title.imdb_id:
+            media_type, media_id = "series", f"anilist:{title.anilist_id or title.id}"
+        else:
+            media_type, media_id = _media_query(title, season=season, episode=episode, pack=pack)
+
     try:
         outcome = await search_all_sources(
             client,
@@ -416,6 +423,7 @@ async def list_releases(
             absolute=episode_row.absolute if episode_row is not None else None,
             provider_seasons=_provider_seasons(session, title, season),
             season_fallback=len(seasons_repo.list_seasons(session, title.id)) <= 1,
+            year=title.year,
         )
     except TorrentioError as exc:
         raise AppError(
@@ -432,16 +440,9 @@ async def list_releases(
     combined = [*outcome.releases, *outcome.packs]
     deduped, duplicates_removed = dedupe_releases(combined)
     total_unfiltered = len(deduped)
-    # A season/batch pack may not carry a video-quality token, but it is still
-    # a valid source because the selected episode file is inspected later. Only
-    # packs get the ``unknown`` exemption; ordinary rows still obey the filter.
-    blocked_lower = {label.strip().lower() for label in blocked if label and label.strip()}
-    matched = [
-        release
-        for release in deduped
-        if (release.is_pack and release.quality.lower() == "unknown")
-        or release.quality.lower() not in blocked_lower
-    ]
+    # Packs and unlabelled remuxes are exempt from the unknown label; every other
+    # row still obeys the local filter.
+    matched = filter_quality(deduped, blocked)
     matched = apply_min_quality(matched, resolved_min_quality)
     ranked = sort_releases(matched, resolved_sort)
     visible = ranked[:resolved_limit]
@@ -453,7 +454,7 @@ async def list_releases(
     releases: list[dict[str, Any]] = []
     for release in visible:
         item = release.to_dict()
-        origin = "animetosho" if release.provider in {"animetosho", "nyaa"} else "torrentio"
+        origin = _release_origin(release)
         item["metadata_json"] = {**item["metadata_json"], "resolved_from": origin}
         stored = rows.get((release.info_hash, episode_id))
         item.update(
@@ -520,7 +521,8 @@ def create_release(
     if body.resolved_from is not None:
         origin: ResolvedFrom = body.resolved_from
     elif body.provider and body.provider != "manual":
-        origin = "torrentio"
+        mapped = _release_origin(body)
+        origin = mapped  # type: ignore[assignment]
     else:
         origin = "manual"
 

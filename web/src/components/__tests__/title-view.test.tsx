@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
-import type { TitleMetadata } from "../../lib/api";
+import type { Episode, TitleMetadata } from "../../lib/api";
 import { TitleView, type TitleViewData } from "../TitleView";
 
 const METADATA: TitleMetadata = {
@@ -151,5 +151,84 @@ describe("TitleView hero", () => {
     const hero = screen.getByTestId("title-hero");
     const episodes = screen.getByRole("region", { name: "Episodes" });
     expect(hero).not.toContainElement(episodes);
+  });
+
+  it("uses the whole width for episodes until one is selected", () => {
+    const episode: Episode = {
+      id: "ep-1",
+      season: 1,
+      episode: 1,
+      label: "S01E01",
+      absolute: 1,
+      name: "Let You Down",
+      air_date: null,
+      status: "available",
+    };
+    render(
+      <MemoryRouter>
+        <TitleView
+          title={makeTitle({ episodes: [episode] })}
+          metadata={METADATA}
+          back={{ to: "/library", label: "← Library" }}
+          renderEpisodePane={(selected) => <div>Releases for {selected.label}</div>}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText(/Pick an episode to see its releases/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Releases for/)).not.toBeInTheDocument();
+    const grid = screen.getByRole("region", { name: "Episodes" }).querySelector(".grid");
+    expect(grid).toHaveClass("grid-cols-1");
+    expect(grid?.className).not.toContain("@min-[900px]:grid-cols-");
+  });
+
+  it("renders downloaded files above the episodes section", () => {
+    const episode: Episode = {
+      id: "ep-1",
+      season: 1,
+      episode: 1,
+      label: "S01E01",
+      absolute: 1,
+      name: "Let You Down",
+      air_date: null,
+      status: "available",
+    };
+    render(
+      <MemoryRouter>
+        <TitleView
+          title={makeTitle({ episodes: [episode] })}
+          metadata={METADATA}
+          back={{ to: "/library", label: "← Library" }}
+          renderEpisodePane={() => <div />}
+          files={{
+            title_id: "title-1",
+            file_count: 1,
+            total_size_bytes: 100,
+            seasons: [{ library_season: 1, file_count: 1, total_size_bytes: 100 }],
+            items: [
+              {
+                id: "file-1",
+                download_id: "d1",
+                episode_id: "ep-1",
+                episode_label: "S01E01",
+                episode_name: "Let You Down",
+                season: 1,
+                episode: 1,
+                file_name: "S01E01.mkv",
+                size_bytes: 100,
+                is_primary: true,
+                has_episode: true,
+              },
+            ],
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    const downloaded = screen.getByTestId("downloaded-files");
+    const episodes = screen.getByRole("region", { name: "Episodes" });
+    expect(
+      downloaded.compareDocumentPosition(episodes) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

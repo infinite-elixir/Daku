@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -170,6 +170,177 @@ describe("DownloadsPage qBittorrent 5 progress", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("qBittorrent is unreachable");
     expect(screen.getByTestId("download-row-d1")).toBeInTheDocument();
+  });
+});
+
+function downloadedFile(overrides: Partial<NonNullable<DownloadRecord["downloaded_files"]>[number]> = {}) {
+  return {
+    id: "f1",
+    episode_id: "e1",
+    episode_label: "S01E01",
+    file_name: "file.mkv",
+    size_bytes: 1024,
+    is_primary: true,
+    ...overrides,
+  };
+}
+
+describe("DownloadsPage sections", () => {
+  beforeEach(() => {
+    FakeEventSource.instances = [];
+    vi.stubGlobal("EventSource", FakeEventSource);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sections_split_active_completed_and_failed in order and hides an empty attention section", async () => {
+    stubDownloads([
+      record({ id: "d1", status: "active", title: "Active title" }),
+      record({ id: "d2", status: "complete", progress: 1, title: "Done title" }),
+      record({ id: "d3", status: "failed", title: "Broken title" }),
+      record({ id: "d4", status: "cancelled", title: "Cancelled title" }),
+    ]);
+    renderPage();
+
+    await screen.findByTestId("download-row-d1");
+    const headings = screen.getAllByRole("heading", { level: 2 });
+    expect(headings.map((heading) => heading.textContent)).toEqual([
+      "Needs attention",
+      "Downloading",
+      "Completed",
+    ]);
+    expect(screen.getByRole("heading", { level: 4, name: "Broken title" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 4, name: "Cancelled title" }),
+    ).toBeInTheDocument();
+
+    cleanup();
+    stubDownloads([record({ status: "active" })]);
+    renderPage();
+    await screen.findAllByTestId("download-row-d1");
+    expect(
+      screen.queryByRole("heading", { level: 2, name: "Needs attention" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows empty states for downloading and completed but not needs attention", async () => {
+    stubDownloads([]);
+    renderPage();
+
+    expect(
+      await screen.findByText("Nothing is downloading. Queue a release from a title page."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("No completed downloads yet.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { level: 2, name: "Needs attention" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("groups_downloads_by_title with one header and an aggregate size", async () => {
+    stubDownloads([
+      record({
+        id: "d1",
+        title: "Dune",
+        title_id: "t1",
+        status: "complete",
+        downloaded_files: [downloadedFile({ id: "f1", size_bytes: 1024 })],
+      }),
+      record({
+        id: "d2",
+        title: "Dune",
+        title_id: "t1",
+        status: "complete",
+        downloaded_files: [downloadedFile({ id: "f2", size_bytes: 2048 })],
+      }),
+      record({ id: "d3", title: "Arrival", title_id: "t2", status: "complete" }),
+    ]);
+    renderPage();
+
+    await screen.findByTestId("download-row-d3");
+    expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(2);
+    expect(screen.getByRole("heading", { level: 3, name: "Dune" })).toBeInTheDocument();
+    expect(screen.getByText("3.00 KB")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Files (2)" })).toBeInTheDocument();
+  });
+});
+
+describe("DownloadsPage honest card copy", () => {
+  beforeEach(() => {
+    FakeEventSource.instances = [];
+    vi.stubGlobal("EventSource", FakeEventSource);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("does_not_render_the_dead_files_link", async () => {
+    stubDownloads([record({ status: "active", selection_label: "S01E03 only" })]);
+    renderPage();
+
+    await screen.findByTestId("download-row-d1");
+    expect(screen.queryByRole("link", { name: "Files" })).not.toBeInTheDocument();
+    expect(document.querySelector('a[href^="#release-files-"]')).not.toBeInTheDocument();
+  });
+
+  it("renders_the_episode_label_once in the meta line, without a selection pill", async () => {
+    stubDownloads([
+      record({
+        episode_label: "S01E03",
+        selection_label: "S01E03 only",
+        selection_size_bytes: 244_000_000,
+      }),
+    ]);
+    renderPage();
+
+    await screen.findByTestId("download-row-d1");
+    expect(screen.getByTitle("S01E03 · 1080p · Torrent")).toBeInTheDocument();
+    expect(screen.getAllByText("S01E03")).toHaveLength(1);
+    expect(screen.queryByText("S01E03 only")).not.toBeInTheDocument();
+    expect(screen.queryByText("S01E03 · 244.0 MB")).not.toBeInTheDocument();
+  });
+
+  it("labels_fetching_size_and_library_size", async () => {
+    stubDownloads([
+      record({
+        status: "active",
+        episode_label: "S01E03",
+        selection_label: "S01E03 only",
+        selection_size_bytes: 244_000_000,
+        downloaded_files: [
+          downloadedFile({ id: "f1", episode_label: "S01E01", size_bytes: 1_024_000_000 }),
+          downloadedFile({ id: "f2", episode_label: "S01E02", size_bytes: 1_024_000_000 }),
+        ],
+      }),
+    ]);
+    renderPage();
+
+    await screen.findByTestId("download-row-d1");
+    expect(screen.getByText(/Fetching S01E03/)).toBeInTheDocument();
+    const library = screen.getByText(/In library:/);
+    expect(library.textContent).toContain("1.91 GB");
+    expect(library.textContent).toContain("2 files");
+  });
+
+  it("hides_already_downloaded_pills_while_active", async () => {
+    stubDownloads([
+      record({
+        status: "active",
+        episode_label: "S01E03",
+        selection_label: "S01E03 only",
+        selection_size_bytes: 244_000_000,
+        downloaded_files: [downloadedFile({ id: "f1", episode_label: "S01E01" })],
+      }),
+    ]);
+    renderPage();
+
+    await screen.findByTestId("download-row-d1");
+    const label = screen.getByText("S01E01");
+    expect(label).not.toHaveClass("text-accent");
+    expect(label.closest(".bg-accent\\/15")).toBeNull();
+    expect(screen.queryByText("Downloaded")).not.toBeInTheDocument();
   });
 });
 

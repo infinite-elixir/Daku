@@ -35,16 +35,22 @@ SECRETS_FILE_MODE = 0o600
 CONFIG_FILE_NAME = "config.json"
 SECRETS_FILE_NAME = "secrets.json"
 
+# The provider names Torrentio knows, offered in the UI. This is *not* a default
+# selection: an absent ``providers=`` part makes Torrentio query every provider.
 DEFAULT_PROVIDERS: tuple[str, ...] = (
     "yts",
     "eztv",
+    "rarbg",
     "1337x",
+    "ext",
     "thepiratebay",
+    "kickasstorrents",
     "torrentgalaxy",
+    "magnetdl",
 )
-TORRENTIO_DEFAULT = (
-    f"providers={','.join(DEFAULT_PROVIDERS)}|qualityfilter=scr,cam,unknown|sort=seeders"
-)
+# Shipped Torrentio prefix: all providers, no upstream quality filter. The local
+# filter in ``ranking`` stays authoritative.
+TORRENTIO_DEFAULT = "sort=seeders"
 
 
 def _home() -> Path:
@@ -117,7 +123,8 @@ class Settings(BaseModel):
     telegram_allowlist: list[int] = Field(default_factory=list)
 
     torrentio_config: str = TORRENTIO_DEFAULT
-    providers: list[str] = Field(default_factory=lambda: list(DEFAULT_PROVIDERS))
+    # Empty means "every provider": no ``providers=`` part is sent to Torrentio.
+    providers: list[str] = Field(default_factory=list)
     sort: Literal["seeders", "quality", "size"] = "seeders"
     limit: int = Field(default=20, ge=1, le=200)
     quality_filter: list[str] = Field(default_factory=lambda: ["cam", "scr", "unknown"])

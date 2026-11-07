@@ -308,12 +308,12 @@ async def test_failure_is_cached_for_five_minutes(settings: Settings) -> None:
         await service.probe(magnetic("6" * 40))
     with pytest.raises(ProbeTimeout):
         await service.probe(magnetic("6" * 40))
-    assert len(lt.sessions[0].added) == 1
+    assert sum(len(session.added) for session in lt.sessions) == 1
 
     now[0] += 5 * 60 + 1
     with pytest.raises(ProbeTimeout):
         await service.probe(magnetic("6" * 40))
-    assert len(lt.sessions[0].added) == 2
+    assert sum(len(session.added) for session in lt.sessions) == 2
 
 
 async def test_invalid_magnets_never_reach_libtorrent(settings: Settings) -> None:
@@ -393,3 +393,70 @@ async def test_duplicate_requests_share_one_probe(settings: Settings) -> None:
 
     assert {first.cached, second.cached} == {False, True}
     assert len(lt.sessions[0].added) == 1
+
+
+def _clocks() -> tuple[Any, Any]:
+    wall = [1_000.0]
+    mono = [1_000.0]
+    return wall, mono
+
+
+def _backend_with_clocks(lt: FakeLibtorrent) -> tuple[LibtorrentBackend, Any, Any]:
+    wall, mono = _clocks()
+    backend = LibtorrentBackend(
+        module=lt,
+        clock=lambda: mono[0],
+        wall_clock=lambda: wall[0],
+    )
+    return backend, wall, mono
+
+
+async def test_a_warm_session_is_reused_between_probes(settings: Settings) -> None:
+    lt = FakeLibtorrent(FakeHandle(FakeInfo()))
+    backend, wall, mono = _backend_with_clocks(lt)
+    service = ProbeService(settings, backend=backend, deadline_seconds=1.0)
+
+    await service.probe(magnetic("8" * 40))
+    wall[0] += 5
+    mono[0] += 5
+    await service.probe(magnetic("9" * 40))
+
+    assert len(lt.sessions) == 1
+
+
+async def test_a_long_system_resume_rebuilds_the_session(settings: Settings) -> None:
+    # libtorrent sessions do not survive a suspend: after a 39 minute sleep the cached
+    # session times every probe out until the process restarts. A wall-clock jump much
+    # larger than the monotonic delta means the host slept, so the session is rebuilt.
+    lt = FakeLibtorrent(FakeHandle(FakeInfo()))
+    backend, wall, mono = _backend_with_clocks(lt)
+    service = ProbeService(settings, backend=backend, deadline_seconds=1.0)
+
+    await service.probe(magnetic("8" * 40))
+    assert len(lt.sessions) == 1
+
+    wall[0] += 39 * 60
+    mono[0] += 2
+    metadata = await service.probe(magnetic("9" * 40))
+
+    assert len(lt.sessions) == 2
+    assert metadata.info_hash == "9" * 40
+    assert len(lt.sessions[1].added) == 1
+
+
+async def test_a_timeout_drops_the_session_for_the_next_attempt(settings: Settings) -> None:
+    now = [1_000.0]
+    lt = FakeLibtorrent(FakeHandle(FakeInfo(), metadata_after=10_000))
+    service = make_service(settings, lt, clock=lambda: now[0], deadline=0.02)
+
+    with pytest.raises(ProbeTimeout):
+        await service.probe(magnetic("a" * 40))
+
+    assert service.backend._session is None
+
+    # Once the failure cache expires the next probe starts from a fresh session.
+    now[0] += 5 * 60 + 1
+    with pytest.raises(ProbeTimeout):
+        await service.probe(magnetic("a" * 40))
+
+    assert len(lt.sessions) == 2

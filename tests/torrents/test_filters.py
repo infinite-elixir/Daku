@@ -5,6 +5,7 @@ from daku.services.torrents.ranking import (
     apply_min_quality,
     dedupe_releases,
     filter_quality,
+    is_high_quality_unlabelled,
     quality_counts,
 )
 
@@ -77,3 +78,46 @@ def test_quality_counts_are_ordered_and_match_filtered_rows() -> None:
 
     assert counts == {"1080p": 2, "720p": 1}
     assert list(counts) == ["1080p", "720p"]
+
+
+def test_unlabelled_remux_is_high_quality() -> None:
+    remux = Release(
+        info_hash="r",
+        filename="Movie.2019.REMUX.AVC.mkv",
+        quality="unknown",
+        size_bytes=1,
+        seeders=1,
+        provider="yts",
+        magnet="magnet:?xt=urn:btih:r",
+    )
+    junk = _release("j", quality="unknown")
+
+    assert is_high_quality_unlabelled(remux) is True
+    assert is_high_quality_unlabelled(junk) is False
+
+
+def test_unknown_filter_keeps_packs_and_remuxes_only() -> None:
+    pack = Release(
+        info_hash="pack",
+        filename="Show.S01.Batch.mkv",
+        quality="unknown",
+        size_bytes=1,
+        seeders=1,
+        provider="yts",
+        magnet="magnet:?xt=urn:btih:pack",
+        is_pack=True,
+    )
+    remux = Release(
+        info_hash="remux",
+        filename="Movie.2019.REMUX.mkv",
+        quality="unknown",
+        size_bytes=1,
+        seeders=1,
+        provider="yts",
+        magnet="magnet:?xt=urn:btih:remux",
+    )
+    plain = _release("plain", quality="unknown")
+
+    kept = filter_quality([pack, remux, plain], ["unknown"])
+
+    assert [row.info_hash for row in kept] == ["pack", "remux"]

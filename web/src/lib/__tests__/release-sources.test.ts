@@ -23,13 +23,14 @@ describe("release source labels", () => {
     );
   });
 
-  it("keeps room for a future source", () => {
+  it("keeps room for a future source after the registered ones", () => {
     const choices = releaseSourceChoices(["torrentio", "animetosho", "example"]);
 
     expect(choices.map((choice) => [choice.number, choice.label])).toEqual([
       [1, "Torrentio"],
       [2, "AnimeTosho"],
-      [3, "Example"],
+      [3, "Torrents-CSV"],
+      [4, "Example"],
     ]);
   });
 });

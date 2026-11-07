@@ -88,6 +88,31 @@ describe("MagnetFiles", () => {
     expect(stacked).toHaveTextContent("Season 01/Episode 01.mkv");
   });
 
+  it("fetches the file list as soon as a defaultOpen release is shown", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(METADATA));
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithClient(
+      <MagnetFiles
+        magnet={`magnet:?xt=urn:btih:${"f".repeat(40)}`}
+        releaseId="release-1"
+        defaultOpen
+      />,
+    );
+
+    expect(
+      (await screen.findAllByText("Season 01/Episode 01.mkv")).length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("button", { name: "Files" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/releases/release-1/files",
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+  });
+
   it("shows a single file for a single-file torrent", async () => {
     vi.stubGlobal(
       "fetch",

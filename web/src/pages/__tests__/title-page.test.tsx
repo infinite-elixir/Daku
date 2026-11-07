@@ -258,7 +258,9 @@ describe("TitlePage banner", () => {
     renderTitle(makeTitle());
 
     fireEvent.click(await screen.findByRole("button", { name: "Delete title" }));
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /Also delete the files on disk/i }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => {

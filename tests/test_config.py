@@ -43,17 +43,18 @@ def test_release_discovery_defaults_match_tsearch(tmp_path: Path) -> None:
     assert list(DEFAULT_PROVIDERS) == [
         "yts",
         "eztv",
+        "rarbg",
         "1337x",
+        "ext",
         "thepiratebay",
+        "kickasstorrents",
         "torrentgalaxy",
+        "magnetdl",
     ]
-    assert settings.providers == list(DEFAULT_PROVIDERS)
+    assert settings.providers == []
     assert settings.quality_filter == ["cam", "scr", "unknown"]
     assert settings.torrentio_config == TORRENTIO_DEFAULT
-    assert TORRENTIO_DEFAULT == (
-        "providers=yts,eztv,1337x,thepiratebay,torrentgalaxy"
-        "|qualityfilter=scr,cam,unknown|sort=seeders"
-    )
+    assert TORRENTIO_DEFAULT == "sort=seeders"
 
 
 def test_providers_accept_comma_string(tmp_path: Path) -> None:

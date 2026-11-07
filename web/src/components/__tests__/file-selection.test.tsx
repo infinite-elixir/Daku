@@ -105,6 +105,69 @@ describe("file selection", () => {
     });
   });
 
+  it("queues selected files for a find result that is not saved yet", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/files") || url.includes("/magnets/inspect")) {
+        return jsonResponse(METADATA);
+      }
+      return jsonResponse({ id: "download-1", status: "queued" }, 201);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const ensureRelease = vi.fn(async () => "release-new");
+
+    renderWithClient(
+      <MagnetFiles
+        magnet={RELEASE.magnet}
+        releaseId={null}
+        episodeId="episode-5"
+        defaultOpen
+        ensureRelease={ensureRelease}
+      />,
+    );
+
+    const button = await screen.findByRole("button", { name: "Download selected" });
+    expect(button).toBeDisabled();
+    expect(screen.getByText(/Tick at least one file/)).toBeInTheDocument();
+
+    const checkboxes = await screen.findAllByRole("checkbox", {
+      name: "Select Show.S02E05.1080p.mkv",
+    });
+    fireEvent.click(checkboxes[0]!);
+
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(ensureRelease).not.toHaveBeenCalled();
+
+    fireEvent.click(button);
+
+    await waitFor(() => expect(downloadsCalls(fetchMock)).toHaveLength(1));
+    expect(ensureRelease).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(String(downloadsCalls(fetchMock)[0]![1]!.body));
+    expect(body).toMatchObject({
+      release_id: "release-new",
+      episode_id: "episode-5",
+      file_paths: ["Show.S02E05.1080p.mkv"],
+    });
+  });
+
+  it("keeps Download selected disabled when the release cannot be stored on demand", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(METADATA));
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithClient(
+      <MagnetFiles magnet={RELEASE.magnet} releaseId={null} defaultOpen />,
+    );
+
+    const checkboxes = await screen.findAllByRole("checkbox", {
+      name: "Select Show.S02E05.1080p.mkv",
+    });
+    fireEvent.click(checkboxes[0]!);
+
+    const button = screen.getByRole("button", { name: "Download selected" });
+    expect(button).toBeDisabled();
+    expect(screen.getByText(/Save this release to download individual files/)).toBeInTheDocument();
+  });
+
   it("confirms an auto-matched episode before queueing it", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);

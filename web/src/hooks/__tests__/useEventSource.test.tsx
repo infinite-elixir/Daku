@@ -122,6 +122,50 @@ describe("useEventSource", () => {
     expect(cached?.items[1]).toBe(second);
   });
 
+  it("refreshes title and library views when a download finishes", () => {
+    const { queryClient } = setup();
+    seed(queryClient);
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const source = FakeEventSource.instances[0]!;
+
+    act(() =>
+      source.emit(
+        "download.updated",
+        record({
+          status: "complete",
+          progress: 1,
+          downloaded_files: [
+            {
+              id: "f1",
+              episode_id: "e5",
+              episode_label: "S01E05",
+              file_name: "S01E05.mkv",
+              size_bytes: 100,
+              is_primary: true,
+            },
+          ],
+        }),
+      ),
+    );
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["title"] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["title-files"] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["library"] });
+  });
+
+  it("does not refetch the library for an in-progress update", () => {
+    const { queryClient } = setup();
+    seed(queryClient);
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const source = FakeEventSource.instances[0]!;
+
+    act(() => source.emit("download.updated", record({ progress: 0.5 })));
+
+    expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ["title"] });
+    expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ["title-files"] });
+    expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ["library"] });
+  });
+
   it("refetches on a resync event", () => {
     const { queryClient } = setup();
     seed(queryClient);

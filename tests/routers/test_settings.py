@@ -8,7 +8,19 @@ def test_settings_exposes_only_release_defaults(client: TestClient) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert set(payload) == {"release", "sources", "player"}
-    assert payload["release"]["providers"]["movie"]
+    assert payload["release"]["providers"]["movie"] == []
+    assert payload["release"]["config_providers"]["movie"] == [
+        "yts",
+        "eztv",
+        "rarbg",
+        "1337x",
+        "ext",
+        "thepiratebay",
+        "kickasstorrents",
+        "torrentgalaxy",
+        "magnetdl",
+    ]
+    assert payload["sources"]["by_kind"]["movie"] == ["torrentio", "torrents-csv"]
     assert payload["player"]["mpv_enabled"] is True
     assert payload["player"]["mpv_bin"] == "mpv"
     assert "qbt_pass" not in response.text
@@ -80,9 +92,15 @@ def test_settings_patch_is_persisted_and_validated(client: TestClient) -> None:
     assert response.json()["release"]["limit"] == 50
     assert client.get("/api/settings").json()["release"]["providers"]["anime"] == ["yts"]
 
-    invalid = client.patch("/api/settings", json={"release": {"providers": {"movie": []}}})
-    assert invalid.status_code == 422
-    assert invalid.json()["code"] == "INVALID_SETTING"
+    invalid_mode = client.patch(
+        "/api/settings", json={"release": {"providers": {"anime": ["bad name!"]}}}
+    )
+    assert invalid_mode.status_code == 422
+    assert invalid_mode.json()["code"] == "INVALID_SETTING"
+
+    empty = client.patch("/api/settings", json={"release": {"providers": {"movie": []}}})
+    assert empty.status_code == 200
+    assert empty.json()["release"]["providers"]["movie"] == []
     unknown = client.patch("/api/settings", json={"release": {"wat": 1}})
     assert unknown.status_code == 422
     assert unknown.json()["code"] == "UNKNOWN_SETTING"
@@ -101,8 +119,28 @@ def test_anime_sources_accept_animetosho_and_legacy_nyaa(client: TestClient) -> 
 
     empty = client.patch("/api/settings", json={"release": {"anime_sources": []}})
     assert empty.status_code == 422
-    assert empty.json()["code"] == "INVALID_SETTING"
+    assert empty.json()["code"] == "INVALID_SOURCES"
 
     junk = client.patch("/api/settings", json={"release": {"anime_sources": ["nyaa", "junk"]}})
     assert junk.status_code == 422
-    assert junk.json()["code"] == "INVALID_SETTING"
+    assert junk.json()["code"] == "INVALID_SOURCES"
+
+
+def test_sources_are_persisted_per_kind(client: TestClient) -> None:
+    response = client.patch(
+        "/api/settings",
+        json={"release": {"sources": {"movie": ["torrentio"], "series": ["torrents-csv"]}}},
+    )
+    assert response.status_code == 200
+    assert response.json()["sources"]["by_kind"]["movie"] == ["torrentio"]
+    assert response.json()["sources"]["by_kind"]["series"] == ["torrents-csv"]
+
+    empty = client.patch("/api/settings", json={"release": {"sources": {"movie": []}}})
+    assert empty.status_code == 422
+    assert empty.json()["code"] == "INVALID_SOURCES"
+
+    unknown = client.patch(
+        "/api/settings", json={"release": {"sources": {"movie": ["animetosho"]}}}
+    )
+    assert unknown.status_code == 422
+    assert unknown.json()["code"] == "INVALID_SOURCES"

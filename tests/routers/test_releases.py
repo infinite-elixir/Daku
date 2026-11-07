@@ -12,6 +12,7 @@ from daku.app import create_app
 from daku.config import Settings
 from daku.repositories import titles as titles_repo
 from daku.services.torrents.torrentio import build_stream_url
+from daku.services.torrents.torrentscsv import build_search_url
 
 
 @pytest.fixture
@@ -19,14 +20,29 @@ def client(settings: Settings) -> Iterator[TestClient]:
     # Router tests use the plain URL; prefix construction has its own unit tests.
     plain = settings.model_copy(update={"torrentio_config": "", "providers": []})
     with TestClient(create_app(plain, configure_logs=False)) as test_client:
+        # Keep the default suite off the keyword source; its own tests opt in.
+        from daku.repositories import settings as settings_repo
+
+        with test_client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+            for kind in ("movie", "series"):
+                settings_repo.set_setting(session, f"sources_{kind}", ["torrentio"])
         yield test_client
+
+
+@pytest.fixture(autouse=True)
+def _reset_keyword_throttle(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the per-process keyword throttle from sleeping between tests."""
+
+    from daku.services.torrents import throttle as throttle_module
+
+    monkeypatch.setattr(throttle_module, "_last_request", {})
 
 
 def _add_title(
     client: TestClient,
     *,
     kind: str,
-    imdb_id: str,
+    imdb_id: str | None,
     title: str = "Big Buck Bunny",
 ) -> str:
     factory = client.app.state.session_factory  # type: ignore[attr-defined]
@@ -39,6 +55,13 @@ def _add_title(
             imdb_id=imdb_id,
         )
         return row.id
+
+
+def _set_sources(client: TestClient, kind: str, values: list[str]) -> None:
+    from daku.repositories import settings as settings_repo
+
+    with client.app.state.session_factory() as session:  # type: ignore[attr-defined]
+        settings_repo.set_setting(session, f"sources_{kind}", values)
 
 
 def _fixture(load_fixture: Callable[[str], object]) -> dict[str, Any]:
@@ -65,16 +88,16 @@ def test_movie_releases(client: TestClient, load_fixture: Callable[[str], object
     assert payload["cached_at"]
     assert payload["sort"] == "seeders"
     assert payload["quality_filter"] == ["cam", "scr", "unknown"]
-    # Six valid streams; the default filter drops cam and unknown.
-    assert payload["total"] == 4
-    assert payload["total_unfiltered"] == 6
-    assert payload["returned"] == 4
-    assert payload["quality_counts"] == {"2160p": 1, "1080p": 2, "720p": 1}
+    # Seven valid streams; the default filter drops cam and unknown.
+    assert payload["total"] == 5
+    assert payload["total_unfiltered"] == 7
+    assert payload["returned"] == 5
+    assert payload["quality_counts"] == {"2160p": 1, "1080p": 3, "720p": 1}
     assert payload["min_quality"] is None
     assert payload["providers"] == []
 
     releases = payload["releases"]
-    assert [r["seeders"] for r in releases] == [120, 43, 12, 7]
+    assert [r["seeders"] for r in releases] == [120, 43, 12, 7, 5]
     first = releases[0]
     # T-007 keys, plus the T-008 row identity/saved annotations.
     assert {
@@ -149,7 +172,7 @@ def test_cam_can_be_reenabled(client: TestClient, load_fixture: Callable[[str], 
     assert response.status_code == 200
     payload = response.json()
     assert payload["quality_filter"] == []
-    assert payload["total"] == 6
+    assert payload["total"] == 7
     assert len(payload["releases"]) == 2
     assert [r["quality"] for r in payload["releases"]] == ["2160p", "1080p"]
 
@@ -229,9 +252,13 @@ def test_options_endpoint_lists_controls(client: TestClient) -> None:
     assert payload["providers"] == [
         "yts",
         "eztv",
+        "rarbg",
         "1337x",
+        "ext",
         "thepiratebay",
+        "kickasstorrents",
         "torrentgalaxy",
+        "magnetdl",
     ]
     assert payload["quality_labels"] == [
         "2160p",
@@ -242,6 +269,8 @@ def test_options_endpoint_lists_controls(client: TestClient) -> None:
         "480p",
     ]
     assert payload["sorts"] == ["seeders", "quality", "size"]
+    assert payload["sources"] == ["torrentio", "torrents-csv"]
+    assert payload["selected_sources"] == ["torrentio"]
     assert payload["defaults"] == {
         "providers": [],
         "min_quality": None,
@@ -267,11 +296,16 @@ def test_min_quality_filters_rows_and_counts(
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["min_quality"] == "1080p"
-    assert payload["total"] == 3
-    assert payload["returned"] == 3
-    assert [row["quality"] for row in payload["releases"]] == ["2160p", "1080p", "1080p"]
-    assert payload["quality_counts"] == {"2160p": 1, "1080p": 2}
-    assert payload["total_unfiltered"] == 6
+    assert payload["total"] == 4
+    assert payload["returned"] == 4
+    assert [row["quality"] for row in payload["releases"]] == [
+        "2160p",
+        "1080p",
+        "1080p",
+        "1080p",
+    ]
+    assert payload["quality_counts"] == {"2160p": 1, "1080p": 3}
+    assert payload["total_unfiltered"] == 7
 
 
 def test_empty_min_quality_means_any(
@@ -290,8 +324,8 @@ def test_empty_min_quality_means_any(
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["min_quality"] is None
-    assert payload["total"] == 4
-    assert payload["quality_counts"] == {"2160p": 1, "1080p": 2, "720p": 1}
+    assert payload["total"] == 5
+    assert payload["quality_counts"] == {"2160p": 1, "1080p": 3, "720p": 1}
 
 
 def test_invalid_providers_return_stable_422(client: TestClient) -> None:
@@ -372,3 +406,140 @@ def test_limit_ceiling_is_200(client: TestClient, load_fixture: Callable[[str], 
     assert response.status_code == 200
     assert response.json()["limit"] == 200
     assert rejected.status_code == 422
+
+
+# ---------------------------------------------------------------- Torrents-CSV source
+
+
+def _csv_payload(
+    load_fixture: Callable[[str], object],
+) -> list[dict[str, Any]]:
+    payload = load_fixture("torrents_csv_search.json")
+    assert isinstance(payload, list)
+    return payload
+
+
+def test_movie_merges_torrentio_and_torrents_csv(
+    client: TestClient, load_fixture: Callable[[str], object]
+) -> None:
+    _set_sources(client, "movie", ["torrentio", "torrents-csv"])
+    title_id = _add_title(client, kind="movie", imdb_id="tt1254207")
+    torrentio_url = build_stream_url("", "movie", "tt1254207")
+    csv_url = build_search_url("Big Buck Bunny 2008")
+
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(torrentio_url).mock(return_value=httpx.Response(200, json=_fixture(load_fixture)))
+        mock.get(csv_url).mock(return_value=httpx.Response(200, json=_csv_payload(load_fixture)))
+        response = client.get(f"/api/titles/{title_id}/releases")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["sources"] == ["torrentio", "torrents-csv"]
+    assert body["sources_degraded"] == []
+    # Five Torrentio rows after the default filter plus the one matching CSV row.
+    assert body["total"] == 6
+    csv_rows = [row for row in body["releases"] if row["provider"] == "torrents-csv"]
+    assert len(csv_rows) == 1
+    assert csv_rows[0]["metadata_json"]["resolved_from"] == "torrents-csv"
+    assert csv_rows[0]["quality"] == "2160p"
+    assert csv_rows[0]["size_bytes"] == 5_000_000_000
+
+
+def test_duplicate_hashes_across_sources_collapse_to_highest_seeders(
+    client: TestClient, load_fixture: Callable[[str], object]
+) -> None:
+    _set_sources(client, "movie", ["torrentio", "torrents-csv"])
+    title_id = _add_title(client, kind="movie", imdb_id="tt1254207")
+    torrentio_url = build_stream_url("", "movie", "tt1254207")
+    csv_url = build_search_url("Big Buck Bunny 2008")
+    payload = [
+        {
+            "infohash": "1111111111111111111111111111111111111111",
+            "name": "Big.Buck.Bunny.2008.1080p.WEB-DL.mkv",
+            "size_bytes": 2_000_000_000,
+            "seeders": 500,
+        }
+    ]
+
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(torrentio_url).mock(return_value=httpx.Response(200, json=_fixture(load_fixture)))
+        mock.get(csv_url).mock(return_value=httpx.Response(200, json=payload))
+        response = client.get(f"/api/titles/{title_id}/releases")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["duplicates_removed"] == 1
+    matching = [
+        row
+        for row in body["releases"]
+        if row["info_hash"] == "1111111111111111111111111111111111111111"
+    ]
+    assert len(matching) == 1
+    assert matching[0]["seeders"] == 500
+    assert matching[0]["provider"] == "torrents-csv"
+
+
+def test_degraded_torrents_csv_keeps_torrentio_rows(
+    client: TestClient, load_fixture: Callable[[str], object]
+) -> None:
+    _set_sources(client, "movie", ["torrentio", "torrents-csv"])
+    title_id = _add_title(client, kind="movie", imdb_id="tt1254207")
+    torrentio_url = build_stream_url("", "movie", "tt1254207")
+    csv_url = build_search_url("Big Buck Bunny 2008")
+
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(torrentio_url).mock(return_value=httpx.Response(200, json=_fixture(load_fixture)))
+        mock.get(csv_url).mock(return_value=httpx.Response(500))
+        response = client.get(f"/api/titles/{title_id}/releases")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["sources_degraded"] == ["torrents-csv"]
+    assert body["total"] == 5
+    assert all(row["provider"] != "torrents-csv" for row in body["releases"])
+
+
+def test_title_without_imdb_still_uses_keyword_source(
+    client: TestClient, load_fixture: Callable[[str], object]
+) -> None:
+    _set_sources(client, "movie", ["torrents-csv"])
+    title_id = _add_title(client, kind="movie", imdb_id=None)
+    csv_url = build_search_url("Big Buck Bunny 2008")
+
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(csv_url).mock(return_value=httpx.Response(200, json=_csv_payload(load_fixture)))
+        response = client.get(f"/api/titles/{title_id}/releases")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["sources"] == ["torrents-csv"]
+    assert body["type"] == ""
+    assert body["id"] == ""
+    assert [row["provider"] for row in body["releases"]] == ["torrents-csv"]
+
+
+def test_title_without_imdb_and_only_imdb_source_returns_422(client: TestClient) -> None:
+    _set_sources(client, "movie", ["torrentio"])
+    title_id = _add_title(client, kind="movie", imdb_id=None)
+
+    response = client.get(f"/api/titles/{title_id}/releases")
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "RELEASE_SOURCE_UNAVAILABLE"
+
+
+def test_torrents_csv_is_not_available_for_anime(client: TestClient) -> None:
+    options = client.get("/api/releases/options", params={"kind": "anime"})
+
+    assert options.status_code == 200
+    assert options.json()["sources"] == ["torrentio", "animetosho"]
+    assert "torrents-csv" not in options.json()["sources"]
+
+    title_id = _add_title(client, kind="anime", imdb_id=None, title="Big Buck Bunny")
+    response = client.get(
+        f"/api/titles/{title_id}/releases",
+        params={"season": 1, "episode": 1, "sources": "torrents-csv"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "INVALID_SOURCES"

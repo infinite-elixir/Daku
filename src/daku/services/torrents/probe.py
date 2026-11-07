@@ -38,6 +38,10 @@ CACHE_TTL_SECONDS = 24 * 60 * 60
 FAILURE_TTL_SECONDS = 5 * 60
 CACHE_CAPACITY = 200
 POLL_INTERVAL_SECONDS = 0.1
+# A wall-clock jump larger than this means the host slept. libtorrent sessions do not
+# survive a long system suspend: the DHT routing table and peer sockets go stale and every
+# later probe times out until the process restarts, so the session is rebuilt on resume.
+SESSION_RESUME_THRESHOLD_SECONDS = 60.0
 
 _CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]+")
 
@@ -161,9 +165,18 @@ def _display_path(path: str) -> str:
 class LibtorrentBackend:
     """Blocking libtorrent adapter. Only call this from a worker thread."""
 
-    def __init__(self, module: Any | None = None) -> None:
+    def __init__(
+        self,
+        module: Any | None = None,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+        wall_clock: Callable[[], float] = time.time,
+    ) -> None:
         self._module = module
         self._session: Any | None = None
+        self._clock = clock
+        self._wall_clock = wall_clock
+        self._last_seen: tuple[float, float] | None = None
 
     def _libtorrent(self) -> Any:
         if self._module is None:
@@ -174,6 +187,27 @@ class LibtorrentBackend:
                     "libtorrent is not installed; install the daku[probe] extra"
                 ) from exc
         return self._module
+
+    def _slept_since_last_probe(self) -> bool:
+        """Whether wall-clock time advanced much further than the monotonic clock.
+
+        ``time.time`` keeps counting through a suspend while ``time.monotonic`` does not,
+        so a large drift means the host was asleep and the cached session is stale.
+        """
+
+        now = (self._wall_clock(), self._clock())
+        previous = self._last_seen
+        self._last_seen = now
+        if previous is None or self._session is None:
+            return False
+        drift = (now[0] - previous[0]) - (now[1] - previous[1])
+        return drift > SESSION_RESUME_THRESHOLD_SECONDS
+
+    def _prepare_session(self) -> Any:
+        if self._slept_since_last_probe():
+            logger.info("magnet probe session rebuilt after a system resume")
+            self.close()
+        return self._ensure_session()
 
     def _ensure_session(self) -> Any:
         if self._session is None:
@@ -204,7 +238,7 @@ class LibtorrentBackend:
         """Fetch metadata for one magnet, blocking until it arrives or the deadline."""
 
         lt = self._libtorrent()
-        session = self._ensure_session()
+        session = self._prepare_session()
         save_dir.mkdir(parents=True, exist_ok=True)
         handle: Any | None = None
         try:
@@ -380,6 +414,10 @@ class ProbeService:
                     await worker
                 raise
         except ProbeError as exc:
+            if isinstance(exc, (ProbeTimeout, ProbeFailed)):
+                # A wedged session (stale DHT after suspend, network change) must not
+                # poison every later probe, so the next attempt starts from a fresh one.
+                await self._drop_session()
             self._record_failure(key, exc)
             logger.warning(
                 "magnet probe failed",
@@ -388,6 +426,7 @@ class ProbeService:
             raise
         except Exception as exc:  # pragma: no cover - unexpected adapter failure
             logger.warning("magnet probe failed", extra={"info_hash": key[:12]}, exc_info=True)
+            await self._drop_session()
             self._record_failure(key, ProbeFailed("the magnet probe failed unexpectedly"))
             raise ProbeFailed("the magnet probe failed unexpectedly") from exc
         else:
@@ -401,6 +440,13 @@ class ProbeService:
         finally:
             await self._leave_queue()
             shutil.rmtree(save_dir, ignore_errors=True)
+
+    async def _drop_session(self) -> None:
+        close = getattr(self.backend, "close", None)
+        if close is None:  # pragma: no cover - test doubles without a session
+            return
+        with contextlib.suppress(Exception):
+            await asyncio.to_thread(close)
 
     async def _enter_queue(self) -> None:
         async with self._guard:

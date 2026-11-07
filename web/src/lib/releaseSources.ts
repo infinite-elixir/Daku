@@ -12,7 +12,18 @@ export interface ReleaseSource {
 export const RELEASE_SOURCES: ReleaseSource[] = [
   { id: "torrentio", label: "Torrentio" },
   { id: "animetosho", label: "AnimeTosho" },
+  { id: "torrents-csv", label: "Torrents-CSV" },
 ];
+
+const SOURCE_NOTES: Record<string, string> = {
+  torrentio: "Stremio addon scraping curated public sites; needs an IMDb id.",
+  animetosho: "Anime-only JSON feed with query search.",
+  "torrents-csv": "DHT-wide index for movies and TV with query search.",
+};
+
+export function releaseSourceNote(id: string): string {
+  return SOURCE_NOTES[id] ?? "";
+}
 
 function prettify(id: string): string {
   return id

@@ -184,7 +184,7 @@ first), Jellyfin artwork, trickplay, a poster proxy.
   were raised to 960px wide, and a movie's primary file became a single wide hero card. A
   follow-up review capped the hero at 640px and made the title-page carousel request real file
   thumbnails (poster remains the fallback). The files page keeps the normal grid.
-- **Deferred dependency:** T-044 (`downloads-page-redesign`) is not present in this checkout.
-  The Downloads group header needed for the `Files (N)` link was implemented as a minimal
-  grouping of rows by title/`title_id` in `DownloadsPage`, rather than rewriting
-  `DownloadRow`. When T-044 lands, fold that header into its richer group component.
+- **Dependency follow-up:** T-044 (`downloads-page-redesign`) has since landed. The Downloads
+  group header now comes from the redesigned section/group component in `DownloadsPage`, and
+  the card hierarchy lives in `DownloadRow`; the `Files (N)` link remains part of the group
+  header.

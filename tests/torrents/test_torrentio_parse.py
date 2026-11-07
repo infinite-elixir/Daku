@@ -15,9 +15,10 @@ def _load(load_fixture: Callable[[str], object]) -> dict[str, Any]:
 def test_parse_recorded_payload(load_fixture: Callable[[str], object]) -> None:
     releases = parse_streams(_load(load_fixture))
 
-    # Four malformed/stream-less entries are dropped: missing hash, missing filename,
-    # a string and a null.
-    assert len(releases) == 6
+    # Three malformed/stream-less entries are dropped: missing hash, a string and
+    # a null. The row without ``behaviorHints.filename`` is kept via the title
+    # fallback.
+    assert len(releases) == 7
     first = releases[0]
     assert first.info_hash == "abcdef0123456789abcdef0123456789abcdef01"
     assert first.filename == "Big.Buck.Bunny.2008.1080p.BluRay.x264.DDP5.1-GROUP.mkv"
@@ -85,9 +86,24 @@ def test_malformed_stream_is_skipped_never_raises() -> None:
     assert parse_stream(None) is None
     assert parse_stream("nope") is None
     assert parse_stream({"title": "missing hash"}) is None
-    assert parse_stream({"infoHash": "abc"}) is None
+    assert parse_stream({"infoHash": "  "}) is None
     assert parse_streams({"streams": "not a list"}) == []
     assert parse_streams(None) == []
+
+
+def test_filename_falls_back_to_title_then_hash() -> None:
+    title_row = parse_stream(
+        {
+            "infoHash": "a" * 40,
+            "title": "Torrentio\n1080p\nBig Buck Bunny (2008)\n👤 10 💾 1 GB ⚙️ yts",
+        }
+    )
+    assert title_row is not None
+    assert title_row.filename == "Torrentio 1080p Big Buck Bunny (2008)"
+
+    hash_row = parse_stream({"infoHash": "b" * 40})
+    assert hash_row is not None
+    assert hash_row.filename == f"release-{'b' * 12}"
 
 
 def test_non_ascii_and_multiline_titles(load_fixture: Callable[[str], object]) -> None:

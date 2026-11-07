@@ -109,6 +109,7 @@ export interface ContinueWatchingItem {
   poster_url: string | null;
   played_at: string | null;
   up_next: boolean;
+  is_new?: boolean;
   file: MediaFileItem;
 }
 
@@ -643,7 +644,7 @@ export function putTitleSeasons(
 
 // ------------------------------------------------------------------ releases
 
-export type ResolvedFrom = "torrentio" | "animetosho" | "manual";
+export type ResolvedFrom = "torrentio" | "animetosho" | "torrents-csv" | "manual";
 
 export interface ReleaseHints {
   source: string | null;
@@ -711,6 +712,8 @@ export interface ReleasesResponse {
 
 export interface ReleaseOptions {
   providers: string[];
+  sources?: string[];
+  selected_sources?: string[];
   anime_sources?: string[];
   quality_labels: string[];
   min_qualities: string[];
@@ -856,7 +859,12 @@ export interface ReleaseSettings {
     sort: "seeders" | "quality" | "size";
     limit: number;
   };
-  sources: { database: boolean; config_keys: string[]; anime_sources: string[] };
+  sources: {
+    database: boolean;
+    config_keys: string[];
+    by_kind?: Record<Kind, string[]>;
+    anime_sources: string[];
+  };
   player: PlayerSettings;
 }
 
@@ -867,6 +875,7 @@ export function getSettings(signal?: AbortSignal): Promise<ReleaseSettings> {
 export function patchSettings(
   body: Partial<Omit<ReleaseSettings["release"], "providers" | "config_providers">> & {
     providers?: Partial<Record<Kind, string[]>>;
+    sources?: Partial<Record<Kind, string[]>>;
     anime_sources?: string[];
   },
   player?: Partial<Pick<PlayerSettings, "mpv_enabled">>,

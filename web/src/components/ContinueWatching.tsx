@@ -75,7 +75,7 @@ export function ContinueWatching() {
               posterUrl={item.poster_url}
               thumbnailUrl={mediaFileThumbnailUrl(item.file.id)}
               titleName={item.title}
-              badge={item.up_next ? "Up next" : null}
+              badge={item.up_next ? "Up next" : item.is_new ? "New" : null}
               bleed
               livePlayback={active?.media_file_id === item.file.id ? active : null}
             />

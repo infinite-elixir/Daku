@@ -8,6 +8,7 @@ import pytest
 import respx
 
 from daku.services.torrents import animetosho
+from daku.services.torrents import throttle as throttle_module
 from daku.services.torrents.animetosho import (
     FEED_BASE,
     LEGACY_FEED_BASE,
@@ -24,7 +25,7 @@ def _fixture(load_fixture: Callable[[str], object]) -> str:
 
 @pytest.fixture(autouse=True)
 def _reset_throttle(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(animetosho, "_last_request", 0.0)
+    monkeypatch.setattr(throttle_module, "_last_request", {})
 
 
 @pytest.mark.asyncio

@@ -33,6 +33,7 @@ def test_doctor_lists_every_integration(client: TestClient) -> None:
         "telegram",
         "torrentio",
         "animetosho",
+        "torrents-csv",
         "tvdb",
         "metadata_sources",
         "omdb",

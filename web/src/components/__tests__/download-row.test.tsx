@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { DownloadRecord } from "../../lib/api";
+import type { DownloadFile, DownloadRecord } from "../../lib/api";
 import { DownloadRow } from "../DownloadRow";
 
 function record(overrides: Partial<DownloadRecord> = {}): DownloadRecord {
@@ -34,14 +34,142 @@ function record(overrides: Partial<DownloadRecord> = {}): DownloadRecord {
   };
 }
 
-describe("DownloadRow selective downloads", () => {
-  it("shows the selected episode and its size", () => {
+function file(overrides: Partial<DownloadFile> = {}): DownloadFile {
+  return {
+    id: "f1",
+    episode_id: "e1",
+    episode_label: "S01E01",
+    file_name: "Cyberpunk.S01E01.mkv",
+    size_bytes: 900_000_000,
+    is_primary: false,
+    ...overrides,
+  };
+}
+
+describe("DownloadRow hierarchy", () => {
+  it("shows the title, one meta line, progress, numbers and labelled fetching size", () => {
     render(<DownloadRow download={record()} onAction={vi.fn()} onRemove={vi.fn()} />);
 
-    const label = screen.getByText("S02E04 only · 1.40 GB");
-    expect(label).toBeInTheDocument();
-    expect(label.getAttribute("title")).toContain("whole torrent");
-    expect(screen.getByRole("link", { name: "Files" })).toBeInTheDocument();
+    const title = screen.getByRole("heading", { level: 4, name: "Cyberpunk" });
+    expect(title).toHaveClass("text-title");
+    expect(title).toHaveAttribute("title", "Cyberpunk");
+    expect(screen.getByText("S02E04")).toBeInTheDocument();
+    expect(screen.getByText("1080p")).toBeInTheDocument();
+    expect(screen.getByText("Torrent")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: /Cyberpunk progress/i })).toBeInTheDocument();
+    expect(screen.getByText("Fetching S02E04 · 1.40 GB")).toBeInTheDocument();
+    expect(screen.getByText("50 B/s")).toBeInTheDocument();
+    expect(screen.getByText("ETA 18s")).toBeInTheDocument();
+  });
+
+  it("does not render the dead Files anchor", () => {
+    render(<DownloadRow download={record()} onAction={vi.fn()} onRemove={vi.fn()} />);
+
+    expect(screen.queryByRole("link", { name: "Files" })).not.toBeInTheDocument();
+    expect(document.querySelector('a[href^="#release-files-"]')).not.toBeInTheDocument();
+  });
+
+  it("renders the library file labels as muted text, never accent pills", () => {
+    render(
+      <DownloadRow
+        download={record({
+          episode_label: "S01E03",
+          selection_label: "S01E03 only",
+          selection_size_bytes: 244_000_000,
+          downloaded_files: [
+            file({ id: "f1", episode_label: "S01E01" }),
+            file({ id: "f2", episode_label: "S01E02" }),
+            file({ id: "f3", episode_label: "S01E03" }),
+          ],
+        })}
+        onAction={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    const library = screen.getByText(/In library:/);
+    expect(library).toHaveClass("text-fg-muted");
+    expect(library).not.toHaveClass("bg-accent/15");
+    expect(screen.getByText("S01E01")).toBeInTheDocument();
+    expect(screen.getByText("S01E02")).toBeInTheDocument();
+    expect(screen.getByText("S01E03", { selector: "span > span" })).toBeInTheDocument();
+    expect(library.textContent).toContain("· 3 files");
+    expect(library.textContent).not.toContain("Downloaded");
+  });
+
+  it("truncates the library line to three names plus the remainder", () => {
+    render(
+      <DownloadRow
+        download={record({
+          status: "complete",
+          progress: 1,
+          selection_label: null,
+          selection_size_bytes: null,
+          downloaded_files: [
+            file({ id: "f1", episode_label: "S01E01" }),
+            file({ id: "f2", episode_label: "S01E02" }),
+            file({ id: "f3", episode_label: "S01E03" }),
+            file({ id: "f4", episode_label: "S01E04" }),
+            file({ id: "f5", episode_label: "S01E05" }),
+          ],
+        })}
+        onAction={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    const library = screen.getByText(/In library:/);
+    expect(library.textContent).toContain("S01E01, S01E02, S01E03 +2");
+    expect(library.textContent).not.toContain("S01E04");
+  });
+
+  it("collapses a single file into one line without an In library figure", () => {
+    render(
+      <DownloadRow
+        download={record({
+          status: "complete",
+          progress: 1,
+          episode_label: "S01E01",
+          selection_label: null,
+          selection_size_bytes: null,
+          downloaded_files: [file({ id: "f1", episode_label: "S01E01" })],
+        })}
+        onAction={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText(/In library:/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Downloaded .* 100%/)).toBeInTheDocument();
+  });
+
+  it("drops unknown quality and still describes the engine", () => {
+    render(
+      <DownloadRow
+        download={record({ quality: null, episode_label: null, selection_label: null })}
+        onAction={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Torrent")).toBeInTheDocument();
+    expect(screen.queryByText(/unknown/)).not.toBeInTheDocument();
+  });
+
+  it("labels a whole pack and shows no size when none is known", () => {
+    render(
+      <DownloadRow
+        download={record({
+          selected_files: null,
+          selection_label: "Whole pack",
+          selection_size_bytes: null,
+        })}
+        onAction={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Fetching Whole pack")).toBeInTheDocument();
   });
 
   it("replaces a raw selection failure with clear copy", () => {
@@ -62,58 +190,29 @@ describe("DownloadRow selective downloads", () => {
     expect(screen.queryByText(/QBT_FILE_SELECTION_FAILED/)).not.toBeInTheDocument();
   });
 
-  it("labels a whole pack", () => {
+  it("shows downloaded episodes only in the library line while the pack is active", () => {
     render(
       <DownloadRow
         download={record({
-          selected_files: null,
-          selection_label: "Whole pack",
-          selection_size_bytes: null,
+          status: "active",
+          episode_label: "S01E03",
+          selection_label: "S01E03 only",
+          selection_size_bytes: 1_100_000_000,
+          downloaded_files: [file({ id: "f1", episode_label: "S01E01" })],
         })}
         onAction={vi.fn()}
         onRemove={vi.fn()}
       />,
     );
 
-    expect(screen.getByText("Whole pack")).toBeInTheDocument();
-  });
-
-  it("lists every episode this torrent has already downloaded", () => {
-    render(
-      <DownloadRow
-        download={record({
-          status: "complete",
-          progress: 1,
-          downloaded_files: [
-            {
-              id: "m1",
-              episode_id: "e1",
-              episode_label: "S01E01",
-              file_name: "Cyberpunk.S01E01.mkv",
-              size_bytes: 900_000_000,
-              is_primary: false,
-            },
-            {
-              id: "m2",
-              episode_id: "e2",
-              episode_label: "S01E02",
-              file_name: "Cyberpunk.S01E02.mkv",
-              size_bytes: 1_100_000_000,
-              is_primary: true,
-            },
-          ],
-        })}
-        onAction={vi.fn()}
-        onRemove={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByText("Downloaded")).toBeInTheDocument();
+    expect(screen.getByText(/Fetching S01E03/)).toBeInTheDocument();
+    expect(screen.getByText(/In library:/)).toBeInTheDocument();
     expect(screen.getByText("S01E01")).toBeInTheDocument();
-    expect(screen.getByText("S01E02")).toBeInTheDocument();
-    expect(screen.getByText("S01E01").getAttribute("title")).toContain("Cyberpunk.S01E01.mkv");
+    expect(screen.queryByText("Downloaded")).not.toBeInTheDocument();
   });
+});
 
+describe("DownloadRow actions", () => {
   it("confirms before removing and defaults the file-delete checkbox off", () => {
     const onRemove = vi.fn();
     render(

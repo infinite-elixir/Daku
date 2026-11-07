@@ -395,6 +395,36 @@ def _migration_014(engine: Engine) -> None:
             conn.exec_driver_sql(statement)
 
 
+def _migration_015(engine: Engine) -> None:
+    """T-059: move untouched provider defaults to "all providers".
+
+    Only the exact shipped defaults are rewritten. Any other stored value is user
+    intent and stays untouched. Values are JSON encoded by ``repositories.settings``.
+    """
+
+    old_providers = ["yts", "eztv", "1337x", "thepiratebay", "torrentgalaxy"]
+    old_config = "providers=yts,eztv,1337x,thepiratebay,torrentgalaxy|qualityfilter=scr,cam,unknown|sort=seeders"
+    with engine.begin() as conn:
+        rows = conn.exec_driver_sql("SELECT key, value FROM settings").all()
+        for key, raw in rows:
+            try:
+                value = json.loads(raw)
+            except (TypeError, ValueError):
+                continue
+            if key == "torrentio_config" and value == old_config:
+                conn.exec_driver_sql(
+                    "UPDATE settings SET value = ? WHERE key = ?",
+                    (json.dumps("sort=seeders"), key),
+                )
+            elif key in {"providers_movie", "providers_series", "providers_anime"} and (
+                value == old_providers
+            ):
+                conn.exec_driver_sql(
+                    "UPDATE settings SET value = ? WHERE key = ?",
+                    (json.dumps([]), key),
+                )
+
+
 class Migration:
     __slots__ = ("name", "upgrade", "version")
 
@@ -419,6 +449,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(12, "release-search aliases", _migration_012),
     Migration(13, "media file playback progress", _migration_013),
     Migration(14, "local watch status and episode progress", _migration_014),
+    Migration(15, "all-provider Torrentio defaults", _migration_015),
 )
 SCHEMA_VERSION = MIGRATIONS[-1].version
 

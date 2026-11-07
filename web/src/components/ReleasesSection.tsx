@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { findEpisode } from "../lib/episodes";
 import { describeReleaseSources, releaseSourceChoices, releaseSourceLabel } from "../lib/releaseSources";
@@ -18,11 +18,14 @@ import {
 import { CopyMagnet } from "./CopyMagnet";
 import { EpisodeDownload } from "./EpisodeDownload";
 import { MagnetFiles, looksLikeMagnet } from "./MagnetFiles";
+import { PlayIcon } from "./icons";
+import { EpisodeStatusPill } from "./Pills";
 
 type Tab = "find" | "saved";
-export type ReleasesMode = "all" | "find" | "saved";
+export type ReleasesMode = "all" | "find" | "saved" | "episode";
 
 const PROVIDERS_STORAGE_KEY = "daku.releaseProviders.override";
+const SOURCES_STORAGE_KEY = "daku.releaseSources.override";
 const SORT_CHOICES = ["seeders", "quality", "size"] as const;
 const MIN_QUALITY_CHOICES = ["480p", "576p", "720p", "1080p", "1440p", "2160p"] as const;
 const SORT_LABELS: Record<string, string> = {
@@ -111,6 +114,42 @@ function storeProviderSelection(kind: string, providers: string[] | null): void 
   }
 }
 
+function loadSourceSelection(kind: string): string[] | null {
+  try {
+    const raw = storage()?.getItem(`${SOURCES_STORAGE_KEY}.${kind}`);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+    const sources = parsed
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean);
+    return sources.length > 0 ? [...new Set(sources)] : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeSourceSelection(kind: string, sources: string[] | null): void {
+  try {
+    const target = storage();
+    if (!target) {
+      return;
+    }
+    if (sources === null) {
+      target.removeItem(`${SOURCES_STORAGE_KEY}.${kind}`);
+    } else {
+      target.setItem(`${SOURCES_STORAGE_KEY}.${kind}`, JSON.stringify(sources));
+    }
+  } catch {
+    // Private-mode storage failures must not block release search.
+  }
+}
+
 const QUALITY_CHOICES = [
   "2160p",
   "1440p",
@@ -159,6 +198,64 @@ function hintsLine(release: ReleaseItem): string {
     .join(" · ");
 }
 
+function ReleaseSummary({ release }: { release: ReleaseItem }) {
+  const hints = hintsLine(release);
+  return (
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <span
+        className="truncate text-body font-semibold text-fg"
+        title={release.filename ?? release.info_hash}
+      >
+        {release.filename ?? release.info_hash}
+      </span>
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-fg-muted">
+        <span>{release.quality ?? "unknown"}</span>
+        <span>· {formatSize(release.size_bytes)}</span>
+        <span>· {release.seeders ?? 0} seeders</span>
+        <SourceBadge release={release} />
+        <PackBadge release={release} />
+      </span>
+      {hints ? <span className="text-micro text-fg-comment">{hints}</span> : null}
+    </span>
+  );
+}
+
+function EpisodeReleaseRow({
+  release,
+  onOpen,
+  active = false,
+}: {
+  release: ReleaseItem;
+  onOpen: () => void;
+  active?: boolean;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className={[
+          "flex w-full items-start gap-3 px-panel py-row text-left transition-colors hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent",
+          active ? "bg-accent/10" : "",
+        ].join(" ")}
+      >
+        <ReleaseSummary release={release} />
+        <span className="flex shrink-0 items-center gap-2 pt-1">
+          {release.dead ? <span className={DEAD_PILL}>Dead</span> : null}
+          {release.is_saved ? (
+            <span aria-label="Saved" className="text-title text-accent">
+              ★
+            </span>
+          ) : null}
+          <span aria-hidden className="text-body text-fg-comment">
+            ›
+          </span>
+        </span>
+      </button>
+    </li>
+  );
+}
+
 function seasonNumbers(episodes: Episode[]): number[] {
   return [...new Set(episodes.map((episode) => episode.season))].sort((a, b) => a - b);
 }
@@ -168,17 +265,28 @@ export function ReleasesSection({
   season = null,
   episode = null,
   mode = "all",
+  onBack,
+  onPlayEpisode,
+  episodePlayable = false,
+  playPending = false,
 }: {
   title: TitleDetail;
   season?: number | null;
   episode?: number | null;
   /**
-   * `find` renders only Torrentio results (used inside an episode card).
-   * `saved` renders saved releases plus the magnet form (below the episodes).
-   * `all` keeps the original tabs for movies.
+   * `episode` is the master–detail release pane: Find/Saved tabs plus a
+   * three-level release menu. `saved` renders saved releases plus the magnet
+   * form (below the episodes). `all` keeps the original tabs for movies.
    */
   mode?: ReleasesMode;
+  /** Narrow-screen drill-down: return to the episode list. */
+  onBack?: () => void;
+  /** Play the selected episode's own file. */
+  onPlayEpisode?: (episode: Episode) => void;
+  episodePlayable?: boolean;
+  playPending?: boolean;
 }) {
+  const isEpisodeMode = mode === "episode";
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>(title.saved_release_count > 0 ? "saved" : "find");
   const [magnet, setMagnet] = useState("");
@@ -190,12 +298,16 @@ export function ReleasesSection({
   const [providers, setProviders] = useState<string[] | null>(() => loadProviderSelection(title.kind));
   const [providerHint, setProviderHint] = useState<string | null>(null);
   const [limitOverride, setLimitOverride] = useState<number | null>(null);
-  const [sources, setSources] = useState<string[] | null>(null);
+  const [sources, setSources] = useState<string[] | null>(() => loadSourceSelection(title.kind));
+  const [openHash, setOpenHash] = useState<string | null>(null);
+  const [lastViewed, setLastViewed] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLUListElement | null>(null);
+  const savedScroll = useRef(0);
 
   const isMovie = title.kind === "movie";
   const showFind = mode !== "saved";
   const showSaved = mode !== "find";
-  const showTabs = mode === "all";
+  const showTabs = mode === "all" || isEpisodeMode;
   const activeTab: Tab = mode === "find" ? "find" : mode === "saved" ? "saved" : tab;
   const seasons = useMemo(() => seasonNumbers(title.episodes), [title.episodes]);
   const selectedEpisode = useMemo(
@@ -207,6 +319,49 @@ export function ReleasesSection({
     [title.episodes],
   );
   const ready = isMovie || selectedEpisode !== null;
+
+  // A different episode is a different menu: start on Find and close level 3.
+  useEffect(() => {
+    if (!isEpisodeMode) {
+      return;
+    }
+    setTab("find");
+    setOpenHash(null);
+    savedScroll.current = 0;
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+  }, [isEpisodeMode, season, episode]);
+
+  useEffect(() => {
+    if (!openHash) {
+      return;
+    }
+    const onPop = () => setOpenHash(null);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [openHash]);
+
+  function openRelease(release: ReleaseItem) {
+    savedScroll.current = scrollRef.current?.scrollTop ?? 0;
+    setOpenHash(release.info_hash);
+    setLastViewed(release.info_hash);
+    window.history.pushState(
+      { ...(typeof window.history.state === "object" ? window.history.state : {}), dakuRelease: release.info_hash },
+      "",
+    );
+  }
+
+  function closeRelease() {
+    const state = window.history.state;
+    setOpenHash(null);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = savedScroll.current;
+    }
+    if (state && typeof state === "object" && "dakuRelease" in state) {
+      window.history.back();
+    }
+  }
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["title", title.id] });
@@ -234,10 +389,16 @@ export function ReleasesSection({
   const effectiveSort = sortMode || options?.defaults?.sort || "seeders";
   const limitSteps = options?.limit_steps?.length ? options.limit_steps : [20, 50, 100, 200];
   const effectiveLimit = limitOverride ?? options?.defaults?.limit ?? 20;
-  const effectiveSources = sources ?? (options?.anime_sources ?? ["torrentio", "animetosho"]);
-  const displaySources =
-    title.kind !== "anime" ? ["torrentio"] : options || sources ? effectiveSources : [];
-  const sourceChoices = releaseSourceChoices(effectiveSources);
+  const defaultSources =
+    options?.selected_sources && options.selected_sources.length > 0
+      ? options.selected_sources
+      : (options?.sources ?? []);
+  const effectiveSources = sources ?? defaultSources;
+  const displaySources = options || sources ? effectiveSources : [];
+  const sourceChoices = releaseSourceChoices([
+    ...(options?.sources ?? []),
+    ...effectiveSources,
+  ]);
 
   const findQuery = useQuery({
     queryKey: [
@@ -257,7 +418,7 @@ export function ReleasesSection({
         {
           ...(isMovie ? {} : { season: season ?? undefined, episode: episode ?? undefined }),
           providers: providers,
-          sources: title.kind === "anime" ? effectiveSources : null,
+          sources: effectiveSources.length > 0 ? effectiveSources : null,
           min_quality: effectiveMinQuality,
           sort: effectiveSort,
           limit: effectiveLimit,
@@ -272,14 +433,24 @@ export function ReleasesSection({
   });
 
   const savedQuery = useQuery({
-    queryKey: ["saved-releases", title.id, qualityFilter, hideDead],
+    queryKey: [
+      "saved-releases",
+      title.id,
+      isEpisodeMode ? (selectedEpisode?.id ?? null) : null,
+      qualityFilter,
+      hideDead,
+    ],
     queryFn: ({ signal }) =>
       listSavedReleases(
         title.id,
-        { quality: qualityFilter || null, dead: hideDead ? false : null },
+        {
+          episode_id: isEpisodeMode ? (selectedEpisode?.id ?? null) : null,
+          quality: qualityFilter || null,
+          dead: hideDead ? false : null,
+        },
         signal,
       ),
-    enabled: showSaved && activeTab === "saved",
+    enabled: isEpisodeMode ? ready : showSaved && activeTab === "saved",
     staleTime: 60_000,
   });
 
@@ -361,7 +532,17 @@ export function ReleasesSection({
     findQuery.data !== undefined &&
     findQuery.data.returned < findQuery.data.total &&
     nextLimit > effectiveLimit;
-  const filtersActive = providers !== null || effectiveMinQuality !== null;
+  const filtersActive =
+    providers !== null || effectiveMinQuality !== null || sources !== null;
+  const savedRows = savedQuery.data?.releases ?? [];
+  const episodeSavedCount = isEpisodeMode
+    ? savedQuery.data?.total ?? title.saved_release_count
+    : title.saved_release_count;
+  const openReleaseItem: ReleaseItem | null = openHash
+    ? ([...(findQuery.data?.releases ?? []), ...savedRows].find(
+        (item) => item.info_hash === openHash,
+      ) ?? null)
+    : null;
 
   function toggleProvider(provider: string) {
     const next = effectiveProviders.includes(provider)
@@ -384,7 +565,15 @@ export function ReleasesSection({
     const next = effectiveSources.includes(source)
       ? effectiveSources.filter((value) => value !== source)
       : [...effectiveSources, source];
-    if (next.length > 0) setSources(next);
+    if (next.length === 0) {
+      return;
+    }
+    const isDefault =
+      next.length === defaultSources.length && defaultSources.every((value) => next.includes(value));
+    const selection = isDefault ? null : next;
+    setSources(selection);
+    storeSourceSelection(title.kind, selection);
+    setLimitOverride(null);
   }
 
   function resetFindFilters() {
@@ -393,7 +582,9 @@ export function ReleasesSection({
     setProviders(null);
     setProviderHint(null);
     setLimitOverride(null);
+    setSources(null);
     storeProviderSelection(title.kind, null);
+    storeSourceSelection(title.kind, null);
     storage()?.removeItem("daku.releaseProviders");
   }
 
@@ -425,7 +616,78 @@ export function ReleasesSection({
 
   return (
     <section className="flex flex-col gap-4">
-      {mode === "find" ? null : (
+      {isEpisodeMode ? (
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="w-fit text-small font-semibold text-fg-muted hover:text-fg @min-[900px]:hidden"
+          >
+            ← Episodes
+          </button>
+          {selectedEpisode ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="flex flex-wrap items-baseline gap-2">
+                  <span className="font-mono text-small tabular-nums text-accent">
+                    {selectedEpisode.label}
+                  </span>
+                  <span className="truncate text-h2 font-semibold tracking-tight text-fg">
+                    {selectedEpisode.name ?? `Episode ${selectedEpisode.episode}`}
+                  </span>
+                </p>
+                <p className="mt-1 flex flex-wrap items-center gap-2">
+                  <EpisodeStatusPill status={selectedEpisode.status} />
+                  {selectedEpisode.watched ? (
+                    <span className="text-micro text-success">Watched</span>
+                  ) : null}
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label={`Play ${selectedEpisode.label}`}
+                title={
+                  episodePlayable
+                    ? "Play in mpv"
+                    : "No downloaded file for this episode yet"
+                }
+                disabled={!episodePlayable || playPending}
+                onClick={() => onPlayEpisode?.(selectedEpisode)}
+                className="inline-flex min-h-control items-center gap-2 rounded-control border border-border-strong px-3 text-small font-semibold text-fg transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:border-border-subtle disabled:text-fg-comment disabled:opacity-50"
+              >
+                <PlayIcon className="h-3.5 w-3.5" />
+                <span>{playPending ? "Playing…" : "Play"}</span>
+              </button>
+            </div>
+          ) : null}
+          {openHash ? null : (
+          <div className="flex items-center gap-1 rounded-control border border-border-subtle bg-panel p-1">
+            <button
+              type="button"
+              aria-pressed={activeTab === "find"}
+              onClick={() => setTab("find")}
+              className={[
+                "min-h-control-sm rounded-control px-3 text-small font-semibold",
+                activeTab === "find" ? "bg-accent/15 text-accent" : "text-fg-muted hover:bg-hover",
+              ].join(" ")}
+            >
+              Find releases
+            </button>
+            <button
+              type="button"
+              aria-pressed={activeTab === "saved"}
+              onClick={() => setTab("saved")}
+              className={[
+                "min-h-control-sm rounded-control px-3 text-small font-semibold",
+                activeTab === "saved" ? "bg-accent/15 text-accent" : "text-fg-muted hover:bg-hover",
+              ].join(" ")}
+            >
+              Saved ({episodeSavedCount})
+            </button>
+          </div>
+          )}
+        </div>
+      ) : mode === "find" ? null : (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-h2 font-semibold tracking-tight text-fg">
             {mode === "saved" ? "Saved releases" : "Releases"}
@@ -434,22 +696,22 @@ export function ReleasesSection({
             <div className="flex items-center gap-1 rounded-control border border-border-subtle bg-panel p-1">
               <button
                 type="button"
-                aria-pressed={tab === "find"}
+                aria-pressed={activeTab === "find"}
                 onClick={() => setTab("find")}
                 className={[
                   "min-h-control-sm rounded-control px-3 text-small font-semibold",
-                  tab === "find" ? "bg-accent/15 text-accent" : "text-fg-muted hover:bg-hover",
+                  activeTab === "find" ? "bg-accent/15 text-accent" : "text-fg-muted hover:bg-hover",
                 ].join(" ")}
               >
                 Find releases
               </button>
               <button
                 type="button"
-                aria-pressed={tab === "saved"}
+                aria-pressed={activeTab === "saved"}
                 onClick={() => setTab("saved")}
                 className={[
                   "min-h-control-sm rounded-control px-3 text-small font-semibold",
-                  tab === "saved" ? "bg-accent/15 text-accent" : "text-fg-muted hover:bg-hover",
+                  activeTab === "saved" ? "bg-accent/15 text-accent" : "text-fg-muted hover:bg-hover",
                 ].join(" ")}
               >
                 Saved ({title.saved_release_count})
@@ -480,7 +742,77 @@ export function ReleasesSection({
         </p>
       ) : null}
 
-      {showFind && activeTab === "find" ? (
+      {openReleaseItem ? (
+        <div className="flex flex-col gap-3 @min-[900px]:max-h-[calc(100dvh-14rem)] @min-[900px]:overflow-y-auto">
+          <button
+            type="button"
+            onClick={closeRelease}
+            className="w-fit text-small font-semibold text-fg-muted hover:text-fg"
+          >
+            ← Releases
+          </button>
+          <div className="flex flex-col gap-1 rounded-panel border border-border-subtle bg-panel px-panel py-row">
+            <ReleaseSummary release={openReleaseItem} />
+            {openReleaseItem.dead || openReleaseItem.last_checked_at ? (
+              <p className="flex flex-wrap items-center gap-2 text-micro text-fg-comment">
+                {openReleaseItem.last_checked_at ? (
+                  <span>Checked {formatChecked(openReleaseItem.last_checked_at)}</span>
+                ) : null}
+                {openReleaseItem.dead ? <span className={DEAD_PILL}>Dead</span> : null}
+                {openReleaseItem.resolved_from === "manual" ? (
+                  <span className={SAVED_PILL}>Manual</span>
+                ) : null}
+              </p>
+            ) : null}
+          </div>
+          {selectedEpisode ? (
+            <EpisodeDownload
+              release={openReleaseItem}
+              episodeId={selectedEpisode.id}
+              episodeLabel={selectedEpisode.label}
+              ensureRelease={() => ensureReleaseId(openReleaseItem)}
+              onQueued={(message) => {
+                setNotice(message);
+                invalidate();
+              }}
+              actions={
+                <>
+                  <button
+                    type="button"
+                    aria-pressed={openReleaseItem.is_saved}
+                    aria-label={`${openReleaseItem.is_saved ? "Unsave" : "Save"} ${
+                      openReleaseItem.filename ?? openReleaseItem.info_hash
+                    }`}
+                    disabled={saveMutation.isPending}
+                    onClick={() => saveMutation.mutate(openReleaseItem)}
+                    className={[
+                      "flex h-9 w-9 items-center justify-center rounded-control border text-title disabled:opacity-40",
+                      openReleaseItem.is_saved
+                        ? "border-accent/50 bg-accent/15 text-accent"
+                        : "border-border-strong text-fg-muted hover:bg-hover",
+                    ].join(" ")}
+                  >
+                    {openReleaseItem.is_saved ? "★" : "☆"}
+                  </button>
+                  <CopyMagnet magnet={openReleaseItem.magnet} iconOnly />
+                </>
+              }
+            />
+          ) : null}
+          <MagnetFiles
+            magnet={openReleaseItem.magnet}
+            releaseId={openReleaseItem.release_id}
+            episodeId={selectedEpisode?.id ?? null}
+            defaultOpen
+            showCopy={false}
+            ensureRelease={() => ensureReleaseId(openReleaseItem)}
+            onQueued={(message) => {
+              setNotice(message);
+              invalidate();
+            }}
+          />
+        </div>
+      ) : showFind && activeTab === "find" ? (
         <>
           {!isMovie && mode === "all" && seasons.length === 0 ? (
             <p className="rounded-panel border border-border-subtle bg-panel px-panel py-gutter text-small text-fg-muted">
@@ -566,17 +898,13 @@ export function ReleasesSection({
                     {provider}
                   </label>
                 ))}
-                {title.kind === "anime" ? (
-                  <>
-                    <p className="mt-2 border-t border-border-subtle pt-2 text-micro font-semibold text-fg-muted">Sources</p>
-                    {sourceChoices.map((source) => (
-                      <label key={source.id} className="flex items-center gap-2 rounded-control px-2 py-1 text-small text-fg-muted hover:bg-hover">
-                        <input type="checkbox" aria-label={`Source ${source.id}`} checked={effectiveSources.includes(source.id)} onChange={() => toggleSource(source.id)} />
-                        {source.number} · {source.label}
-                      </label>
-                    ))}
-                  </>
-                ) : null}
+                <p className="mt-2 border-t border-border-subtle pt-2 text-micro font-semibold text-fg-muted">Sources</p>
+                {sourceChoices.map((source) => (
+                  <label key={source.id} className="flex items-center gap-2 rounded-control px-2 py-1 text-small text-fg-muted hover:bg-hover">
+                    <input type="checkbox" aria-label={`Source ${source.id}`} checked={effectiveSources.includes(source.id)} onChange={() => toggleSource(source.id)} />
+                    {source.number} · {source.label}
+                  </label>
+                ))}
                 {providerHint ? (
                   <p role="status" className="text-micro text-warning">
                     {providerHint}
@@ -606,7 +934,12 @@ export function ReleasesSection({
 
           {findQuery.data ? (
             <>
-              <div className="flex flex-wrap items-center gap-2 text-small text-fg-comment">
+              <div
+                className={[
+                  "flex flex-wrap items-center gap-2 text-small text-fg-comment",
+                  isEpisodeMode ? "hidden" : "",
+                ].join(" ")}
+              >
                 <span>
                   Showing {findQuery.data.returned} of {findQuery.data.total}
                   {findQuery.data.total_unfiltered > findQuery.data.total
@@ -616,7 +949,7 @@ export function ReleasesSection({
                 {countLabel ? <span>· {countLabel}</span> : null}
                 {findQuery.data.sources_degraded?.map((source) => (
                   <span key={source} className="rounded-full bg-warning/15 px-2 py-0.5 text-warning">
-                    {releaseSourceLabel(source)} unavailable.
+                    {releaseSourceLabel(source)} unavailable; showing remaining results.
                   </span>
                 ))}
                 {findQuery.data.stale ? (
@@ -650,19 +983,42 @@ export function ReleasesSection({
                     </button>
                   ) : null}
                 </div>
-              ) : (
+              ) : isEpisodeMode ? (
                 <ul
-                  className={[
-                    "divide-y divide-border-subtle rounded-panel border border-border-subtle bg-panel",
-                    mode === "find" ? "max-h-[22rem] overflow-y-auto" : "",
-                  ].join(" ")}
+                  ref={scrollRef}
+                  className="max-h-[42rem] divide-y divide-border-subtle overflow-y-auto rounded-panel border border-border-subtle bg-panel @min-[900px]:max-h-[calc(100dvh-16rem)]"
                 >
+                  <li className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-border-subtle bg-panel px-panel py-2 text-small text-fg-comment">
+                    <span>
+                      Showing {findQuery.data.returned} of {findQuery.data.total}
+                      {findQuery.data.total_unfiltered > findQuery.data.total
+                        ? ` (${findQuery.data.total_unfiltered} before filters)`
+                        : ""}
+                    </span>
+                    {countLabel ? <span>· {countLabel}</span> : null}
+                    {findQuery.data.stale ? (
+                      <span className="rounded-full bg-warning/15 px-2 py-0.5 text-warning">
+                        Showing cached results
+                      </span>
+                    ) : null}
+                  </li>
+                  {findQuery.data.releases.map((release) => (
+                    <EpisodeReleaseRow
+                      key={release.info_hash}
+                      release={release}
+                      active={lastViewed === release.info_hash}
+                      onOpen={() => openRelease(release)}
+                    />
+                  ))}
+                </ul>
+              ) : (
+                <ul className="divide-y divide-border-subtle rounded-panel border border-border-subtle bg-panel">
                   {findQuery.data.releases.map((release) => (
                     <li
                       key={release.info_hash}
                       className="flex flex-col gap-3 px-panel py-row"
                     >
-                      <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex flex-col gap-2">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-body font-semibold text-fg">
                             {release.filename ?? release.info_hash}
@@ -679,7 +1035,7 @@ export function ReleasesSection({
                           ) : null}
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <CopyMagnet magnet={release.magnet} compact />
+                          <CopyMagnet magnet={release.magnet} iconOnly />
                           <button
                             type="button"
                             aria-pressed={release.is_saved}
@@ -702,7 +1058,7 @@ export function ReleasesSection({
                             aria-label={`Download ${release.filename ?? release.info_hash}`}
                             disabled={downloadMutation.isPending}
                             onClick={() => downloadMutation.mutate(release)}
-                            className="min-h-control-sm rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
+                            className="min-h-control-sm rounded-control border border-accent/50 bg-accent/15 px-3 text-small font-semibold text-accent hover:bg-accent/25 disabled:opacity-40"
                           >
                             Download
                           </button>
@@ -724,6 +1080,7 @@ export function ReleasesSection({
                         magnet={release.magnet}
                         releaseId={release.release_id}
                         episodeId={isMovie ? null : (selectedEpisode?.id ?? null)}
+                        ensureRelease={() => ensureReleaseId(release)}
                         onQueued={(message) => {
                           setNotice(message);
                           invalidate();
@@ -804,100 +1161,117 @@ export function ReleasesSection({
           ) : null}
 
           {savedQuery.data && savedQuery.data.releases.length > 0 ? (
-            <ul className="divide-y divide-border-subtle rounded-panel border border-border-subtle bg-panel">
-              {savedQuery.data.releases.map((release) => (
-                <li key={release.id} className="flex flex-col gap-3 px-panel py-row">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-body font-semibold text-fg">
-                        {release.filename ?? release.info_hash}
-                      </p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-fg-muted">
-                        <span>{release.quality ?? "unknown"}</span>
-                        <span>· {formatSize(release.size_bytes)}</span>
-                        <span>· {release.seeders ?? 0} seeders</span>
-                        <SourceBadge release={release} />
-                      </p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-2 text-micro text-fg-comment">
-                        <span>Checked {formatChecked(release.last_checked_at)}</span>
-                        {release.dead ? <span className={DEAD_PILL}>Dead</span> : null}
-                        {release.resolved_from === "manual" ? (
-                          <span className={SAVED_PILL}>Manual</span>
+            <ul
+              className={[
+                "divide-y divide-border-subtle rounded-panel border border-border-subtle bg-panel",
+                isEpisodeMode
+                  ? "max-h-[34rem] overflow-y-auto @min-[900px]:max-h-[calc(100dvh-24rem)]"
+                  : "",
+              ].join(" ")}
+            >
+              {savedQuery.data.releases.map((release) =>
+                isEpisodeMode ? (
+                  <EpisodeReleaseRow
+                    key={release.id}
+                    release={release}
+                    active={lastViewed === release.info_hash}
+                    onOpen={() => openRelease(release)}
+                  />
+                ) : (
+                  <li key={release.id} className="flex flex-col gap-3 px-panel py-row">
+                    <div className="flex flex-col gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-body font-semibold text-fg">
+                          {release.filename ?? release.info_hash}
+                        </p>
+                        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-fg-muted">
+                          <span>{release.quality ?? "unknown"}</span>
+                          <span>· {formatSize(release.size_bytes)}</span>
+                          <span>· {release.seeders ?? 0} seeders</span>
+                          <SourceBadge release={release} />
+                        </p>
+                        <p className="mt-0.5 flex flex-wrap items-center gap-2 text-micro text-fg-comment">
+                          <span>Checked {formatChecked(release.last_checked_at)}</span>
+                          {release.dead ? <span className={DEAD_PILL}>Dead</span> : null}
+                          {release.resolved_from === "manual" ? (
+                            <span className={SAVED_PILL}>Manual</span>
+                          ) : null}
+                          {release.episode_id ? (
+                            <span>{episodeLabels.get(release.episode_id) ?? "episode"}</span>
+                          ) : null}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <CopyMagnet magnet={release.magnet} iconOnly />
+                        {release.dead ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (showTabs) {
+                                setTab("find");
+                              } else {
+                                document
+                                  .getElementById("episodes-heading")
+                                  ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+                              }
+                            }}
+                            className="min-h-control-sm rounded-control border border-warning/50 px-3 text-small font-semibold text-warning hover:bg-warning/10"
+                          >
+                            Find another
+                          </button>
                         ) : null}
-                        {release.episode_id ? (
-                          <span>{episodeLabels.get(release.episode_id) ?? "episode"}</span>
-                        ) : null}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <CopyMagnet magnet={release.magnet} compact />
-                      {release.dead ? (
                         <button
                           type="button"
-                          onClick={() => {
-                            if (showTabs) {
-                              setTab("find");
-                            } else {
-                              document
-                                .getElementById("episodes-heading")
-                                ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-                            }
-                          }}
-                          className="min-h-control-sm rounded-control border border-warning/50 px-3 text-small font-semibold text-warning hover:bg-warning/10"
+                          aria-pressed={release.is_saved}
+                          aria-label={`Unsave ${release.filename ?? release.info_hash}`}
+                          disabled={saveMutation.isPending}
+                          onClick={() => saveMutation.mutate(release)}
+                          className="flex h-9 w-9 items-center justify-center rounded-control border border-accent/50 bg-accent/15 text-title text-accent disabled:opacity-40"
                         >
-                          Find another
+                          ★
                         </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        aria-pressed={release.is_saved}
-                        aria-label={`Unsave ${release.filename ?? release.info_hash}`}
-                        disabled={saveMutation.isPending}
-                        onClick={() => saveMutation.mutate(release)}
-                        className="flex h-9 w-9 items-center justify-center rounded-control border border-accent/50 bg-accent/15 text-title text-accent disabled:opacity-40"
-                      >
-                        ★
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Download ${release.filename ?? release.info_hash}`}
-                        disabled={downloadMutation.isPending}
-                        onClick={() => downloadMutation.mutate(release)}
-                        className="min-h-control-sm rounded-control border border-border-strong px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-40"
-                      >
-                        Download
-                      </button>
+                        <button
+                          type="button"
+                          aria-label={`Download ${release.filename ?? release.info_hash}`}
+                          disabled={downloadMutation.isPending}
+                          onClick={() => downloadMutation.mutate(release)}
+                          className="min-h-control-sm rounded-control border border-accent/50 bg-accent/15 px-3 text-small font-semibold text-accent hover:bg-accent/25 disabled:opacity-40"
+                        >
+                          Download
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  {!isMovie && selectedEpisode ? (
-                    <EpisodeDownload
-                      release={release}
-                      episodeId={selectedEpisode.id}
-                      episodeLabel={selectedEpisode.label}
+                    {!isMovie && selectedEpisode ? (
+                      <EpisodeDownload
+                        release={release}
+                        episodeId={selectedEpisode.id}
+                        episodeLabel={selectedEpisode.label}
+                        ensureRelease={() => ensureReleaseId(release)}
+                        onQueued={(message) => {
+                          setNotice(message);
+                          invalidate();
+                        }}
+                      />
+                    ) : null}
+                    <MagnetFiles
+                      magnet={release.magnet}
+                      releaseId={release.id}
+                      episodeId={isMovie ? null : (selectedEpisode?.id ?? null)}
                       ensureRelease={() => ensureReleaseId(release)}
                       onQueued={(message) => {
                         setNotice(message);
                         invalidate();
                       }}
                     />
-                  ) : null}
-                  <MagnetFiles
-                    magnet={release.magnet}
-                    releaseId={release.id}
-                    episodeId={isMovie ? null : (selectedEpisode?.id ?? null)}
-                    onQueued={(message) => {
-                      setNotice(message);
-                      invalidate();
-                    }}
-                  />
-                </li>
-              ))}
+                  </li>
+                ),
+              )}
             </ul>
           ) : null}
         </>
       )}
 
-      {mode !== "find" ? (
+      {showSaved && activeTab === "saved" ? (
         <form
           className="flex flex-col gap-2 rounded-panel border border-border-subtle bg-panel px-panel py-row"
           onSubmit={(event) => {

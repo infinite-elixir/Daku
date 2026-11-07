@@ -184,6 +184,17 @@ def _info_line(title: str) -> str:
     return ""
 
 
+def _title_filename(title: str) -> str | None:
+    """Filename fallback from the stream title before the info line."""
+
+    lines: list[str] = []
+    for line in title.replace("\r", "").split("\n"):
+        if "👤" in line or "💾" in line or "⚙" in line:
+            break
+        lines.append(line)
+    return sanitize_filename(" ".join(line.strip() for line in lines if line.strip()))
+
+
 def _parse_seeders(info: str) -> int:
     match = SEEDERS_RE.search(info)
     if match is None:
@@ -227,9 +238,9 @@ def parse_stream(stream: Any) -> Release | None:
     raw_filename = hints.get("filename") if isinstance(hints, dict) else None
     filename = sanitize_filename(raw_filename)
     if filename is None:
-        # Torrentio always sends behaviorHints.filename; without it the row cannot be
-        # tied to a file, so drop it instead of inventing a name.
-        return None
+        filename = _title_filename(title)
+    if filename is None:
+        filename = f"release-{info_hash.strip().lower()[:12]}"
 
     info = _info_line(title)
     seeders = _parse_seeders(info)

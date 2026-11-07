@@ -11,6 +11,48 @@ from daku.repositories import titles as titles_repo
 from daku.services.metadata.models import EpisodeRef
 
 
+def _upgrade_to(engine: Engine, version: int) -> None:
+    for migration in MIGRATIONS:
+        if migration.version > version:
+            break
+        migration.upgrade(engine)
+        with engine.begin() as conn:
+            conn.exec_driver_sql(f"PRAGMA user_version = {migration.version}")
+
+
+def test_migration_15_rewrites_only_untouched_defaults(settings: Settings) -> None:
+    from daku.db import _migration_015
+    from daku.repositories import settings as settings_repo
+
+    engine = create_db_engine(settings.db_path)
+    try:
+        _upgrade_to(engine, 14)
+        factory = sessionmaker(bind=engine, expire_on_commit=False, class_=Session)
+        with factory() as session:
+            settings_repo.set_setting(
+                session,
+                "torrentio_config",
+                "providers=yts,eztv,1337x,thepiratebay,torrentgalaxy"
+                "|qualityfilter=scr,cam,unknown|sort=seeders",
+            )
+            settings_repo.set_setting(
+                session,
+                "providers_movie",
+                ["yts", "eztv", "1337x", "thepiratebay", "torrentgalaxy"],
+            )
+            settings_repo.set_setting(session, "providers_series", ["yts"])
+
+        _migration_015(engine)
+
+        with factory() as session:
+            assert settings_repo.get_setting(session, "torrentio_config") == "sort=seeders"
+            assert settings_repo.get_setting(session, "providers_movie") == []
+            # User intent is untouched.
+            assert settings_repo.get_setting(session, "providers_series") == ["yts"]
+    finally:
+        engine.dispose()
+
+
 def test_watch_columns_upgrade_existing_rows_as_untracked(
     settings: Settings,
 ) -> None:
@@ -40,7 +82,7 @@ def test_watch_columns_upgrade_existing_rows_as_untracked(
             )
 
         assert current_version(engine) == 13
-        assert migrate(engine) == SCHEMA_VERSION == 14
+        assert migrate(engine) == SCHEMA_VERSION == 15
 
         factory = sessionmaker(bind=engine, expire_on_commit=False, class_=Session)
         with factory() as session:

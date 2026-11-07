@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy.orm import Session
 
+from daku.config import DEFAULT_PROVIDERS
 from daku.db import get_session
 from daku.errors import AppError
 from daku.events import EventBus
@@ -26,6 +27,7 @@ class ReleasePatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     providers: dict[str, list[str]] | None = None
+    sources: dict[str, list[str]] | None = None
     min_quality: str | None = Field(default=None)
     sort: Literal["seeders", "quality", "size"] | None = None
     limit: int | None = Field(default=None, ge=1, le=200)
@@ -54,16 +56,9 @@ def _resolved(session: Session, request: Request) -> dict[str, Any]:
     defaults = {
         kind: settings_repo.effective_release_defaults(session, runtime, kind) for kind in KINDS
     }
-    config_providers = list(runtime.providers)
-    if not config_providers:
-        for part in runtime.torrentio_config.split("|"):
-            if part.lower().startswith("providers="):
-                config_providers = [
-                    item.strip().lower()
-                    for item in part.split("=", 1)[1].split(",")
-                    if item.strip()
-                ]
-                break
+    # The known provider catalogue, not a selection. An empty stored list means
+    # "all providers" and is returned as-is under ``providers``.
+    config_providers = list(dict.fromkeys([*DEFAULT_PROVIDERS, *runtime.providers]))
     first = defaults["movie"]
     stored_mpv = settings_repo.get_setting(session, "mpv_enabled", None)
     mpv_enabled = stored_mpv if isinstance(stored_mpv, bool) else runtime.mpv_enabled
@@ -78,7 +73,9 @@ def _resolved(session: Session, request: Request) -> dict[str, Any]:
         "sources": {
             "database": True,
             "config_keys": ["providers", "sort", "limit"],
-            "anime_sources": settings_repo.get_anime_sources(session),
+            "by_kind": {kind: settings_repo.get_sources(session, kind) for kind in KINDS},
+            # Legacy alias kept for older SPA builds.
+            "anime_sources": settings_repo.get_sources(session, "anime"),
         },
         "player": {
             "mpv_enabled": mpv_enabled,
@@ -141,6 +138,7 @@ def patch_settings(
 def _apply_release(session: Session, body: dict[str, Any]) -> None:
     unknown_release = set(body) - {
         "providers",
+        "sources",
         "min_quality",
         "sort",
         "limit",
@@ -153,16 +151,19 @@ def _apply_release(session: Session, body: dict[str, Any]) -> None:
     except ValidationError as exc:
         raise _invalid("Invalid release setting") from exc
     if release.anime_sources is not None:
-        raw_sources = [value.strip().lower() for value in release.anime_sources]
-        if not raw_sources or any(
-            value not in {*settings_repo.ANIME_SOURCES, "nyaa"} for value in raw_sources
-        ):
-            raise _invalid(
-                "Anime sources must include Torrentio or AnimeTosho",
-                {"anime_sources": raw_sources},
+        sources = settings_repo.normalize_sources("anime", release.anime_sources)
+        settings_repo.set_setting(session, "sources_anime", sources)
+    if release.sources is not None:
+        unknown = set(release.sources) - set(KINDS)
+        if unknown:
+            raise AppError(
+                code="UNKNOWN_SETTING",
+                message=f"Unknown source kind: {sorted(unknown)[0]}",
+                status_code=422,
             )
-        sources = settings_repo.normalize_anime_sources(raw_sources)
-        settings_repo.set_setting(session, "anime_sources", sources)
+        for kind, values in release.sources.items():
+            normalised_sources = settings_repo.normalize_sources(kind, values)
+            settings_repo.set_setting(session, f"sources_{kind}", normalised_sources)
     if release.providers is not None:
         unknown = set(release.providers) - set(KINDS)
         if unknown:
@@ -172,8 +173,8 @@ def _apply_release(session: Session, body: dict[str, Any]) -> None:
                 status_code=422,
             )
         for kind, providers in release.providers.items():
-            if not providers or len(providers) > 20:
-                raise _invalid("Each kind must have 1-20 providers", {"kind": kind})
+            if len(providers) > 20:
+                raise _invalid("Each kind must have 0-20 providers", {"kind": kind})
             normalised: list[str] = []
             for raw in providers:
                 value = raw.strip().lower()
@@ -181,8 +182,7 @@ def _apply_release(session: Session, body: dict[str, Any]) -> None:
                     raise _invalid(f"Invalid provider name: {raw!r}", {"kind": kind})
                 if value not in normalised:
                     normalised.append(value)
-            if not normalised:
-                raise _invalid("Each kind must have at least one provider", {"kind": kind})
+            # An empty list is valid and means "all providers".
             settings_repo.set_setting(session, f"providers_{kind}", normalised)
     if release.min_quality is not None:
         if release.min_quality not in MIN_QUALITIES:

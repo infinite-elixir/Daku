@@ -14,9 +14,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from daku.config import Settings
+from daku.errors import AppError
 from daku.models import Setting
+from daku.services.torrents.registry import available_sources
 
-ANIME_SOURCES: tuple[str, ...] = ("torrentio", "animetosho")
+ANIME_SOURCES: tuple[str, ...] = available_sources("anime")
+SOURCE_KINDS: tuple[str, ...] = ("movie", "series", "anime")
+DEFAULT_SOURCES: dict[str, list[str]] = {
+    "movie": ["torrentio", "torrents-csv"],
+    "series": ["torrentio", "torrents-csv"],
+    "anime": ["torrentio", "animetosho"],
+}
 
 DEFAULT_SETTING_KEYS: tuple[str, ...] = (
     "host",
@@ -43,6 +51,9 @@ DEFAULT_SETTING_KEYS: tuple[str, ...] = (
     "providers_movie",
     "providers_series",
     "providers_anime",
+    "sources_movie",
+    "sources_series",
+    "sources_anime",
     "anime_sources",
     "default_min_quality",
     "default_sort",
@@ -63,9 +74,13 @@ def default_settings_map(settings: Settings) -> dict[str, Any]:
     values = {key: getattr(settings, key) for key in DEFAULT_SETTING_KEYS if hasattr(settings, key)}
     values.update(
         {
-            "providers_movie": list(settings.providers),
-            "providers_series": list(settings.providers),
-            "providers_anime": list(settings.providers),
+            # An empty provider list means "all providers".
+            "providers_movie": [],
+            "providers_series": [],
+            "providers_anime": [],
+            "sources_movie": list(DEFAULT_SOURCES["movie"]),
+            "sources_series": list(DEFAULT_SOURCES["series"]),
+            "sources_anime": list(DEFAULT_SOURCES["anime"]),
             "anime_sources": list(ANIME_SOURCES),
             "default_min_quality": None,
             "default_sort": settings.sort,
@@ -108,25 +123,81 @@ def get_setting(session: Session, key: str, default: Any = None) -> Any:
     return _decode(row.value)
 
 
-def normalize_anime_sources(values: object) -> list[str]:
-    """Return the selectable anime sources, accepting the legacy ``nyaa`` value."""
+def normalize_sources(kind: str, values: object) -> list[str]:
+    """Return a valid source selection for ``kind``.
 
+    Unknown names and an empty selection are rejected. The legacy ``nyaa`` value is
+    accepted for anime and normalises to ``animetosho``.
+    """
+
+    available = available_sources(kind)
     if not isinstance(values, list):
-        return list(ANIME_SOURCES)
+        raise AppError(
+            code="INVALID_SOURCES",
+            message="Sources must be a list",
+            status_code=422,
+            detail={"kind": kind},
+        )
     normalised: list[str] = []
     for raw in values:
         if not isinstance(raw, str):
             continue
         value = raw.strip().lower()
-        if value == "nyaa":
+        if value == "nyaa" and kind == "anime":
             value = "animetosho"
-        if value in ANIME_SOURCES and value not in normalised:
+        if value in available and value not in normalised:
             normalised.append(value)
-    return normalised or list(ANIME_SOURCES)
+        else:
+            raise AppError(
+                code="INVALID_SOURCES",
+                message=f"Invalid source for {kind}: {raw!r}",
+                status_code=422,
+                detail={"kind": kind, "sources": values},
+            )
+    if not normalised:
+        raise AppError(
+            code="INVALID_SOURCES",
+            message="Choose at least one release source",
+            status_code=422,
+            detail={"kind": kind},
+        )
+    return normalised
+
+
+def get_sources(session: Session, kind: str) -> list[str]:
+    """Stored sources for one kind, falling back to the legacy anime key."""
+
+    stored = get_setting(session, f"sources_{kind}", None)
+    if isinstance(stored, list):
+        try:
+            return normalize_sources(kind, stored)
+        except AppError:
+            return list(DEFAULT_SOURCES.get(kind, ()))
+    if kind == "anime":
+        legacy = get_setting(session, "anime_sources", None)
+        if isinstance(legacy, list):
+            try:
+                return normalize_sources(kind, legacy)
+            except AppError:
+                pass
+    return list(DEFAULT_SOURCES.get(kind, ()))
+
+
+def effective_sources(session: Session, kind: str) -> list[str]:
+    return get_sources(session, kind)
+
+
+def normalize_anime_sources(values: object) -> list[str]:
+    """Backward-compatible anime helper, accepting the legacy ``nyaa`` value."""
+
+    try:
+        return normalize_sources("anime", values)
+    except AppError:
+        return list(DEFAULT_SOURCES["anime"])
 
 
 def get_anime_sources(session: Session) -> list[str]:
-    return normalize_anime_sources(get_setting(session, "anime_sources", list(ANIME_SOURCES)))
+    return get_sources(session, "anime")
 
 
 def set_setting(session: Session, key: str, value: Any) -> Setting:
@@ -166,18 +237,18 @@ def effective_release_defaults(session: Session, settings: Settings, kind: str) 
     if not isinstance(providers, list):
         providers = list(settings.providers)
         source = "config"
+        if not providers:
+            for part in settings.torrentio_config.split("|"):
+                if part.lower().startswith("providers="):
+                    providers = [
+                        item.strip().lower()
+                        for item in part.split("=", 1)[1].split(",")
+                        if item.strip()
+                    ]
+                    break
     else:
+        # ``[]`` is a deliberate "all providers" choice and must survive.
         source = "settings"
-    if not providers:
-        for part in settings.torrentio_config.split("|"):
-            if part.lower().startswith("providers="):
-                providers = [
-                    item.strip().lower()
-                    for item in part.split("=", 1)[1].split(",")
-                    if item.strip()
-                ]
-                source = "config"
-                break
     if not isinstance(sort, str):
         sort = settings.sort
     if not isinstance(limit, int) or isinstance(limit, bool):

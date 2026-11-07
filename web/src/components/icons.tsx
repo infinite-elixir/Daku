@@ -58,6 +58,25 @@ export function TrashIcon({ className = BASE }: IconProps) {
   );
 }
 
+export function ClipboardIcon({ className = BASE }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="6" y="4.5" width="12" height="16" rx="2" />
+      <path d="M9.5 4.5V3h5v1.5" />
+      <path d="M9 9h6M9 12.5h6M9 16h4" />
+    </svg>
+  );
+}
+
 export function EyeIcon({ className = BASE }: IconProps) {
   return (
     <svg

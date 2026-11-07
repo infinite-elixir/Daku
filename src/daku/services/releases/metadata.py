@@ -13,7 +13,7 @@ import json
 from collections.abc import Mapping
 from typing import Any, Literal
 
-ResolvedFrom = Literal["torrentio", "animetosho", "manual"]
+ResolvedFrom = Literal["torrentio", "animetosho", "torrents-csv", "manual"]
 
 SNAPSHOT_KEYS: tuple[str, ...] = (
     "source",
@@ -68,8 +68,12 @@ def resolved_from(row: Any) -> ResolvedFrom:
         return "torrentio"
     if value in {"animetosho", "nyaa"}:
         return "animetosho"
+    if value == "torrents-csv":
+        return "torrents-csv"
     if value == "manual":
         return "manual"
     if getattr(row, "provider", None) in {"animetosho", "nyaa"}:
         return "animetosho"
+    if getattr(row, "provider", None) == "torrents-csv":
+        return "torrents-csv"
     return "manual" if getattr(row, "provider", None) == "manual" else "torrentio"

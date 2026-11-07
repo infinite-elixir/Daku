@@ -58,6 +58,21 @@ function updateCache(queryClient: QueryClient, setter: (current: DownloadsRespon
 }
 
 /**
+ * Library availability is derived from media rows the worker writes after a
+ * download completes. Refresh the title and library views when that happens so
+ * an open title page stops showing "No file" without a manual reload.
+ */
+function invalidateLibraryViews(queryClient: QueryClient) {
+  void queryClient.invalidateQueries({ queryKey: ["title"] });
+  void queryClient.invalidateQueries({ queryKey: ["title-files"] });
+  void queryClient.invalidateQueries({ queryKey: ["library"] });
+}
+
+function finishedStatus(status: string | undefined): boolean {
+  return status === "complete" || status === "available";
+}
+
+/**
  * Subscribe the TanStack Query cache to `/api/events`.
  *
  * `EventSource` reconnects by itself. If it fails twice, or is unavailable in
@@ -76,6 +91,7 @@ export function useEventSource(url = "/api/events"): EventStreamState {
 
     const refetch = () => {
       void queryClient.invalidateQueries({ queryKey: DOWNLOADS_QUERY_KEY });
+      invalidateLibraryViews(queryClient);
     };
 
     const stopPolling = () => {
@@ -109,7 +125,19 @@ export function useEventSource(url = "/api/events"): EventStreamState {
       if (typeof record.id !== "string") {
         return;
       }
+      const previous = queryClient
+        .getQueryData<DownloadsResponse>(DOWNLOADS_QUERY_KEY)
+        ?.items.find((item) => item.id === record.id);
       updateCache(queryClient, (current) => applyDownloadPayload(current, record));
+      // A completed download may be published twice: first when the engine
+      // finishes, then again after inspection adds media_files. Refresh the
+      // library on the status change and whenever the file set grows.
+      const filesChanged =
+        (record.downloaded_files?.length ?? 0) !==
+        (previous?.downloaded_files?.length ?? 0);
+      if (finishedStatus(record.status) && (!finishedStatus(previous?.status) || filesChanged)) {
+        invalidateLibraryViews(queryClient);
+      }
     };
 
     const handleRemoved = (event: MessageEvent<string>) => {

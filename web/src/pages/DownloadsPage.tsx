@@ -132,7 +132,7 @@ export function DownloadsPage() {
   const rows = data?.items ?? [];
   const active = rows.filter(isActiveDownload);
   const completed = rows.filter(isCompletedDownload);
-  const failed = rows.filter(isFailedDownload);
+  const needsAttention = rows.filter(isFailedDownload);
 
   return (
     <section className="flex flex-col gap-section">
@@ -186,38 +186,31 @@ export function DownloadsPage() {
         </div>
       ) : isLoading ? (
         <p className="text-small text-fg-muted">Loading downloads…</p>
-      ) : rows.length === 0 ? (
-        <div className="rounded-panel border border-border-subtle bg-panel px-6 py-12 text-center">
-          <p className="text-h2 font-semibold tracking-tight text-fg">Nothing downloading</p>
-          <p className="mx-auto mt-1 max-w-[48ch] text-small text-fg-muted">
-            Pick a release from a title and it will appear here with live progress.
-          </p>
-        </div>
       ) : (
         <div className="flex flex-col gap-section">
+          {needsAttention.length > 0 ? (
+            <DownloadSection
+              title="Needs attention"
+              rows={needsAttention}
+              onAction={onAction}
+              onRemove={onRemove}
+              empty=""
+            />
+          ) : null}
           <DownloadSection
-            title="Active"
+            title="Downloading"
             rows={active}
             onAction={onAction}
             onRemove={onRemove}
-            empty="No active downloads."
+            empty="Nothing is downloading. Queue a release from a title page."
           />
           <DownloadSection
             title="Completed"
             rows={completed}
             onAction={onAction}
             onRemove={onRemove}
-            empty="Nothing completed yet."
+            empty="No completed downloads yet."
           />
-          {failed.length > 0 ? (
-            <DownloadSection
-              title="Needs attention"
-              rows={failed}
-              onAction={onAction}
-              onRemove={onRemove}
-              empty=""
-            />
-          ) : null}
         </div>
       )}
     </section>
@@ -246,11 +239,9 @@ function groupByTitle(rows: DownloadRecord[]): DownloadGroup[] {
   for (const group of result) {
     group.rows.sort((left, right) => left.created_at.localeCompare(right.created_at));
   }
-  result.sort((left, right) => {
-    const leftAt = left.rows.at(-1)?.updated_at ?? "";
-    const rightAt = right.rows.at(-1)?.updated_at ?? "";
-    return rightAt.localeCompare(leftAt);
-  });
+  const latest = (group: DownloadGroup) =>
+    group.rows.reduce((newest, row) => (row.updated_at > newest ? row.updated_at : newest), "");
+  result.sort((left, right) => latest(right).localeCompare(latest(left)));
   return result;
 }
 
@@ -282,18 +273,20 @@ function DownloadSection({
             const files = group.rows.flatMap((row) => row.downloaded_files ?? []);
             const size = files.reduce((total, file) => total + (file.size_bytes ?? 0), 0);
             return (
-              <section key={group.titleId ?? group.title} className="flex flex-col gap-3">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  {group.titleId ? (
-                    <Link
-                      to={`/title/${group.titleId}`}
-                      className="text-title font-semibold text-fg hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                    >
-                      {group.title}
-                    </Link>
-                  ) : (
-                    <h3 className="text-title font-semibold text-fg">{group.title}</h3>
-                  )}
+              <section key={group.titleId ?? group.title} className="flex min-w-0 flex-col gap-3">
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <h3 className="min-w-0 max-w-full truncate text-title font-semibold text-fg">
+                    {group.titleId ? (
+                      <Link
+                        to={`/title/${group.titleId}`}
+                        className="hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      >
+                        {group.title}
+                      </Link>
+                    ) : (
+                      group.title
+                    )}
+                  </h3>
                   {group.titleId && files.length > 0 ? (
                     <Link
                       to={`/title/${group.titleId}/files`}
@@ -302,15 +295,15 @@ function DownloadSection({
                       Files ({files.length})
                     </Link>
                   ) : null}
-                  {size > 0 ? (
-                    <span className="ml-auto text-small tabular-nums text-fg-muted">
+                  {files.length > 0 ? (
+                    <span className="ml-auto shrink-0 text-small tabular-nums text-fg-muted">
                       {formatBytes(size)}
                     </span>
                   ) : null}
                 </div>
-                <ul className="flex flex-col gap-3">
+                <ul className="flex min-w-0 flex-col gap-3">
                   {group.rows.map((row) => (
-                    <li key={row.id}>
+                    <li key={row.id} className="min-w-0">
                       <DownloadRow download={row} onAction={onAction} onRemove={onRemove} />
                     </li>
                   ))}
